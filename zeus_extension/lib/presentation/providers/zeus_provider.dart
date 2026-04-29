@@ -200,6 +200,11 @@ class ZeusNotifier extends StateNotifier<ZeusState> {
       if (text.isNotEmpty) {
         _voiceService.speak(text);
       }
+    } else if (type == 'AUDIO_RESPONSE') {
+      final audio = msg['audio'] ?? "";
+      if (audio.isNotEmpty) {
+        _voiceService.playBase64Audio(audio);
+      }
     } else if (type == 'pong') {
       // Keep-alive response from backend; no UI mutation needed.
     } else if (type == 'METRICS') {

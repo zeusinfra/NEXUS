@@ -97,18 +97,22 @@ class Agent:
     async def _call_llm_stream(self, messages: list):
         # O Gemini generator precisa ser consumido no thread que o criou ou de forma segura
         # Como o call_cloud_llm_stream é um generator síncrono no core_system, usamos to_thread
-        def gen():
-            yield from call_cloud_llm_stream(messages)
-        
+        def safe_next(i):
+            try:
+                return next(i), False
+            except StopIteration:
+                return None, True
+
         loop = asyncio.get_running_loop()
-        it = gen()
+        it = call_cloud_llm_stream(messages)
         
         while True:
-            try:
-                chunk = await loop.run_in_executor(None, next, it)
-                yield chunk
-            except StopIteration:
+            # Em Python 3.11+, StopIteration não pode ser levantado em um Future (run_in_executor)
+            # Usamos uma flag 'done' para sinalizar o fim de forma segura.
+            chunk, done = await loop.run_in_executor(None, safe_next, it)
+            if done:
                 break
+            yield chunk
 
     async def _broadcast(self, broadcast: Optional[BroadcastFn], payload: dict) -> None:
         if not broadcast:

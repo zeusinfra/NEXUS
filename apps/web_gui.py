@@ -16,6 +16,7 @@ import ipaddress
 import uuid
 from pathlib import Path
 from collections import Counter
+from communication.voice_service import voice_service
 from urllib.parse import urlparse
 from urllib.parse import parse_qs
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -315,6 +316,11 @@ async def speak(text, target: str = "all"):
     if not text or not text.strip():
         return
     try:
+        if not ENABLE_VOICE:
+            # Em modo somente texto, não enviamos o comando de voz nem para mobile
+            print(f"[ZEUS VOICE ALERT] {text}")
+            return
+
         # Sempre envia o comando de voz para App/Web.
         # Assim, o mobile continua falando mesmo que o TTS local do servidor esteja desabilitado.
         await broadcast_message({
@@ -323,10 +329,6 @@ async def speak(text, target: str = "all"):
             "voice": "pt-BR-AntonioNeural",
             "target": target,
         })
-
-        if not ENABLE_VOICE:
-            print(f"[ZEUS VOICE ALERT] {text}")
-            return
 
         # Mantém a fala no servidor quando habilitado
         await voice_module.speak(text)
@@ -1566,12 +1568,37 @@ async def api_chat(req: ChatReq, request: Request):
     await broadcast_message({"type": "HUD_STATUS", "text": "Núcleo cognitivo (Gemini 3) em processamento..."})
     
     try:
-        # Usamos .run() que consome o run_stream internamente e faz o broadcast dos chunks
-        reply = await react_agent.run(context_prompt, client_key=client_key, broadcast=broadcast_message)
+        # Buffer for sentence-by-sentence streaming TTS
+        sentence_buffer = ""
+        full_reply = ""
         
-        # Atualização de memória em background
+        async def voice_chunk_callback(token: str):
+            nonlocal sentence_buffer, full_reply
+            full_reply += token
+            sentence_buffer += token
+            
+            # If we find a sentence terminator, synthesize and send (ONLY if voice is enabled)
+            if ENABLE_VOICE and any(punct in token for punct in [".", "!", "?", "\n"]):
+                clean_sentence = sentence_buffer.strip()
+                if len(clean_sentence) > 5: # Avoid synthesizing tiny fragments
+                    audio_b64 = await voice_service.generate_speech_base64(clean_sentence)
+                    if audio_b64:
+                        await broadcast_message({"type": "AUDIO_RESPONSE", "audio": audio_b64})
+                    sentence_buffer = ""
+            elif not ENABLE_VOICE:
+                sentence_buffer = "" # Clear buffer if voice disabled
+
+        # Run with streaming enabled
+        reply = await react_agent.run(context_prompt, client_key=client_key, broadcast=broadcast_message, token_callback=voice_chunk_callback)
+        
+        # Synthesize any remaining text in buffer (ONLY if voice is enabled)
+        if ENABLE_VOICE and sentence_buffer.strip():
+            audio_b64 = await voice_service.generate_speech_base64(sentence_buffer.strip())
+            if audio_b64:
+                await broadcast_message({"type": "AUDIO_RESPONSE", "audio": audio_b64})
+
+        # Final memory update and logs
         asyncio.create_task(update_memory_after_chat(req.message, reply))
-        
         await broadcast_message({"type": "CHAT_AI", "id": msg_id, "source": source, "client_id": client_id, "message": reply})
         await broadcast_message({"type": "HUD_STATUS", "text": "Aguardando atividade neural..."})
         
@@ -1923,6 +1950,7 @@ if __name__ == "__main__":
     import sys
 
     if "--desktop" in sys.argv:
+        # Modo Desktop com GUI
         from PyQt6.QtWidgets import QApplication, QMainWindow
         from PyQt6.QtWebEngineWidgets import QWebEngineView
         from PyQt6.QtCore import QUrl
@@ -1970,7 +1998,20 @@ if __name__ == "__main__":
         window.setCentralWidget(browser)
         window.show()
         sys.exit(qt_app.exec())
+    elif "--headless" in sys.argv or "--server" in sys.argv:
+        # Modo Servidor Puro (Headless)
+        print(f"🌑 ZEUS em modo HEADLESS operacional em {SERVER_HOST}:{SERVER_PORT}")
+        ssl_opts = {}
+        if not DISABLE_SSL:
+            if os.path.exists("configs/key.pem") and os.path.exists("configs/cert.pem"):
+                ssl_opts = {"ssl_keyfile": "configs/key.pem", "ssl_certfile": "configs/cert.pem"}
+            elif os.path.exists("key.pem") and os.path.exists("cert.pem"):
+                ssl_opts = {"ssl_keyfile": "key.pem", "ssl_certfile": "cert.pem"}
+        
+        # Log level reduzido para não poluir o terminal headless
+        uvicorn.run(app, host=SERVER_HOST, port=SERVER_PORT, log_level="warning", **ssl_opts)
     else:
+        # Modo Web padrão
         ssl_opts = {}
         if not DISABLE_SSL:
             if os.path.exists("configs/key.pem") and os.path.exists("configs/cert.pem"):

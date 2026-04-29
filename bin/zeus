@@ -24,6 +24,10 @@ case "$1" in
     sphere|gui|3d|web)
         echo "🧠 Iniciando ZEUS Command Center (Browser)..."
         echo "🌐 Acesse: http://127.0.0.1:8080"
+        echo "🦀 Iniciando Microsserviços Rust (Watcher & Memory)..."
+        (cd watcher_rs && cargo run --release > ../logs/watcher.log 2>&1) &
+        (cd core-rust/zeus_memory && cargo run --release --bin memory_service > ../../logs/memory.log 2>&1) &
+        sleep 2
         "$PY" -m apps.web_gui
         ;;
     v4|core4|daemon)
@@ -31,8 +35,22 @@ case "$1" in
         echo "📝 Inbox: scratch/v4_inbox.txt (adicione texto lá para o core perceber)"
         "$PY" -m apps.zeus_v4
         ;;
+    server|headless)
+        echo "🌑 Iniciando ZEUS em modo Headless (Cérebro em Background)..."
+        echo "🦀 Iniciando Microsserviços Rust (Watcher & Memory)..."
+        (cd watcher_rs && cargo run --release > ../logs/watcher.log 2>&1) &
+        (cd core-rust/zeus_memory && cargo run --release --bin memory_service > ../../logs/memory.log 2>&1) &
+        sleep 2
+        echo "🧠 ZEUS Core operacional. Conecte-se via App Mobile."
+        "$PY" -m apps.web_gui --headless
+        ;;
     desktop|app)
         echo "🖥️  Iniciando ZEUS Command Center (Desktop App)..."
+        echo "🦀 Iniciando Microsserviços Rust (Watcher & Memory)..."
+        # Inicia Watcher na 8081 e Memory na 8082 em background
+        (cd watcher_rs && cargo run --release > ../logs/watcher.log 2>&1) &
+        (cd core-rust/zeus_memory && cargo run --release --bin memory_service > ../../logs/memory.log 2>&1) &
+        sleep 2
         "$PY" -m apps.web_gui --desktop
         ;;
     evolve|think|ev)

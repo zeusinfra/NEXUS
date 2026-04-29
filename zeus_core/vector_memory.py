@@ -30,11 +30,21 @@ class VectorMemory:
             self.rust_mem = None
             self.vectors: Dict[str, List[float]] = {}
             self.load()
+        
+        self.service_url = "http://127.0.0.1:8082"
+
+    def _call_service(self, endpoint: str, data: dict):
+        try:
+            resp = requests.post(f"{self.service_url}/{endpoint}", json=data, timeout=0.5)
+            if resp.status_code == 200:
+                return resp.json()
+        except Exception:
+            pass
+        return None
 
     def _evict_if_needed(self) -> None:
         """
         Mantém o uso de RAM sob controle removendo embeddings antigos.
-        Dict mantém ordem de inserção em Python 3.7+.
         """
         limit = self.max_vectors
         if not limit or limit <= 0:
@@ -68,36 +78,42 @@ class VectorMemory:
             with open(path, "r", encoding="utf-8", errors="ignore") as f:
                 content = f.read()
                 if content.strip():
-                    vector = self._get_embedding(content[:5000])
-                    if vector:
-                        if self.rust_mem:
-                            self.rust_mem.add_vector(path, vector)
-                        else:
-                            self.vectors[path] = vector
-                            self._evict_if_needed()
-                        # self.save() # REMOVIDO: Evita disk thrashing. web_gui gerencia persistência.
+                    self.index_text(path, content[:5000])
         except Exception as e:
             print(f"Indexing Error ({path}): {e}")
 
     def index_text(self, key: str, text: str):
-        """Armazena o embedding de um texto arbitrário (ex: contexto web)."""
+        """Armazena o embedding de um texto arbitrário."""
         if not text or not text.strip():
             return
         vector = self._get_embedding(text[:5000])
-        if vector:
-            if self.rust_mem:
-                self.rust_mem.add_vector(key, vector)
-            else:
-                self.vectors[key] = vector
-                self._evict_if_needed()
-            # self.save() # REMOVIDO: web_gui gerencia persistência.
+        if not vector:
+            return
+
+        # Tenta o Microsserviço Rust primeiro
+        res = self._call_service("add", {"key": key, "vector": vector})
+        if res:
+            return
+
+        # Fallback local
+        if self.rust_mem:
+            self.rust_mem.add_vector(key, vector)
+        else:
+            self.vectors[key] = vector
+            self._evict_if_needed()
 
     def find_similar(self, query: str, top_k: int = 3) -> List[Tuple[str, float]]:
-        """Encontra os arquivos mais similares semanticamente à query."""
+        """Encontra os itens mais similares semanticamente."""
         query_vector = self._get_embedding(query)
         if not query_vector:
             return []
 
+        # Tenta o Microsserviço Rust primeiro
+        res = self._call_service("query", {"vector": query_vector, "top_k": top_k})
+        if res:
+            return [(item[0], item[1]) for item in res]
+
+        # Fallback local
         if self.rust_mem:
             return self.rust_mem.find_similar(query_vector, top_k)
 

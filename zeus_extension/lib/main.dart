@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'presentation/screens/login_screen.dart';
+import 'presentation/screens/voice_conversation_screen.dart';
 
 void main() {
   runApp(const ProviderScope(child: ZeusApp()));
@@ -39,7 +39,7 @@ class ZeusApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const LoginScreen(),
+      home: const VoiceConversationScreen(),
     );
   }
 }

@@ -2,7 +2,8 @@ import os
 import json
 import requests
 import datetime
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 # --- CARREGADOR DE AMBIENTE LOCAL (.env) ---
 def _load_local_env():
@@ -29,10 +30,13 @@ MAX_PROMPT_CHARS = int(os.getenv("ZEUS_MAX_PROMPT_CHARS", "16000") or "16000")
 
 GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
 
+# Cliente Global do Gemini (Novo SDK google-genai)
+_GEMINI_CLIENT = None
 if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-    # Modelo padrão para casos simples
-    _GEMINI_DEFAULT_MODEL = genai.GenerativeModel(GEMINI_MODEL_NAME)
+    try:
+        _GEMINI_CLIENT = genai.Client(api_key=GEMINI_API_KEY)
+    except Exception as e:
+        print(f" [ZEUS] Erro ao inicializar cliente Gemini: {e}")
 
 def _extract_message_content(data):
     """Aceita formatos estilo Ollama e compatíveis com OpenAI."""
@@ -92,10 +96,10 @@ class CloudAgent:
             ]
         )
 
-def _format_messages_for_gemini(messages):
-    """Converte formato OpenAI/Ollama para o formato nativo do Gemini."""
+def _format_messages_for_genai(messages):
+    """Converte formato OpenAI/Ollama para o formato nativo do novo SDK google-genai."""
     system_instruction = None
-    history = []
+    contents = []
     
     for m in messages:
         role = m["role"]
@@ -104,12 +108,11 @@ def _format_messages_for_gemini(messages):
         if role == "system":
             system_instruction = content
         elif role == "user":
-            history.append({"role": "user", "parts": [content]})
+            contents.append(types.Content(role="user", parts=[types.Part(text=content)]))
         elif role in ["assistant", "model"]:
-            history.append({"role": "model", "parts": [content]})
+            contents.append(types.Content(role="model", parts=[types.Part(text=content)]))
             
-    # print(f"DEBUG FORMAT: sys={system_instruction} hist_len={len(history)}")
-    return system_instruction, history
+    return system_instruction, contents
 
 
 def _trim_messages(messages):
@@ -144,27 +147,35 @@ def _trim_messages(messages):
 def call_cloud_llm(messages):
     messages = _trim_messages(messages)
     # Prioridade para o Gemini se a chave existir
-    if GEMINI_API_KEY:
+    if GEMINI_API_KEY and _GEMINI_CLIENT:
         try:
-            sys_inst, history = _format_messages_for_gemini(messages)
+            sys_inst, contents = _format_messages_for_genai(messages)
             
             # Debug parameters
-            print(f"DEBUG GEMINI: model={GEMINI_MODEL_NAME} sys_inst={sys_inst[:50] if sys_inst else None} history_len={len(history)}")
+            print(f"DEBUG GEMINI: model={GEMINI_MODEL_NAME} sys_inst={sys_inst[:50] if sys_inst else None} history_len={len(contents)}")
 
+            config = None
             if sys_inst:
-                model = genai.GenerativeModel(GEMINI_MODEL_NAME, system_instruction=sys_inst)
-            else:
-                model = _GEMINI_DEFAULT_MODEL
+                config = types.GenerateContentConfig(system_instruction=sys_inst)
             
-            if history:
-                last_msg = history.pop()
-                response = model.generate_content(history + [last_msg])
+            if contents:
+                response = _GEMINI_CLIENT.models.generate_content(
+                    model=GEMINI_MODEL_NAME,
+                    contents=contents,
+                    config=config
+                )
             else:
                 return "Error: No messages to process."
 
             if response.text:
                 return response.text
         except Exception as e:
+            err_msg = str(e)
+            if "429" in err_msg or "quota" in err_msg.lower():
+                print(f"\n[ZEUS WARNING] Quota do Gemini excedida (429).")
+                print(f"Considere ativar o Ollama (.env: ZEUS_DISABLE_OLLAMA=0) ou aguardar o reset da quota.\n")
+                return f"Error: Gemini Quota Exceeded (429). {err_msg[:100]}"
+            
             import traceback
             traceback.print_exc()
             print(f" [ZEUS] Erro no Gemini, fallback para Ollama: {e}")
@@ -205,23 +216,30 @@ def call_cloud_llm(messages):
 def call_cloud_llm_stream(messages):
     """Versão streaming para interação em tempo real."""
     messages = _trim_messages(messages)
-    if GEMINI_API_KEY:
+    if GEMINI_API_KEY and _GEMINI_CLIENT:
         try:
-            sys_inst, history = _format_messages_for_gemini(messages)
+            sys_inst, contents = _format_messages_for_genai(messages)
             
+            config = None
             if sys_inst:
-                model = genai.GenerativeModel(GEMINI_MODEL_NAME, system_instruction=sys_inst)
-            else:
-                model = _GEMINI_DEFAULT_MODEL
+                config = types.GenerateContentConfig(system_instruction=sys_inst)
             
-            if history:
-                last_msg = history.pop()
-                response = model.generate_content(history + [last_msg], stream=True)
+            if contents:
+                response = _GEMINI_CLIENT.models.generate_content_stream(
+                    model=GEMINI_MODEL_NAME,
+                    contents=contents,
+                    config=config
+                )
                 for chunk in response:
                     if chunk.text:
                         yield chunk.text
                 return
         except Exception as e:
+            err_msg = str(e)
+            if "429" in err_msg or "quota" in err_msg.lower():
+                yield f"[QUOTA EXCEEDED] O limite de uso do Gemini foi atingido. Por favor, aguarde ou ative o Ollama."
+                return
+                
             import traceback
             traceback.print_exc()
             print(f" [ZEUS] Erro no Gemini Stream: {e}")
