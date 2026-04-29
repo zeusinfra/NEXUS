@@ -1,0 +1,70 @@
+#!/bin/bash
+# ══════════════════════════════════════
+#  ZEUS — Launcher Unificado
+# ══════════════════════════════════════
+DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT_DIR="$(dirname "$DIR")"
+VENV="$ROOT_DIR/.venv/bin/python"
+SYS="python3"
+
+# Usa venv se existir, senão usa sistema
+PY="$SYS"
+[[ -f "$VENV" ]] && PY="$VENV"
+
+# Força UTF-8
+export PYTHONIOENCODING=utf-8
+export LC_ALL=C.UTF-8
+export LANG=C.UTF-8
+
+# Suprime mensagens de debug ALSA/JACK (sem quebrar o PortAudio)
+export ALSA_CARD=0
+export SDL_AUDIODRIVER=pulseaudio
+
+case "$1" in
+    sphere|gui|3d|web)
+        echo "🧠 Iniciando ZEUS Command Center (Browser)..."
+        echo "🌐 Acesse: http://127.0.0.1:8080"
+        "$PY" -m apps.web_gui
+        ;;
+    v4|core4|daemon)
+        echo "🧠 Iniciando ZEUS Cognitive Core v4 (Loop contínuo)..."
+        echo "📝 Inbox: scratch/v4_inbox.txt (adicione texto lá para o core perceber)"
+        "$PY" -m apps.zeus_v4
+        ;;
+    desktop|app)
+        echo "🖥️  Iniciando ZEUS Command Center (Desktop App)..."
+        "$PY" -m apps.web_gui --desktop
+        ;;
+    evolve|think|ev)
+        echo "🌀 Iniciando Motor de Evolução..."
+        "$PY" -m apps.zeus_evolution
+        ;;
+    logs)
+        echo "📜  Monitorando logs do ZEUS..."
+        tail -f zeus_server.log
+        ;;
+    setup-aliases)
+        echo "🔧  Configurando aliases globais em ~/.bashrc e ~/.zshrc..."
+        for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
+            if [ -f "$rc" ]; then
+                grep -q "alias zeus-server" "$rc" || echo "alias zeus-server='cd $ROOT_DIR && ./bin/zeus web > zeus_server.log 2>&1 & sleep 1 && tail -f zeus_server.log'" >> "$rc"
+                grep -q "alias zeus-desktop" "$rc" || echo "alias zeus-desktop='cd $ROOT_DIR && ./bin/zeus desktop'" >> "$rc"
+                echo "✅  Aliases adicionados a $rc"
+            fi
+        done
+        echo "🔄  Execute 'source ~/.zshrc' (ou .bashrc) para ativar."
+        ;;
+    *)
+        echo "╔════════════════════════════════════╗"
+        echo "║     ZEUS — Command Launcher        ║"
+        echo "╚════════════════════════════════════╝"
+        echo ""
+        echo "  ./zeus web           → Iniciar Servidor (Browser)"
+        echo "  ./zeus desktop       → Iniciar App Desktop (PyQt)"
+        echo "  ./zeus logs          → Ver logs em tempo real"
+        echo "  ./zeus setup-aliases → Instalar aliases zeus-server/zeus-desktop"
+        echo "  ./zeus v4            → Core v4 (loop contínuo)"
+        echo "  ./zeus evolve        → Motor de Evolução"
+        echo ""
+        ;;
+esac

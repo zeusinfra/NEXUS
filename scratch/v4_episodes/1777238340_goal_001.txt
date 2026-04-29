@@ -1,0 +1,4 @@
+Goal: Otimizar workflow do usuário
+Situation: os_pressure_active
+Plan: Otimizar workflow do usuário
+Reward: 0.2477390683438018

@@ -1,0 +1,32 @@
+name: zeus_extension
+description: A complete cognitive extension for the ZEUS OS.
+version: 1.0.6+6
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_riverpod: ^2.4.9
+  http: ^1.2.0
+  web_socket_channel: ^3.0.3
+  firebase_core: ^2.24.2
+  firebase_messaging: ^14.7.10
+  flutter_local_notifications: ^17.0.0
+  flutter_tts: ^3.8.5
+  speech_to_text: ^7.3.0
+  shared_preferences: ^2.2.2
+  intl: ^0.19.0
+  fl_chart: ^0.66.0
+  google_fonts: ^6.1.0
+  glassmorphism_ui: ^0.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+
+flutter:
+  uses-material-design: true
+  # Adicione fontes futuristas aqui se necessário

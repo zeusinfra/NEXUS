@@ -1,0 +1,4 @@
+Goal: Otimizar workflow do usuário
+Situation: active_editing
+Plan: Otimizar workflow do usuário mitigando picos de pressão de sistema e analisando gargalos de I/O
+Reward: 0.5961760619349882

@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package zeus_core;
+
+// The main service for controlling the OS
+service ZeusCore {
+  // Executes a command after simulation and validation
+  rpc ExecuteAction (ActionRequest) returns (ActionResponse);
+  
+  // Simulates a command in the shadow environment
+  rpc SimulateAction (SimulationRequest) returns (SimulationResponse);
+  
+  // Streams system telemetry (CPU, RAM, Processes)
+  rpc StreamTelemetry (TelemetryRequest) returns (stream TelemetryUpdate);
+  
+  // Manages the system mode (SAFE, DEV, AUTONOMOUS)
+  rpc SetMode (ModeRequest) returns (ModeResponse);
+}
+
+message ActionRequest {
+  string command = 1;
+  repeated string target_files = 2;
+  string goal_id = 3;
+}
+
+message ActionResponse {
+  bool success = 1;
+  string output = 2;
+  string error = 3;
+  string backup_id = 4;
+}
+
+message SimulationRequest {
+  string command = 1;
+  repeated string target_files = 2;
+}
+
+message SimulationResponse {
+  bool success = 1;
+  float confidence = 2;
+  string output = 3;
+  string error = 4;
+}
+
+message TelemetryRequest {
+  bool include_processes = 1;
+}
+
+message TelemetryUpdate {
+  float cpu_usage = 1;
+  float ram_usage = 2;
+  float disk_usage = 3;
+  repeated ProcessInfo processes = 4;
+}
+
+message ProcessInfo {
+  uint32 pid = 1;
+  string name = 2;
+  float cpu_percent = 3;
+  float mem_percent = 4;
+}
+
+message ModeRequest {
+  string mode = 1; // SAFE, DEV, AUTONOMOUS
+}
+
+message ModeResponse {
+  bool success = 1;
+  string current_mode = 2;
+}

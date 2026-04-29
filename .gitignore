@@ -1,0 +1,42 @@
+__pycache__/
+*.pyc
+.ruff_cache/
+.pytest_cache/
+
+# Virtual env (keep local; do not commit)
+.venv/
+
+# Rust
+**/target/
+
+# Flutter
+zeus_extension/.dart_tool/
+zeus_extension/build/
+zeus_extension/.idea/
+zeus_extension/*.iml
+
+# Logs / runtime artifacts
+logs/*.log
+logs/*.jsonl
+zeus_core.log
+zeus_server.log
+zeus_extension_v1.1.apk
+
+# Environment / Secrets
+.env
+.env.*
+
+# IDEs / Editors
+.vscode/
+.obsidian/
+.codex
+.kiro/
+
+# Local Data / DB
+data/
+*.db
+*.sqlite
+
+# OS files
+.DS_Store
+Thumbs.db
