@@ -25,6 +25,7 @@ zeus_extension_v1.1.apk
 # Environment / Secrets
 .env
 .env.*
+!.env.example
 
 # IDEs / Editors
 .vscode/
