@@ -1,121 +1,145 @@
-use notify::{Watcher, RecursiveMode, Config};
-use serde::{Serialize, Deserialize};
-use std::path::Path;
-use std::sync::mpsc::channel;
-use walkdir::WalkDir;
-use std::io::{self, Write};
-use std::thread;
-use std::time::Duration;
+use axum::{
+    extract::ws::{Message, WebSocket, WebSocketUpgrade},
+    response::IntoResponse,
+    routing::get,
+    Router,
+};
+use notify::{Config, RecursiveMode, Watcher};
+use serde::{Deserialize, Serialize};
+use std::{path::Path, sync::Arc, time::Duration};
+use sysinfo::System;
+use tokio::sync::broadcast;
+use tower_http::cors::CorsLayer;
 
-#[derive(Serialize, Deserialize, Debug)]
-struct FileEvent {
-    event_type: String,
-    path: String,
-    project: String,
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(tag = "type")]
+enum ZeusEvent {
+    #[serde(rename = "file_event")]
+    File {
+        event_kind: String,
+        path: String,
+        project: String,
+    },
+    #[serde(rename = "telemetry")]
+    Telemetry {
+        cpu_usage: f32,
+        ram_usage: f32,
+        disk_usage: f32,
+    },
+}
+
+struct AppState {
+    tx: broadcast::Sender<ZeusEvent>,
+}
+
+#[tokio::main]
+async fn main() {
+    dotenv::dotenv().ok();
+    
+    // Configurações
+    let port = std::env::var("ZEUS_WATCHER_PORT").unwrap_or_else(|_| "8081".to_string());
+    let (tx, _rx) = broadcast::channel(100);
+    let app_state = Arc::new(AppState { tx: tx.clone() });
+
+    // Loop de Telemetria (Background)
+    let tx_telemetry = tx.clone();
+    tokio::spawn(async move {
+        let mut sys = System::new_all();
+        loop {
+            sys.refresh_cpu();
+            sys.refresh_memory();
+            
+            let event = ZeusEvent::Telemetry {
+                cpu_usage: sys.global_cpu_info().cpu_usage(),
+                ram_usage: (sys.used_memory() as f32 / sys.total_memory() as f32) * 100.0,
+                disk_usage: 0.0, // Simplificado
+            };
+            
+            let _ = tx_telemetry.send(event);
+            tokio::time::sleep(Duration::from_secs(2)).await;
+        }
+    });
+
+    // Watcher de Arquivos (Background)
+    let tx_files = tx.clone();
+    tokio::spawn(async move {
+        let (watcher_tx, mut watcher_rx) = tokio::sync::mpsc::channel(100);
+        
+        let mut watcher = notify::RecommendedWatcher::new(
+            move |res| {
+                let _ = watcher_tx.blocking_send(res);
+            },
+            Config::default(),
+        ).expect("Error creating watcher");
+
+        let watch_dirs = vec![
+            std::env::var("HOME").unwrap_or_else(|_| "/home/zeus".to_string()) + "/Documentos/ZEUS_BRAIN",
+            std::env::var("HOME").unwrap_or_else(|_| "/home/zeus".to_string()) + "/Documentos/ZEUS_SYSTEM",
+        ];
+
+        for dir in watch_dirs {
+            if Path::new(&dir).exists() {
+                let _ = watcher.watch(Path::new(&dir), RecursiveMode::Recursive);
+            }
+        }
+
+        while let Some(res) = watcher_rx.recv().await {
+            if let Ok(event) = res {
+                for path in event.paths {
+                    if !is_ignored(&path) {
+                        let ev = ZeusEvent::File {
+                            event_kind: format!("{:?}", event.kind),
+                            path: path.to_string_lossy().into_owned(),
+                            project: get_project(&path),
+                        };
+                        // Mantém compatibilidade com o pipe do Python
+                        println!("{}", serde_json::to_string(&ev).unwrap());
+                        let _ = tx_files.send(ev);
+                    }
+                }
+            }
+        }
+    });
+
+    // Servidor WebSocket (Axum)
+    let app = Router::new()
+        .route("/ws", get(ws_handler))
+        .layer(CorsLayer::permissive())
+        .with_state(app_state);
+
+    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port)).await.unwrap();
+    println!("🧠 ZEUS Watcher Hub rodando em ws://0.0.0.0:{}/ws", port);
+    axum::serve(listener, app).await.unwrap();
+}
+
+async fn ws_handler(ws: WebSocketUpgrade, state: axum::extract::State<Arc<AppState>>) -> impl IntoResponse {
+    ws.on_upgrade(|socket| handle_socket(socket, state))
+}
+
+async fn handle_socket(mut socket: WebSocket, state: axum::extract::State<Arc<AppState>>) {
+    let mut rx = state.tx.subscribe();
+    
+    while let Ok(event) = rx.recv().await {
+        let msg = serde_json::to_string(&event).unwrap();
+        if socket.send(Message::Text(msg)).await.is_err() {
+            break;
+        }
+    }
 }
 
 fn get_project(path: &Path) -> String {
     let path_str = path.to_string_lossy();
-    if path_str.contains("ZEUS_BRAIN") {
-        return "ZEUS_BRAIN".to_string();
-    }
-    if path_str.contains("ZEUS_SYSTEM") {
-        return "ZEUS_SYSTEM".to_string();
-    }
-    "unknown".to_string()
+    if path_str.contains("ZEUS_BRAIN") { "ZEUS_BRAIN".to_string() }
+    else if path_str.contains("ZEUS_SYSTEM") { "ZEUS_SYSTEM".to_string() }
+    else { "unknown".to_string() }
 }
 
 fn is_ignored(path: &Path) -> bool {
-    let ignored = [
-        ".git",
-        ".venv",
-        "node_modules",
-        "__pycache__",
-        "target",
-        "dist",
-        ".cache",
-        ".dart_tool",
-        ".gradle",
-        "build",
-        "logs",
-        "vector_db",
-    ];
+    let ignored = [".git", ".venv", "node_modules", "__pycache__", "target", "dist", "build", "logs"];
     for part in path.components() {
         let p = part.as_os_str().to_string_lossy();
-        if p.starts_with('.') || ignored.contains(&p.as_ref()) {
-            return true;
-        }
-        // Evita tempestade de eventos de artefatos pesados mobile/dev.
-        if p == "zeus_extension" {
-            return true;
-        }
+        if p.starts_with('.') || ignored.contains(&p.as_ref()) { return true; }
+        if p == "zeus_extension" { return true; }
     }
     false
-}
-
-fn scan_files(root: &str) {
-    let mut emitted = 0usize;
-    for entry in WalkDir::new(root).into_iter().filter_map(|e| e.ok()) {
-        if entry.file_type().is_file() && !is_ignored(entry.path()) {
-            let ev = FileEvent {
-                event_type: "SCAN".to_string(),
-                path: entry.path().to_string_lossy().into_owned(),
-                project: get_project(entry.path()),
-            };
-            println!("{}", serde_json::to_string(&ev).unwrap());
-            emitted += 1;
-            if emitted % 40 == 0 {
-                io::stdout().flush().unwrap();
-                thread::sleep(Duration::from_millis(12));
-            }
-        }
-    }
-    io::stdout().flush().unwrap();
-}
-
-fn main() {
-    let skip_initial_scan = std::env::var("ZEUS_WATCHER_SKIP_INITIAL_SCAN")
-        .unwrap_or_else(|_| "1".to_string())
-        .to_lowercase();
-    let skip_initial_scan = matches!(skip_initial_scan.as_str(), "1" | "true" | "yes" | "on");
-
-    let watch_dirs = vec![
-        format!("{}/Documentos/ZEUS_BRAIN", std::env::var("HOME").unwrap_or_else(|_| "/home/zeus".to_string())),
-        format!("{}/Documentos/ZEUS_SYSTEM", std::env::var("HOME").unwrap_or_else(|_| "/home/zeus".to_string())),
-    ];
-
-    // Initial scan (opt-in). Por padrao desativado para reduzir latencia no boot.
-    if !skip_initial_scan {
-        for dir in &watch_dirs {
-            scan_files(dir);
-        }
-    }
-
-    let (tx, rx) = channel();
-    let mut watcher = notify::RecommendedWatcher::new(tx, Config::default()).expect("Error creating watcher");
-
-    for dir in watch_dirs {
-        if Path::new(&dir).exists() {
-            watcher.watch(Path::new(&dir), RecursiveMode::Recursive).expect("Error watching dir");
-        }
-    }
-
-    for res in rx {
-        match res {
-            Ok(event) => {
-                for path in event.paths {
-                    if !is_ignored(&path) {
-                        let ev = FileEvent {
-                            event_type: format!("{:?}", event.kind),
-                            path: path.to_string_lossy().into_owned(),
-                            project: get_project(&path),
-                        };
-                        println!("{}", serde_json::to_string(&ev).unwrap());
-                        io::stdout().flush().unwrap();
-                    }
-                }
-            }
-            Err(e) => eprintln!("Watch error: {:?}", e),
-        }
-    }
 }
