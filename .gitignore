@@ -14,6 +14,9 @@ zeus_extension/.dart_tool/
 zeus_extension/build/
 zeus_extension/.idea/
 zeus_extension/*.iml
+**/build/
+**/intermediates/
+**/outputs/
 
 # Logs / runtime artifacts
 logs/*.log
