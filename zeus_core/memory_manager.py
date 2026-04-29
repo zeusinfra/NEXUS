@@ -7,6 +7,12 @@ from datetime import datetime
 from typing import Dict, Any, List, Optional
 import logging
 
+try:
+    from zeus_synapse import SynapseManagerRust
+    SYNAPSE_RUST_AVAILABLE = True
+except ImportError:
+    SYNAPSE_RUST_AVAILABLE = False
+
 class MemoryManager:
     """
     ZEUS Memory Manager (PHASE 4 - Tiered Architecture)
@@ -22,6 +28,13 @@ class MemoryManager:
         
         # Initialize L2: Working Memory (SQLite)
         self._init_db()
+
+        if SYNAPSE_RUST_AVAILABLE:
+            print("🦀 ZEUS: Usando Backend Rust para Sinapses (L2).")
+            self.rust_synapse = SynapseManagerRust(db_path)
+        else:
+            print("🐍 ZEUS: Usando Backend Python para Sinapses (L2).")
+            self.rust_synapse = None
         
     def _init_db(self):
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
@@ -77,6 +90,13 @@ class MemoryManager:
     # --- L2: Working Memory Methods (SQLite) ---
     def update_synapse(self, source: str, target: str, weight_inc: int = 1):
         """Updates or creates a connection between two nodes in L2."""
+        if self.rust_synapse:
+            try:
+                self.rust_synapse.update_synapse(source, target, weight_inc)
+                return
+            except Exception as e:
+                self.logger.error(f"Rust Synapse Error: {e}")
+
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         now = datetime.now().isoformat()
@@ -105,6 +125,12 @@ class MemoryManager:
 
     def get_working_context(self, path: str, limit=5) -> List[str]:
         """Retrieves related paths (synapses) from L2."""
+        if self.rust_synapse:
+            try:
+                return self.rust_synapse.get_working_context(path, limit)
+            except Exception as e:
+                self.logger.error(f"Rust Synapse Recall Error: {e}")
+
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute('''
@@ -135,6 +161,14 @@ class MemoryManager:
     # --- Maintenance ---
     def decay_memory(self, factor=0.95):
         """Applies aging to synapses in L2 to simulate forgetting unimportant data."""
+        if self.rust_synapse:
+            try:
+                self.rust_synapse.decay_memory(factor)
+                self.logger.info("Memory decay applied to L2 (Rust).")
+                return
+            except Exception as e:
+                self.logger.error(f"Rust Decay Error: {e}")
+
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute('UPDATE synapses SET weight = MAX(1, CAST(weight * ? AS INTEGER))', (factor,))

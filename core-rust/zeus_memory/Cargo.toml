@@ -1,0 +1,20 @@
+[package]
+name = "zeus_memory"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "zeus_memory"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.20", features = ["extension-module"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+rayon = "1.8" # Para processamento paralelo ultra-rápido
+bincode = "1.3" # Serialização binária ultra-rápida
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

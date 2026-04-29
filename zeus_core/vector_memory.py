@@ -1,22 +1,35 @@
-
 import json
 import os
 import requests
 import numpy as np
 from typing import List, Dict, Tuple
 
+try:
+    from zeus_memory import VectorMemoryRust
+    RUST_AVAILABLE = True
+except ImportError:
+    RUST_AVAILABLE = False
+
 class VectorMemory:
     """
     Memória Vetorial Simplificada para ZEUS.
     Utiliza embeddings do Ollama e armazena em JSON para máxima portabilidade.
     """
-    def __init__(self, storage_file: str = "data/vector_memory.json", embedding_model: str = "all-minilm"):
+    def __init__(self, storage_file: str = "data/vector_memory.bin", embedding_model: str = "all-minilm"):
         self.storage_file = storage_file
         self.model = embedding_model
         self.url = "http://127.0.0.1:11434/api/embeddings"
-        self.vectors: Dict[str, List[float]] = {}
         self.max_vectors = int(os.getenv("ZEUS_VECTOR_MAX", "5000") or "5000")
-        self.load()
+        
+        if RUST_AVAILABLE:
+            print("🦀 ZEUS: Usando Backend Rust para Memória Vetorial.")
+            self.rust_mem = VectorMemoryRust(storage_file)
+            self.vectors = self.rust_mem.vectors
+        else:
+            print("🐍 ZEUS: Usando Backend Python para Memória Vetorial.")
+            self.rust_mem = None
+            self.vectors: Dict[str, List[float]] = {}
+            self.load()
 
     def _evict_if_needed(self) -> None:
         """
@@ -57,8 +70,11 @@ class VectorMemory:
                 if content.strip():
                     vector = self._get_embedding(content[:5000])
                     if vector:
-                        self.vectors[path] = vector
-                        self._evict_if_needed()
+                        if self.rust_mem:
+                            self.rust_mem.add_vector(path, vector)
+                        else:
+                            self.vectors[path] = vector
+                            self._evict_if_needed()
                         # self.save() # REMOVIDO: Evita disk thrashing. web_gui gerencia persistência.
         except Exception as e:
             print(f"Indexing Error ({path}): {e}")
@@ -69,8 +85,11 @@ class VectorMemory:
             return
         vector = self._get_embedding(text[:5000])
         if vector:
-            self.vectors[key] = vector
-            self._evict_if_needed()
+            if self.rust_mem:
+                self.rust_mem.add_vector(key, vector)
+            else:
+                self.vectors[key] = vector
+                self._evict_if_needed()
             # self.save() # REMOVIDO: web_gui gerencia persistência.
 
     def find_similar(self, query: str, top_k: int = 3) -> List[Tuple[str, float]]:
@@ -78,6 +97,9 @@ class VectorMemory:
         query_vector = self._get_embedding(query)
         if not query_vector:
             return []
+
+        if self.rust_mem:
+            return self.rust_mem.find_similar(query_vector, top_k)
 
         similarities = []
         for path, vector in self.vectors.items():
@@ -114,6 +136,13 @@ class VectorMemory:
         return sorted(similarities, key=lambda x: x[1], reverse=True)[:top_k]
 
     def save(self):
+        if self.rust_mem:
+            try:
+                self.rust_mem.save()
+            except Exception as e:
+                print(f"Rust Save Error: {e}")
+            return
+
         try:
             # Atomic write: save to temp then rename to avoid corruption
             temp_file = self.storage_file + ".tmp"
@@ -124,6 +153,13 @@ class VectorMemory:
             print(f"Save Error: {e}")
 
     def load(self):
+        if self.rust_mem:
+            try:
+                self.rust_mem.load()
+            except Exception as e:
+                print(f"Rust Load Error: {e}")
+            return
+
         if os.path.exists(self.storage_file):
             try:
                 with open(self.storage_file, "r", encoding="utf-8") as f:

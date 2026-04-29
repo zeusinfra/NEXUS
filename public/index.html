@@ -27,6 +27,9 @@ body{background:radial-gradient(circle at 50% 45%, rgba(0,229,255,.08), transpar
 .brand{display:flex;align-items:center;gap:10px;font-family:var(--hud);font-size:1.1rem;letter-spacing:4px;flex-wrap:wrap}
 .brand .dot{width:8px;height:8px;border-radius:50%;background:var(--c);box-shadow:0 0 8px var(--c);animation:blink 2s infinite}
 .online-tag{font-family:var(--mono);font-size:.65rem;padding:2px 8px;border-radius:99px;background:rgba(0,229,255,.1);color:var(--c);border:1px solid rgba(0,229,255,.2)}
+.rust-tag{font-family:var(--mono);font-size:.65rem;padding:2px 8px;border-radius:99px;background:rgba(255,165,0,.1);color:#ffa500;border:1px solid rgba(255,165,0,.2);margin-left:8px;display:none}
+.rust-tag.active{display:inline-block;animation:pulse-rust 2s infinite}
+@keyframes pulse-rust{0%,100%{box-shadow:0 0 5px rgba(255,165,0,.2)}50%{box-shadow:0 0 12px rgba(255,165,0,.5)}}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
 .top-center{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:.75rem;color:var(--muted);padding:6px 16px;border:1px solid var(--border);border-radius:99px;background:rgba(0,0,0,.3);min-width:0}
 .top-center .dot-sm{width:6px;height:6px;border-radius:50%;background:var(--c);box-shadow:0 0 6px var(--c)}
@@ -36,15 +39,15 @@ body{background:radial-gradient(circle at 50% 45%, rgba(0,229,255,.08), transpar
 .top-act:hover{transform:translateY(-1px);border-color:var(--c3);color:var(--c3);box-shadow:0 8px 22px rgba(0,229,255,.1)}
 .top-act.active{border-color:var(--c3);color:var(--c3)}
 
-/* CARDS */
-.card{background:linear-gradient(180deg, rgba(10,22,38,.86), rgba(7,15,28,.68));border:1px solid var(--border);border-radius:12px;overflow:hidden;backdrop-filter:blur(14px)}
-.card-h{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid rgba(0,229,255,.06);gap:8px;flex-wrap:wrap}
-.card-h h3{font-family:var(--hud);font-size:.7rem;letter-spacing:2px;color:var(--c);display:flex;align-items:center;gap:6px}
-.card-h .icon{font-size:.8rem}
+/* CARDS - Glassmorphism Refresh */
+.card{background:linear-gradient(135deg, rgba(13,26,43,0.55), rgba(8,18,32,0.4));border:1px solid rgba(0,229,255,0.15);border-radius:16px;overflow:hidden;backdrop-filter:blur(18px);box-shadow:0 8px 32px rgba(0,0,0,0.4), inset 0 0 10px rgba(0,229,255,0.05)}
+.card-h{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid rgba(0,229,255,0.1);gap:8px;background:rgba(0,229,255,0.03)}
+.card-h h3{font-family:var(--hud);font-size:.65rem;letter-spacing:3px;color:var(--c);display:flex;align-items:center;gap:8px;text-transform:uppercase;text-shadow:0 0 10px rgba(0,229,255,0.4)}
+.card-h .icon{font-size:.8rem;filter:drop-shadow(0 0 5px var(--c))}
 .card-h .actions{display:flex;gap:6px}
-.card-h .act-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:.75rem}
-.card-h .act-btn:hover{color:var(--c)}
-.card-body{padding:12px 14px}
+.card-h .act-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:.75rem;transition:color .2s}
+.card-h .act-btn:hover{color:var(--c3)}
+.card-body{padding:16px}
 
 /* LEFT PANEL */
 .left{display:flex;flex-direction:column;gap:12px;overflow-y:auto;transition:opacity .35s ease,transform .35s ease,filter .35s ease;min-width:0;padding-right:4px;}
@@ -53,29 +56,36 @@ body{background:radial-gradient(circle at 50% 45%, rgba(0,229,255,.08), transpar
 .left::-webkit-scrollbar-thumb{background:rgba(0,229,255,.15);border-radius:10px}
 .left::-webkit-scrollbar-thumb:hover{background:rgba(0,229,255,.3)}
 
-/* System Stats */
-.stat-row{margin-bottom:10px}
-.stat-label{display:flex;justify-content:space-between;font-size:.75rem;color:var(--muted);margin-bottom:4px}
-.stat-bar{height:4px;background:rgba(0,229,255,.08);border-radius:2px;overflow:hidden}
-.stat-fill{height:100%;background:var(--c);box-shadow:0 0 6px var(--c);transition:width .6s ease;border-radius:2px}
-.stat-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px}
-.stat-box{text-align:center;padding:8px;border:1px solid var(--border);border-radius:8px;background:rgba(0,0,0,.2)}
-.stat-box .val{font-family:var(--mono);font-size:.85rem;font-weight:700}
-.stat-box .lbl{font-size:.6rem;color:var(--muted);margin-top:2px}
+/* System Stats - Segmented Energy Bars */
+.stat-row{margin-bottom:16px}
+.stat-label{display:flex;justify-content:space-between;font-size:.7rem;color:rgba(224,240,255,0.6);margin-bottom:6px;font-family:var(--mono);text-transform:uppercase;letter-spacing:1px}
+.stat-label span:last-child{color:var(--c);font-weight:700}
+.stat-bar{height:6px;background:rgba(0,0,0,0.3);border-radius:3px;overflow:hidden;border:1px solid rgba(0,229,255,0.05);position:relative}
+.stat-fill{height:100%;background:linear-gradient(90deg, var(--c2), var(--c));box-shadow:0 0 12px var(--c);transition:width .8s cubic-bezier(0.16, 1, 0.3, 1);border-radius:3px;position:relative}
+.stat-fill::after{content:"";position:absolute;inset:0;background-image:linear-gradient(90deg, transparent 0%, transparent 70%, rgba(0,0,0,0.4) 71%, rgba(0,0,0,0.4) 100%);background-size:4px 100%;z-index:2}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:16px}
+.stat-box{text-align:center;padding:12px 8px;border:1px solid rgba(0,229,255,0.1);border-radius:10px;background:rgba(0,0,0,0.25);transition:border-color .3s}
+.stat-box:hover{border-color:rgba(0,229,255,0.3)}
+.stat-box .val{font-family:var(--mono);font-size:.95rem;font-weight:700;color:var(--text);text-shadow:0 0 8px rgba(0,229,255,0.2)}
+.stat-box .lbl{font-size:.55rem;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:1px}
 
 /* Log Panel */
 .log-scroll{max-height:260px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(0,229,255,.2) transparent;display:flex;flex-direction:column;gap:8px;padding-right:4px}
 .log-scroll::-webkit-scrollbar{width:4px}
 .log-scroll::-webkit-scrollbar-track{background:transparent}
 .log-scroll::-webkit-scrollbar-thumb{background:rgba(0,229,255,.2);border-radius:10px}
-.log-e{font-family:var(--mono);font-size:.67rem;padding:10px 12px;border:1px solid rgba(255,255,255,.05);opacity:.92;line-height:1.5;animation:lin .4s ease, flashBg .6s ease;border-radius:12px;background:rgba(5,12,22,.58)}
-.log-e.l{border-color:rgba(0,229,255,.18);box-shadow:inset 0 0 0 1px rgba(0,229,255,.04)}
-.log-e.e{border-color:rgba(0,255,170,.18);box-shadow:inset 0 0 0 1px rgba(0,255,170,.04)}
-.log-e.a{border-color:rgba(255,200,87,.2);box-shadow:inset 0 0 0 1px rgba(255,200,87,.04)}
-.log-e .ts{display:block;color:rgba(0,229,255,.42);margin-bottom:6px;font-size:.58rem;letter-spacing:.08em}
-.log-e strong{color:#fff;font-weight:700}
-@keyframes lin{from{transform:translateX(-10px);opacity:0}to{transform:translateX(0);opacity:.85}}
-@keyframes flashBg{0%{background:rgba(0,229,255,.4)}100%{}}
+.log-e{font-family:var(--mono);font-size:.62rem;padding:12px 14px;border:1px solid rgba(0,229,255,0.1);opacity:.9;line-height:1.6;animation:lin .5s cubic-bezier(0.23, 1, 0.32, 1), flashBg .8s ease;border-radius:14px;background:rgba(5,12,22,0.6);position:relative;overflow:hidden;transition:transform .2s, border-color .2s}
+.log-e:hover{transform:translateX(4px);border-color:rgba(0,229,255,0.3);background:rgba(0,229,255,0.05)}
+.log-e::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--c);opacity:.5}
+.log-e.l{border-color:rgba(0,229,255,0.2)}
+.log-e.e{border-color:rgba(255,80,80,0.3);background:rgba(255,80,80,0.05)}
+.log-e.e::before{background:#ff5050}
+.log-e.a{border-color:rgba(255,200,87,0.3);background:rgba(255,200,87,0.05)}
+.log-e.a::before{background:#ffc857}
+.log-e .ts{display:inline-block;color:var(--c);margin-bottom:6px;font-size:.55rem;letter-spacing:.1em;font-weight:700}
+.log-e strong{color:var(--text);font-weight:700;text-transform:uppercase;margin-right:4px}
+@keyframes lin{from{transform:translateX(-15px);opacity:0}to{transform:translateX(0);opacity:.9}}
+@keyframes flashBg{0%{background:rgba(0,229,255,0.3)}100%{}}
 
 /* Time Panel */
 .time-panel{display:grid;gap:10px}
@@ -86,9 +96,10 @@ body{background:radial-gradient(circle at 50% 45%, rgba(0,229,255,.08), transpar
 .time-chip{padding:8px;border-radius:10px;border:1px solid rgba(255,255,255,.05);background:rgba(0,0,0,.18);text-align:center}
 .time-chip .val{font-family:var(--mono);font-size:.78rem;font-weight:700}
 .time-chip .lbl{font-size:.58rem;color:var(--muted);margin-top:2px}
-.system-note{padding:9px 10px;border-radius:10px;background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.1)}
-.system-note .title{font-size:.62rem;color:var(--c3);text-transform:uppercase;letter-spacing:.1em}
-.system-note .body{margin-top:4px;font-size:.72rem;line-height:1.45}
+.system-note{padding:12px 14px;border-radius:14px;background:rgba(0,229,255,0.03);border:1px solid rgba(0,229,255,0.1);position:relative;overflow:hidden}
+.system-note::after{content:"";position:absolute;right:-10px;bottom:-10px;width:40px;height:40px;background:var(--c);opacity:.05;filter:blur(20px)}
+.system-note .title{font-size:.65rem;color:var(--c3);text-transform:uppercase;letter-spacing:2px;font-family:var(--hud);font-weight:700}
+.system-note .body{margin-top:8px;font-size:.78rem;line-height:1.6;color:rgba(224,240,255,0.8)}
 
 /* Uptime */
 .uptime-val{font-family:var(--mono);font-size:1.4rem;font-weight:700;text-align:center;margin:6px 0;text-shadow:0 0 10px rgba(0,229,255,.3)}
@@ -118,23 +129,27 @@ body{background:radial-gradient(circle at 50% 45%, rgba(0,229,255,.08), transpar
 .center-overlay.engaged{transform:translateY(-6px)}
 .core-status{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:.75rem;color:var(--c);padding:.4rem .9rem;border:1px solid rgba(0,229,255,.12);border-radius:999px;background:rgba(6,18,32,.36);box-shadow:0 0 22px rgba(0,229,255,.08)}
 .core-status .dot{width:6px;height:6px;border-radius:50%;background:var(--c);box-shadow:0 0 6px var(--c);animation:blink 1.5s infinite}
-.voice-io{display:flex;flex-direction:column;gap:8px;min-width:min(520px,92vw);padding:.55rem .75rem;border-radius:18px;border:1px solid rgba(0,229,255,.14);background:rgba(6,18,32,.42);box-shadow:0 0 36px rgba(0,229,255,.08);backdrop-filter: blur(8px)}
-.voice-io .row{display:flex;align-items:center;justify-content:space-between;gap:10px}
-.voice-io .title{font-family:var(--mono);font-size:.72rem;letter-spacing:.08em;color:rgba(224,240,255,.75);text-transform:uppercase}
-.voice-io .stage{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.voice-pill{display:flex;align-items:center;gap:8px;padding:.35rem .6rem;border-radius:999px;border:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.18);font-family:var(--mono);font-size:.72rem;color:rgba(224,240,255,.88)}
-.voice-pill .dot{width:7px;height:7px;border-radius:50%;background:rgba(180,220,255,.32);box-shadow:0 0 0 rgba(0,229,255,.0);transition:all .18s ease}
-.voice-pill .bars{display:flex;align-items:flex-end;gap:2px;height:12px}
-.voice-pill .bars span{width:2px;height:4px;border-radius:3px;background:rgba(0,229,255,.55);opacity:.6;animation:vu 1.1s infinite ease-in-out;transform-origin:bottom}
-.voice-pill .bars span:nth-child(2){animation-delay:.1s}
-.voice-pill .bars span:nth-child(3){animation-delay:.2s}
-.voice-pill .bars span:nth-child(4){animation-delay:.32s}
-.voice-pill .label{opacity:.92}
-.voice-io .sub{font-family:var(--mono);font-size:.74rem;color:rgba(224,240,255,.72);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.voice-io.idle .voice-pill .bars span{animation:none;height:3px;opacity:.28}
-.voice-io.listening #pill-in .dot{background:rgba(0,229,255,.55);box-shadow:0 0 10px rgba(0,229,255,.28)}
-.voice-io.transcribing #pill-in .dot{background:rgba(255,210,120,.65);box-shadow:0 0 10px rgba(255,210,120,.22)}
-.voice-io.speaking #pill-out .dot{background:rgba(255,120,170,.65);box-shadow:0 0 10px rgba(255,120,170,.22)}
+
+.voice-io{display:flex;flex-direction:column;gap:12px;min-width:min(620px,92vw);padding:1rem 1.4rem;border-radius:24px;border:1px solid rgba(0,229,255,0.2);background:rgba(8,18,32,0.55);box-shadow:0 0 50px rgba(0,0,0,0.4), inset 0 0 20px rgba(0,229,255,0.05);backdrop-filter:blur(20px);transition:all 0.5s ease;pointer-events:auto;}
+.voice-io .row{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.voice-io .title{font-family:var(--hud);font-size:.65rem;letter-spacing:.2em;color:var(--c);text-transform:uppercase;opacity:.8}
+.voice-io .stage{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.voice-pill{display:flex;align-items:center;gap:10px;padding:.5rem 1rem;border-radius:999px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);font-family:var(--mono);font-size:.7rem;color:rgba(224,240,255,0.9);box-shadow:0 4px 15px rgba(0,0,0,0.2)}
+.voice-pill .dot{width:8px;height:8px;border-radius:50%;background:rgba(180,220,255,0.2);transition:all .3s ease}
+.voice-pill .bars{display:flex;align-items:center;gap:3px;height:18px}
+.voice-pill .bars span{width:3px;height:4px;border-radius:4px;background:var(--c);opacity:.4;animation:vu 1s infinite ease-in-out;transform-origin:center;box-shadow:0 0 8px var(--c)}
+.voice-pill .bars span:nth-child(2){animation-delay:.15s;height:6px}
+.voice-pill .bars span:nth-child(3){animation-delay:.3s;height:8px}
+.voice-pill .bars span:nth-child(4){animation-delay:.45s;height:5px}
+.voice-pill .label{opacity:.8;font-weight:600;letter-spacing:1px}
+.voice-io .sub{font-family:var(--font);font-size:.85rem;color:rgba(224,240,255,0.85);margin-top:4px;letter-spacing:0.5px;min-height:1.2em}
+.voice-io.idle .voice-pill .bars span{animation:none;height:2px;opacity:.1}
+.voice-io.listening #pill-in .dot{background:var(--c);box-shadow:0 0 15px var(--c)}
+.voice-io.listening #pill-in .bars span{animation-duration:0.6s;opacity:0.8}
+.voice-io.transcribing #pill-in .dot{background:#ffd700;box-shadow:0 0 15px #ffd700}
+.voice-io.speaking #pill-out .dot{background:var(--c3);box-shadow:0 0 15px var(--c3)}
+.voice-io.speaking #pill-out .bars span{animation-duration:0.4s;opacity:0.9;background:var(--c3)}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes vu{0%,100%{height:3px;opacity:.35}40%{height:12px;opacity:.9}70%{height:6px;opacity:.6}}
 
 .app.sidebars-hidden{grid-template-columns:0 1fr}
@@ -142,6 +157,37 @@ body{background:radial-gradient(circle at 50% 45%, rgba(0,229,255,.08), transpar
 .app.sidebars-hidden .center{grid-column:1/-1}
 @keyframes aurora{0%,100%{transform:scale(1) translateY(0);opacity:.45}50%{transform:scale(1.08) translateY(-10px);opacity:.82}}
 @keyframes titleFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+
+/* NEURAL LABELS - High Vibrancy Refresh */
+.neural-label {
+    position: absolute;
+    font-family: var(--hud);
+    font-size: 0.68rem;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    padding: 6px 12px;
+    background: rgba(0, 0, 0, 0.6);
+    border-left: 3px solid var(--c);
+    pointer-events: none;
+    white-space: nowrap;
+    opacity: 0.7;
+    font-weight: 700;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    backdrop-filter: blur(6px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    z-index: 50; /* Lower than chat console */
+}
+.neural-label .line {
+    position: absolute;
+    width: 25px;
+    height: 2px;
+    background: var(--c);
+    left: -25px;
+    top: 50%;
+    opacity: 0.8;
+    box-shadow: 0 0 10px var(--c);
+}
 @media (max-width: 900px){
   .topbar{justify-content:center}
   .brand,.top-center,.top-right{width:100%;justify-content:center;text-align:center}
@@ -182,7 +228,7 @@ body{background:radial-gradient(circle at 50% 45%, rgba(0,229,255,.08), transpar
 <body>
 <div class="app">
   <header class="topbar">
-    <div class="brand">ZEUS CORE <span style="color:var(--c3)">GEMINI 3</span> <span class="dot"></span> <span class="online-tag">Online</span></div>
+    <div class="brand">ZEUS CORE <span style="color:var(--c3)">GEMINI 3</span> <span class="dot"></span> <span class="online-tag">Online</span> <span id="rust-badge" class="rust-tag">Rust Engine</span></div>
     <div class="top-center"><span class="dot-sm"></span><span id="clock">--:--:--</span> | <span id="date">--</span></div>
     <div class="top-right">
       <span id="weather">⚙</span>
@@ -254,6 +300,8 @@ body{background:radial-gradient(circle at 50% 45%, rgba(0,229,255,.08), transpar
         <div class="sub" id="voice-sub">Aguardando atividade neural...</div>
       </div>
     </div>
+    <!-- Floating Neural Labels -->
+    <div id="neural-labels-container" style="position:absolute; inset:0; pointer-events:none; z-index:10; overflow:hidden"></div>
   </main>
 
 
@@ -437,7 +485,24 @@ scene.add(plexusGroup);
 const NODE_COUNT = 1000;
 const CLUSTER_COUNT = 8;
 const CLUSTER_COLORS = [0x00e5ff, 0x8c3cff, 0x00ffaa, 0xff5050, 0xffd700, 0xff00d4, 0x2e6bff, 0xff7a18];
+const CLUSTER_NAMES = ["Core", "Logic", "Senses", "Synapse", "Archive", "Pulse", "Network", "Dynamics"];
 const clusterInfo = [];
+const neuralLabels = [];
+
+function initNeuralLabels() {
+    const container = document.getElementById('neural-labels-container');
+    container.innerHTML = '';
+    neuralLabels.length = 0;
+    
+    CLUSTER_NAMES.forEach((name, i) => {
+        const el = document.createElement('div');
+        el.className = 'neural-label';
+        el.style.borderColor = '#' + CLUSTER_COLORS[i].toString(16).padStart(6, '0');
+        el.innerHTML = `<div class="line" style="background:#${CLUSTER_COLORS[i].toString(16).padStart(6, '0')}"></div>${name}`;
+        container.appendChild(el);
+        neuralLabels.push({ el, color: CLUSTER_COLORS[i] });
+    });
+}
 
 function initKnowledgeGraph() {
   plexusGroup.clear();
@@ -501,29 +566,97 @@ function initKnowledgeGraph() {
   const edgeMesh = new THREE.LineSegments(edgeGeo, edgeMat);
   plexusGroup.add(edgeMesh);
   window.graphEdges = edgeMesh;
+
+  initNeuralLabels();
 }
 initKnowledgeGraph();
 
-const singularityGeo = new THREE.IcosahedronGeometry(0.18, 3);
-const singularityMat = new THREE.MeshBasicMaterial({ color: 0xffa500, transparent: true, opacity: 0.8 }); // Rust Orange
-const singularity = new THREE.Mesh(singularityGeo, singularityMat);
-window.singularity = singularity;
-scene.add(singularity);
+// --- ADVANCED NEURAL SINGULARITY ---
+const singularityGroup = new THREE.Group();
+scene.add(singularityGroup);
+
+// 1. Inner Core (The Power Source)
+const innerCoreGeo = new THREE.IcosahedronGeometry(0.15, 4);
+const innerCoreMat = new THREE.MeshPhongMaterial({ 
+  color: 0x00e5ff, 
+  emissive: 0x00e5ff,
+  emissiveIntensity: 3,
+  transparent: true,
+  opacity: 0.9 
+});
+const innerCore = new THREE.Mesh(innerCoreGeo, innerCoreMat);
+singularityGroup.add(innerCore);
+window.singularity = innerCore;
+
+// 2. Outer Wireframe Shell (Digital Structure)
+const shellGeo = new THREE.DodecahedronGeometry(0.28, 1);
+const shellMat = new THREE.MeshBasicMaterial({ 
+  color: 0x00e5ff, 
+  wireframe: true,
+  transparent: true,
+  opacity: 0.15,
+  blending: THREE.AdditiveBlending 
+});
+const shell = new THREE.Mesh(shellGeo, shellMat);
+singularityGroup.add(shell);
+window.coreShell = shell;
+
+// 3. Neural Dust (Particle Swarm)
+const particleCount = 180;
+const particleGeo = new THREE.BufferGeometry();
+const pPositions = new Float32Array(particleCount * 3);
+for(let i=0; i<particleCount * 3; i++) {
+  pPositions[i] = (Math.random() - 0.5) * 1.5;
+}
+particleGeo.setAttribute('position', new THREE.BufferAttribute(pPositions, 3));
+const pMat = new THREE.PointsMaterial({
+  color: 0x00e5ff,
+  size: 0.02,
+  transparent: true,
+  opacity: 0.4,
+  blending: THREE.AdditiveBlending
+});
+const pPoints = new THREE.Points(particleGeo, pMat);
+singularityGroup.add(pPoints);
+window.coreParticles = pPoints;
+
+// 4. Double Energy Rings
+const createRing = (radius, tiltX, tiltZ) => {
+  const ringGeo = new THREE.TorusGeometry(radius, 0.003, 16, 100);
+  const ringMat = new THREE.MeshBasicMaterial({ 
+    color: 0x00e5ff, 
+    transparent: true, 
+    opacity: 0.3,
+    blending: THREE.AdditiveBlending 
+  });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.rotation.x = tiltX;
+  ring.rotation.z = tiltZ;
+  return ring;
+};
+const ring1 = createRing(0.4, Math.PI / 2, 0.2);
+const ring2 = createRing(0.45, Math.PI / 3, -0.4);
+singularityGroup.add(ring1);
+singularityGroup.add(ring2);
+window.ring1 = ring1;
+window.ring2 = ring2;
 
 const coreSprite = new THREE.Sprite(new THREE.SpriteMaterial({
   map: new THREE.CanvasTexture((()=>{
     const c=document.createElement('canvas'); c.width=256; c.height=256;
     const ctx=c.getContext('2d');
-    // Cinematic anamorphic flare look
     const g=ctx.createRadialGradient(128,128,0,128,128,128);
-    g.addColorStop(0,'rgba(255,255,255,0.8)'); g.addColorStop(0.2,'rgba(0,229,255,0.3)'); g.addColorStop(0.5,'rgba(0,100,255,0.05)'); g.addColorStop(1,'rgba(0,0,0,0)');
+    g.addColorStop(0,'rgba(255,255,255,1)'); 
+    g.addColorStop(0.15,'rgba(0,229,255,0.6)'); 
+    g.addColorStop(0.4,'rgba(0,100,255,0.15)'); 
+    g.addColorStop(1,'rgba(0,0,0,0)');
     ctx.fillStyle=g; ctx.fillRect(0,0,256,256);
-    ctx.fillStyle='rgba(0,229,255,0.1)'; ctx.fillRect(0,126,256,4); // Horizontal flare line
+    ctx.fillStyle='rgba(0,229,255,0.2)'; ctx.fillRect(0,124,256,8); // Wider flare
     return c;
   })()),
-  blending: THREE.AdditiveBlending, transparent: true, opacity: 0.8
+  blending: THREE.AdditiveBlending, transparent: true, opacity: 0.9
 }));
-coreSprite.scale.set(3, 3, 1);
+coreSprite.scale.set(3.5, 3.5, 1);
 window.coreSprite = coreSprite;
 scene.add(coreSprite);
 
@@ -543,23 +676,20 @@ function createNeuralBridges() {
   bridgeGroup.clear();
   if (!clusterInfo.length) return;
 
-  // Core-to-cluster bridges
-  clusterInfo.forEach((cluster, idx) => {
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute([
-      0, 0, 0,
-      cluster.center.x, cluster.center.y, cluster.center.z
-    ], 3));
-    const mat = new THREE.LineBasicMaterial({
-      color: cluster.color,
-      transparent: true,
-      opacity: 0,
-      blending: THREE.AdditiveBlending
+    // Core-to-cluster bridges (Energy Beams)
+    clusterInfo.forEach((cluster, idx) => {
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, cluster.center.x, cluster.center.y, cluster.center.z], 3));
+        const mat = new THREE.LineBasicMaterial({
+            color: cluster.color,
+            transparent: true,
+            opacity: 0.1,
+            blending: THREE.AdditiveBlending
+        });
+        const line = new THREE.Line(geo, mat);
+        line.userData = { type: 'core', idx: idx, baseOpacity: 0.1 };
+        bridgeGroup.add(line);
     });
-    const line = new THREE.Line(geo, mat);
-    line.userData = { type: 'core', idx: idx };
-    bridgeGroup.add(line);
-  });
 
   // Inter-cluster bridges
   for (let i = 0; i < clusterInfo.length; i++) {
@@ -597,6 +727,74 @@ const PROJECT_VISUALS={
   OS_CORE:{color:[0.48,0.94,0.58],tilt:[-0.024,-0.012],spin:0.00024},
   unknown:{color:[0.4,0.7,0.9],tilt:[0,0],spin:0.0001},
 };
+
+const CLUSTER_MAP = {
+    CORE: 0, LOGIC: 1, SENSES: 2, SYNAPSE: 3, ARCHIVE: 4, PULSE: 5, NETWORK: 6, DYNAMICS: 7
+};
+
+// Animation loop update for core complexity
+function animateCore() {
+    const time = Date.now() * 0.001;
+    if(window.coreShell) {
+        window.coreShell.rotation.y += 0.005;
+        window.coreShell.rotation.x += 0.003;
+        const s = 1 + Math.sin(time * 2) * 0.05;
+        window.coreShell.scale.set(s, s, s);
+    }
+    if(window.ring1) window.ring1.rotation.z += 0.01;
+    if(window.ring2) window.ring2.rotation.z -= 0.008;
+    if(window.coreParticles) {
+        window.coreParticles.rotation.y += 0.002;
+        const positions = window.coreParticles.geometry.attributes.position.array;
+        for(let i=0; i<positions.length; i+=3) {
+            positions[i+1] += Math.sin(time + positions[i]) * 0.001;
+        }
+        window.coreParticles.geometry.attributes.position.needsUpdate = true;
+    }
+
+    // Update Neural Bridges (Beams) Visibility
+    if(window.bridgeGroup) {
+        bridgeGroup.children.forEach(beam => {
+            if(beam.userData.type === 'core') {
+                const idx = beam.userData.idx;
+                const active = (idx === window.dominantIdx || idx === window.closestCluster);
+                const targetOp = active ? (0.6 + Math.sin(Date.now()*0.01)*0.2) : 0.05;
+                beam.material.opacity += (targetOp - beam.material.opacity) * 0.1;
+            }
+        });
+    }
+
+    // Update Floating Labels
+    if (neuralLabels.length && clusterInfo.length && renderer) {
+        const widthHalf = canvas.clientWidth / 2;
+        const heightHalf = canvas.clientHeight / 2;
+        const tempVec = new THREE.Vector3();
+
+        clusterInfo.forEach((c, i) => {
+            tempVec.copy(c.center);
+            tempVec.project(camera);
+
+            const x = (tempVec.x * widthHalf) + widthHalf;
+            const y = -(tempVec.y * heightHalf) + heightHalf;
+
+            const label = neuralLabels[i];
+            if (label) {
+                if (tempVec.z < 1 && x > 0 && x < canvas.clientWidth && y > 0 && y < canvas.clientHeight) {
+                    label.el.style.display = 'block';
+                    const active = (i === window.dominantIdx || i === window.closestCluster);
+                    const color = '#' + CLUSTER_COLORS[i].toString(16).padStart(6, '0');
+                    label.el.style.opacity = active ? 1 : 0.65;
+                    label.el.style.borderColor = color;
+                    label.el.style.textShadow = active ? `0 0 10px ${color}, 0 0 20px ${color}` : `0 0 5px ${color}`;
+                    label.el.style.boxShadow = active ? `0 0 20px rgba(0,0,0,0.5), inset 0 0 10px ${color}33` : `0 0 10px rgba(0,0,0,0.5)`;
+                    label.el.style.transform = `translate(${x}px, ${y}px) scale(${active ? 1.1 : 1})`;
+                } else {
+                    label.el.style.display = 'none';
+                }
+            }
+        });
+    }
+}
 const WEB_CATEGORY_VISUALS={
   dev:{color:[0.5,0.86,1],entropy:0.42},
   docs:{color:[0.58,1,0.84],entropy:0.26},
@@ -721,8 +919,8 @@ function resetOrbState(){
   baseRotY=0;
   mouseNdc.set(999,999);
   if(controls){
-    controls.target.set(0,-0.08,0);
-    camera.position.set(0,0,4.1);
+    controls.target.set(0, 1.2, 0); // Shift target UP
+    camera.position.set(0, 1.2, 5.5); // Move camera back and UP
     controls.update();
   }
   pulseOrb(.2,.01,.01);
@@ -811,6 +1009,9 @@ function animate() {
   requestAnimationFrame(animate);
   if (!renderer || !orbReady || rendererLost) return;
   const t = Date.now() * 0.001;
+  // Update Advanced Core
+  animateCore();
+
   if (controls) controls.update();
 
   // Mood color interpolation
@@ -973,8 +1174,9 @@ function addMsg(role, text){
   const prefix = role==='user' ? '[USER]' : '[ZEUS]';
   addLog({title: prefix, detail: text}, role==='user' ? 'l' : 'e');
   if(role==='ai') {
-    // Clear status line when full message arrives in log
-    setCoreStatus('Aguardando atividade neural...');
+    pulseOrb(0.3);
+    setCoreStatus('Processando resposta neural...');
+    setTimeout(()=>setCoreStatus('Aguardando atividade neural...'), 2000);
   }
 }
 window.addMsg = addMsg;
@@ -988,7 +1190,14 @@ document.addEventListener('keydown',e=>{
   }
   if(e.key==='Escape')resetOrbState();
 });
+
 syncSidebarButton();
+
+setTimeout(() => {
+    resetOrbState();
+    initRustHub();
+    connectRealtime();
+}, 100);
 
 
 
@@ -1227,7 +1436,58 @@ function connectRealtime(){
     addLog({title:'Falha de conexao realtime',detail:String(err&&err.message||err||'erro'),meta:'retry=auto'},'a');
   });
 }
-connectRealtime();
+// === RUST HUB INTEGRATION ===
+function initRustHub() {
+    const badge = document.getElementById('rust-badge');
+    // window.location.hostname works for both local and LAN
+    const host = window.location.hostname || 'localhost';
+    const ws = new WebSocket(`ws://${host}:8081/ws`);
+
+    ws.onopen = () => {
+        console.log("🦀 ZEUS Rust Hub Connected");
+        if(badge) badge.classList.add('active');
+        setCoreStatus("Motor Rust conectado: Telemetria em tempo real ativa.");
+    };
+
+    ws.onmessage = (e) => {
+        try {
+            const data = JSON.parse(e.data);
+            if (data.type === 'telemetry') {
+                updateMetrics(data.cpu_usage, data.ram_usage);
+            } else if (data.type === 'file_event') {
+                reactToSignal('FILE_EVENT', data);
+            }
+        } catch (err) { console.error("Rust WS Error:", err); }
+    };
+
+    ws.onclose = () => {
+        if(badge) badge.classList.remove('active');
+        setTimeout(initRustHub, 5000); 
+    };
+}
+
+function updateMetrics(cpu, ram) {
+    const cpuV = document.getElementById('cpu-v');
+    const ramV = document.getElementById('ram-v');
+    const sgCpu = document.getElementById('sg-cpu');
+    const cpuB = document.getElementById('cpu-b');
+    const ramB = document.getElementById('ram-b');
+
+    if(cpuV) cpuV.textContent = `${cpu.toFixed(1)}%`;
+    if(ramV) ramV.textContent = `${ram.toFixed(1)}%`;
+    if(sgCpu) sgCpu.textContent = `${cpu.toFixed(0)}%`;
+    
+    if(cpuB) {
+        cpuB.style.width = `${cpu}%`;
+        if(cpu > 80) cpuB.style.background = '#ff5050';
+        else if(cpu > 50) cpuB.style.background = '#ffc857';
+        else cpuB.style.background = 'var(--c)';
+    }
+    if(ramB) ramB.style.width = `${ram}%`;
+    
+    if(cpu > 10) pulseOrb(0.01);
+}
+
 </script>
 </body>
 </html>
