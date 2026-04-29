@@ -1,78 +1,136 @@
-# ZEUS — Cognitive Operating System & AI Interface
+# 🧠 ZEUS — Cognitive Operating System & Neural Interface
 
-ZEUS is a modular, high-performance cognitive system designed to integrate large language models (LLMs), vision, voice, and browser control into a unified command center. It features a FastAPI backend, a Flutter-based mobile extension, and a Rust-powered file watcher.
+[![Status](https://img.shields.io/badge/Status-Active-brightgreen.svg)]()
+[![Version](https://img.shields.io/badge/Version-1.1.0-blue.svg)]()
+[![Architecture](https://img.shields.io/badge/Architecture-Decentralized-orange.svg)]()
+[![License](https://img.shields.io/badge/License-MIT-red.svg)](LICENSE)
 
-## 🚀 Key Features
+**ZEUS** is a modular, high-performance cognitive system designed to bridge human intent and machine execution. It integrates advanced LLMs, real-time vision, streaming voice synthesis, and autonomous system monitoring into a unified, neural-responsive command center.
 
-- **Multi-Modal Interaction**: Integrated support for Gemini, Ollama, and other LLMs.
-- **Cognitive Core**: Advanced memory hierarchy (long-term, vector memory, and synaptic maps).
-- **Unified Interface**: Accessible via Browser (FastAPI + WebSockets), Desktop App (PyQt wrapper), and Mobile (Flutter).
-- **Voice Sensing & ASR**: Real-time voice interaction and speech-to-text capabilities.
-- **Vision & Browser Control**: Ability to "see" and interact with web pages and local files.
-- **Evolution Engine**: Self-optimizing logic and pattern recognition.
+---
 
-## 🏗️ Architecture
+## 🌌 System Vision
 
-The project is divided into several modules:
+ZEUS is not just an assistant; it is a **Neural Interface** that decentralizes intelligence across your workspace. By combining high-speed Rust backends with the cognitive flexibility of Gemini and Ollama, ZEUS creates a persistent, evolving digital presence.
 
-- `zeus_core/`: The "brain" of the system, containing the agent logic, memory managers, and execution engines.
-- `apps/`: Main entry points for the system (Web GUI, Evolution Engine, v4 Core).
-- `zeus_extension/`: Flutter mobile application for remote control and cognitive sync.
-- `watcher_rs/` & `core-rust/`: High-performance Rust components for system monitoring and core operations.
-- `communication/`: WebSocket and API protocols for inter-component synchronization.
+---
 
-## 🛠️ Getting Started
+## 🏗️ Synaptic Architecture
 
-### Prerequisites
+The system operates through a polyglot orchestration layer, ensuring low-latency responses and robust memory retention.
 
-- Python 3.10+
-- Flutter SDK (for the mobile extension)
-- Rust (for the core-rust/watcher components)
-- Ollama or Gemini API Key (optional, for LLM features)
-
-### Installation
-
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/ZEUS_SYSTEM.git
-   cd ZEUS_SYSTEM
-   ```
-
-2. **Setup Virtual Environment**:
-   ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate
-   pip install -r requirements.txt
-   ```
-
-3. **Configure Environment Variables**:
-   Copy the example environment file (if available) or create a `.env` file in the root:
-   ```bash
-   # .env
-   GEMINI_API_KEY=your_key_here
-   ZEUS_LLM_URL=http://127.0.0.1:11434/api/chat
-   ```
-
-4. **Launch the System**:
-   Use the unified launcher in `bin/`:
-   ```bash
-   chmod +x bin/zeus
-   ./bin/zeus web      # Starts the Web Command Center
-   ./bin/zeus desktop  # Starts the Desktop App
-   ```
-
-## 📱 Mobile Extension
-
-The mobile extension is located in `zeus_extension/`. To build and run:
-```bash
-cd zeus_extension
-flutter pub get
-flutter run
+### High-Level Flow
+```mermaid
+graph TD
+    User((User)) <--> Mobile[Flutter HUD]
+    User <--> Web[Web Command Center]
+    
+    subgraph Core[ZEUS CORE]
+        API[FastAPI Backend]
+        LLM[Cognitive Engine - Gemini/Ollama]
+        Memory[(Synaptic Memory - SQLite/Vector)]
+        Watcher[Rust File Watcher]
+    end
+    
+    Mobile <-->|WS/JWT| API
+    Web <-->|Socket.IO| API
+    API <--> LLM
+    API <--> Memory
+    Watcher -->|Events| API
 ```
 
-## 📜 License
+### Cognitive Pipeline
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant H as Mobile/Web HUD
+    participant B as Backend (FastAPI)
+    participant C as Cognitive Core (LLM)
+    participant M as Synaptic Memory
 
-This project is licensed under the [MIT License](LICENSE) - see the LICENSE file for details. (Note: Adjust license as needed).
+    U->>H: Interaction (Voice/Text/Event)
+    H->>B: Encrypted Payload (JWT)
+    B->>M: Context Retrieval (RAG)
+    M-->>B: Relevant Memories
+    B->>C: Augmented Prompt
+    C-->>B: Streaming Response
+    B->>H: Real-time Update
+    B->>M: Consolidate Memory
+```
+
+---
+
+## 🚀 Key Capabilities
+
+- **🎙️ Neural Voice Pipeline**: Sentence-by-sentence streaming for near-zero latency interaction.
+- **👁️ Vision & Context Awareness**: Real-time analysis of screen, web, and local file states.
+- **🦀 Rust-Powered Sensors**: High-performance filesystem monitoring via `watcher_rs` for instant event detection.
+- **📱 Mobile HUD**: A Flutter-based extension providing a visual, responsive interface to the system's neural state.
+- **🧠 Advanced Memory**: Hybrid Relational (SQLite) and Vector (JSON/Embeddings) memory hierarchy.
+
+---
+
+## 🛠️ Technical Stack
+
+- **Backend**: Python 3.10+ (FastAPI, Socket.IO)
+- **Cognitive**: Gemini Pro API / Ollama (Local Fallback)
+- **Performance**: Rust (System Monitoring & Resource Intensive Tasks)
+- **Frontend**: 
+  - **Web**: Vanilla JS / HTML5 (Modern HUD Design)
+  - **Mobile**: Flutter (Dart)
+- **Infrastructure**: WebSocket-based real-time synchronization with JWT security.
+
+---
+
+## 🏁 Getting Started
+
+### 1. Synchronization
+Clone the repository and initialize the environment:
+```bash
+git clone https://github.com/geniusdev-tech/zeusOS.git
+cd zeusOS
+./bin/setup  # Optional setup script if available
+```
+
+### 2. Environment Configuration
+Create a `.env` file based on `.env.example`:
+```env
+GEMINI_API_KEY=your_key_here
+ZEUS_MOBILE_TOKEN=secure_token_here
+ALLOW_LAN=true
+```
+
+### 3. Execution
+Launch the core modules using the unified binary:
+```bash
+chmod +x bin/zeus
+./bin/zeus web      # Launch Web Command Center
+./bin/zeus watcher  # Launch Rust File Sensor
+```
+
+---
+
+## 📱 Mobile Deployment
+
+The **ZEUS Mobile HUD** is located in `zeus_extension/`.
+1. Ensure Flutter is installed.
+2. Run `flutter build apk --release` or install the pre-compiled `zeus_extension_v1.1.apk`.
+
+---
+
+## 📜 Repository Structure
+
+- `apps/`: Main entry points and service orchestrators.
+- `zeus_core/`: Cognitive logic, memory managers, and agent strategies.
+- `watcher_rs/`: High-performance Rust file monitoring.
+- `zeus_extension/`: Flutter mobile application.
+- `docs/`: Technical specifications and system analysis.
+
+---
+
+> [!TIP]
+> Use the `bin/zeus` command-line utility for the most streamlined experience across all system components.
 
 ---
 *ZEUS — The ultimate interface between human intelligence and machine cognition.*
+
