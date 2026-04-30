@@ -22,6 +22,8 @@ dependencies:
   google_fonts: ^6.1.0
   glassmorphism_ui: ^0.3.0
   audioplayers: ^6.0.0
+  window_manager: ^0.4.3
+  flutter_acrylic: ^1.1.4
 
 dev_dependencies:
   flutter_test:
