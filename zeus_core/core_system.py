@@ -2,8 +2,13 @@ import os
 import json
 import requests
 import datetime
-from google import genai
-from google.genai import types
+
+try:
+    from google import genai
+    from google.genai import types
+except ImportError:
+    genai = None
+    types = None
 
 # --- CARREGADOR DE AMBIENTE LOCAL (.env) ---
 def _load_local_env():
@@ -32,11 +37,13 @@ GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
 
 # Cliente Global do Gemini (Novo SDK google-genai)
 _GEMINI_CLIENT = None
-if GEMINI_API_KEY:
+if GEMINI_API_KEY and genai:
     try:
         _GEMINI_CLIENT = genai.Client(api_key=GEMINI_API_KEY)
     except Exception as e:
         print(f" [ZEUS] Erro ao inicializar cliente Gemini: {e}")
+elif GEMINI_API_KEY:
+    print(" [ZEUS] google-genai não está instalado; Gemini desativado, usando fallback.")
 
 def _extract_message_content(data):
     """Aceita formatos estilo Ollama e compatíveis com OpenAI."""
@@ -98,6 +105,9 @@ class CloudAgent:
 
 def _format_messages_for_genai(messages):
     """Converte formato OpenAI/Ollama para o formato nativo do novo SDK google-genai."""
+    if types is None:
+        raise RuntimeError("google-genai não está instalado.")
+
     system_instruction = None
     contents = []
     

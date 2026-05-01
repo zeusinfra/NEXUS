@@ -1,9 +1,11 @@
 import os
 import asyncio
-import edge_tts
 import base64
-from pydub import AudioSegment
-import io
+
+try:
+    import edge_tts
+except ImportError:
+    edge_tts = None
 
 # Configuração da voz do ZEUS
 # Sugestão: pt-BR-AntonioNeural (Masculino, Profundo, Autoritário)
@@ -19,6 +21,10 @@ class VoiceService:
         """
         Gera o áudio a partir do texto e retorna em Base64 para envio via WebSocket.
         """
+        if edge_tts is None:
+            print("[VOICE SERVICE ERROR] edge-tts não está instalado.")
+            return ""
+
         try:
             temp_file = os.path.join(self.output_dir, "response.mp3")
             communicate = edge_tts.Communicate(text, VOICE, rate="+5%", pitch="+0Hz")

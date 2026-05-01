@@ -22,7 +22,7 @@ The system operates through a polyglot orchestration layer, ensuring low-latency
 ### High-Level Flow
 ```mermaid
 graph TD
-    User((User)) <--> Mobile[Flutter HUD]
+    User((User)) <--> Bubble[Linux Desktop Bubble]
     User <--> Web[Web Command Center]
     
     subgraph Core[ZEUS CORE]
@@ -32,7 +32,7 @@ graph TD
         Watcher[Rust File Watcher]
     end
     
-    Mobile <-->|WS/JWT| API
+    Bubble <-->|WS/JWT| API
     Web <-->|Socket.IO| API
     API <--> LLM
     API <--> Memory
@@ -43,7 +43,7 @@ graph TD
 ```mermaid
 sequenceDiagram
     participant U as User
-    participant H as Mobile/Web HUD
+    participant H as Desktop Bubble / Web HUD
     participant B as Backend (FastAPI)
     participant C as Cognitive Core (LLM)
     participant M as Synaptic Memory
@@ -65,7 +65,7 @@ sequenceDiagram
 - **🎙️ Neural Voice Pipeline**: Sentence-by-sentence streaming for near-zero latency interaction.
 - **👁️ Vision & Context Awareness**: Real-time analysis of screen, web, and local file states.
 - **🦀 Rust-Powered Sensors**: High-performance filesystem monitoring via `watcher_rs` for instant event detection.
-- **📱 Mobile HUD**: A Flutter-based extension providing a visual, responsive interface to the system's neural state.
+- **Desktop Bubble (Linux Overlay)**: A frameless, transparent, always-on-top Flutter application that acts as a living, breathing entity on your desktop. Activated instantly via `Alt+Space`.
 - **🧠 Advanced Memory**: Hybrid Relational (SQLite) and Vector (JSON/Embeddings) memory hierarchy.
 
 ---
@@ -77,7 +77,7 @@ sequenceDiagram
 - **Performance**: Rust (System Monitoring & Resource Intensive Tasks)
 - **Frontend**: 
   - **Web**: Vanilla JS / HTML5 (Modern HUD Design)
-  - **Mobile**: Flutter (Dart)
+  - **Desktop Overlay**: Flutter (Dart) compiled natively for Linux.
 - **Infrastructure**: WebSocket-based real-time synchronization with JWT security.
 
 ---
@@ -110,11 +110,16 @@ chmod +x bin/zeus
 
 ---
 
-## 📱 Mobile Deployment
+## 🫧 Desktop Overlay Deployment
 
-The **ZEUS Mobile HUD** is located in `zeus_extension/`.
-1. Ensure Flutter is installed.
-2. Run `flutter build apk --release` or install the pre-compiled `zeus_extension_v1.1.apk`.
+The **ZEUS Cognitive Bubble** is located in `zeus_extension/`.
+1. Ensure Flutter and Linux native dependencies (`gstreamer-1.0`, `clang`, `lld`, `keybinder-3.0`) are installed.
+2. Run the provided launcher script to compile and start both the backend and the bubble:
+   ```bash
+   chmod +x bin/zeus-desktop.sh
+   ./bin/zeus-desktop.sh
+   ```
+3. Use the global shortcut `Alt+Space` to focus the bubble.
 
 ---
 
@@ -123,7 +128,7 @@ The **ZEUS Mobile HUD** is located in `zeus_extension/`.
 - `apps/`: Main entry points and service orchestrators.
 - `zeus_core/`: Cognitive logic, memory managers, and agent strategies.
 - `watcher_rs/`: High-performance Rust file monitoring.
-- `zeus_extension/`: Flutter mobile application.
+- `zeus_extension/`: Flutter Linux Desktop Overlay (The Cognitive Bubble).
 - `docs/`: Technical specifications and system analysis.
 
 ---

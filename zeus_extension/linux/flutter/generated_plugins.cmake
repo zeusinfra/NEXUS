@@ -4,6 +4,10 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   audioplayers_linux
+  flutter_acrylic
+  hotkey_manager_linux
+  screen_retriever_linux
+  window_manager
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST

@@ -3,12 +3,14 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_acrylic/flutter_acrylic.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hotkey_manager/hotkey_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'presentation/overlay/zeus_bubble_app.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await hotKeyManager.unregisterAll();
 
   if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
     await Window.initialize();
@@ -27,7 +29,6 @@ Future<void> main() async {
       await windowManager.setAsFrameless();
       await windowManager.setAlwaysOnTop(true);
       await windowManager.setResizable(false);
-      await windowManager.setHasShadow(false);
       await windowManager.show();
       await windowManager.focus();
     });

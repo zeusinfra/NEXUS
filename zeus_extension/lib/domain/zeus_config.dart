@@ -10,8 +10,8 @@ class ZeusConfig {
   final String? token;
 
   static ZeusConfig defaults() => ZeusConfig(
-        wsUrl: 'ws://127.0.0.1:8000/ws',
-        httpUrl: 'http://127.0.0.1:8000/chat',
+        wsUrl: 'ws://127.0.0.1:8080/ws',
+        httpUrl: 'http://127.0.0.1:8080/chat',
       );
 
   ZeusConfig copyWith({

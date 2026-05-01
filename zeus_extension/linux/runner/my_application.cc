@@ -62,8 +62,17 @@ static void my_application_activate(GApplication* application) {
   GdkRGBA background_color;
   // Background defaults to black, override it here if necessary, e.g. #00000000
   // for transparent.
-  gdk_rgba_parse(&background_color, "#000000");
+  gdk_rgba_parse(&background_color, "#00000000");
   fl_view_set_background_color(view, &background_color);
+
+  // Habilita canal alpha para transparência real no Linux (X11/Wayland)
+  GdkScreen *my_screen = gtk_widget_get_screen(GTK_WIDGET(window));
+  GdkVisual *visual = gdk_screen_get_rgba_visual(my_screen);
+  if (visual != nullptr) {
+    gtk_widget_set_visual(GTK_WIDGET(window), visual);
+  }
+  gtk_widget_set_app_paintable(GTK_WIDGET(window), TRUE);
+
   gtk_widget_show(GTK_WIDGET(view));
   gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(view));
 

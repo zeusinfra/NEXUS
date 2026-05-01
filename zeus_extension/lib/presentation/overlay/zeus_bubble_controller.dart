@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../data/voice_service.dart';
 import '../../domain/bubble_state.dart';
 import '../../domain/zeus_config.dart';
 import '../../services/zeus_gateway_service.dart';
@@ -10,6 +11,12 @@ import '../../services/zeus_gateway_service.dart';
 const _wsKey = 'zeus_ws_url';
 const _httpKey = 'zeus_http_url';
 const _tokenKey = 'zeus_auth_token';
+
+final voiceServiceProvider = Provider<VoiceService>((ref) {
+  final service = VoiceService();
+  service.init();
+  return service;
+});
 
 final zeusConfigProvider =
     StateNotifierProvider<ZeusConfigController, ZeusConfig>((_) {
@@ -38,6 +45,7 @@ final bubbleStateProvider =
   final controller = BubbleStateController(
     ref.read(zeusGatewayProvider),
     ref.read(connectionStateProvider.notifier),
+    ref.read(voiceServiceProvider),
     ref.read(chatHistoryProvider.notifier),
   );
   ref.onDispose(controller.dispose);
@@ -70,13 +78,14 @@ class ZeusConfigController extends StateNotifier<ZeusConfig> {
 }
 
 class BubbleStateController extends StateNotifier<BubbleState> {
-  BubbleStateController(this._gateway, this._connectionStateNotifier, [this._historyState])
+  BubbleStateController(this._gateway, this._connectionStateNotifier, this._voiceService, [this._historyState])
       : super(BubbleState.idle) {
     _init();
   }
 
   final ZeusGatewayService _gateway;
   final StateController<ZeusConnectionState> _connectionStateNotifier;
+  final VoiceService _voiceService;
   final StateController<List<Map<String, dynamic>>>? _historyState;
   StreamSubscription<ZeusEvent>? _eventSubscription;
   StreamSubscription<ZeusConnectionState>? _connectionSubscription;
@@ -117,6 +126,13 @@ class BubbleStateController extends StateNotifier<BubbleState> {
         break;
       case 'idle':
         state = BubbleState.idle;
+        break;
+      case 'voice_play':
+        if (event.payload['audio'] != null) {
+          _voiceService.playBase64Audio(event.payload['audio'] as String);
+        } else if (event.payload['text'] != null) {
+          _voiceService.speak(event.payload['text'] as String);
+        }
         break;
       default:
         break;

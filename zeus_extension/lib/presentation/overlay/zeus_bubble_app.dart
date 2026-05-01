@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_tts/flutter_tts.dart';
-import 'package:speech_to_text/speech_to_text.dart';
+import 'package:hotkey_manager/hotkey_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../../data/voice_service.dart';
 import '../../domain/bubble_state.dart';
 import '../../domain/zeus_config.dart';
 import '../../services/zeus_gateway_service.dart';
@@ -25,14 +26,68 @@ class ZeusBubbleOverlay extends ConsumerStatefulWidget {
   ConsumerState<ZeusBubbleOverlay> createState() => _State();
 }
 
-class _State extends ConsumerState<ZeusBubbleOverlay> {
-  final _stt = SpeechToText();
-  final _tts = FlutterTts();
+class _State extends ConsumerState<ZeusBubbleOverlay> with SingleTickerProviderStateMixin {
+  final VoiceService _voiceService = VoiceService();
+  late AnimationController _animController;
+  late Animation<double> _breatheAnim;
+  final HotKey _hotKey = HotKey(
+    key: LogicalKeyboardKey.space,
+    modifiers: [HotKeyModifier.alt],
+    scope: HotKeyScope.system,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _voiceService.init();
+    
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
+    
+    _breatheAnim = Tween<double>(begin: 0.95, end: 1.05).animate(
+      CurvedAnimation(parent: _animController, curve: Curves.easeInOut),
+    );
+
+    _initHotkeys();
+  }
+
+  Future<void> _initHotkeys() async {
+    await hotKeyManager.register(
+      _hotKey,
+      keyDownHandler: (hotKey) async {
+        await windowManager.show();
+        await windowManager.focus();
+        _startVoice();
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    hotKeyManager.unregister(_hotKey);
+    _animController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(bubbleStateProvider);
     final conn = ref.watch(connectionStateProvider);
+    
+    // Ajusta a velocidade da animação com base no estado
+    if (state == BubbleState.listening) {
+      _animController.duration = const Duration(milliseconds: 600);
+      if (!_animController.isAnimating) _animController.repeat(reverse: true);
+    } else if (state == BubbleState.thinking) {
+      _animController.duration = const Duration(milliseconds: 300);
+      if (!_animController.isAnimating) _animController.repeat(reverse: true);
+    } else {
+      _animController.duration = const Duration(seconds: 2);
+      if (!_animController.isAnimating) _animController.repeat(reverse: true);
+    }
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Center(
@@ -41,16 +96,19 @@ class _State extends ConsumerState<ZeusBubbleOverlay> {
           onTap: _startVoice,
           onDoubleTap: () => _showChatPanel(context),
           onSecondaryTapDown: (_) => _showMenu(context),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 280),
-            width: _size(state),
-            height: _size(state),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: RadialGradient(colors: _colors(state)),
-              border: Border.all(color: _connColor(conn), width: 2),
+          child: ScaleTransition(
+            scale: _breatheAnim,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 280),
+              width: _size(state),
+              height: _size(state),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(colors: _colors(state)),
+                border: Border.all(color: _connColor(conn), width: 2),
+              ),
+              child: const Icon(Icons.blur_circular, color: Colors.white70),
             ),
-            child: const Icon(Icons.blur_circular, color: Colors.white70),
           ),
         ),
       ),
@@ -58,14 +116,8 @@ class _State extends ConsumerState<ZeusBubbleOverlay> {
   }
 
   Future<void> _startVoice() async {
+    // Por enquanto, sem STT no desktop. Mas mantemos o visual de "listening" para quando implementar via python.
     await ref.read(bubbleStateProvider.notifier).activateListening();
-    final ready = await _stt.initialize();
-    if (!ready) return;
-    await _stt.listen(onResult: (r) async {
-      if (r.finalResult && r.recognizedWords.isNotEmpty) {
-        await ref.read(bubbleStateProvider.notifier).sendText(r.recognizedWords);
-      }
-    });
   }
 
   Future<void> _showMenu(BuildContext context) async {
@@ -148,7 +200,7 @@ class _State extends ConsumerState<ZeusBubbleOverlay> {
             ElevatedButton(
               onPressed: () async {
                 await ref.read(bubbleStateProvider.notifier).sendText(input.text);
-                await _tts.speak('Mensagem enviada');
+                await _voiceService.speak('Mensagem enviada');
                 if (context.mounted) Navigator.pop(context);
               },
               child: const Text('Enviar'),

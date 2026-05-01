@@ -1,0 +1,10 @@
+🌑 Iniciando ZEUS em modo Headless (Cérebro em Background)...
+🦀 Iniciando Microsserviços Rust (Watcher & Memory)...
+🧠 ZEUS Core operacional. Conecte-se via App Mobile.
+ERROR:    [Errno 98] error while attempting to bind on address ('0.0.0.0', 8080): address already in use
+DEBUG: ALLOW_LAN=True, DISABLE_SSL=True
+🦀 ZEUS: Usando Backend Rust para Sinapses (L2).
+🦀 ZEUS: Usando Backend Rust para Memória Vetorial.
+🌑 ZEUS em modo HEADLESS operacional em 0.0.0.0:8080
+./bin/zeus: line 42: 1192824 Killed                  cargo run --release --bin memory_service > ../../logs/memory.log 2>&1
+./bin/zeus: line 41: 1192823 Killed                  cargo run --release > ../logs/watcher.log 2>&1

@@ -7,17 +7,23 @@
 #include "generated_plugin_registrant.h"
 
 #include <audioplayers_windows/audioplayers_windows_plugin.h>
-#include <firebase_core/firebase_core_plugin_c_api.h>
+#include <flutter_acrylic/flutter_acrylic_plugin.h>
 #include <flutter_tts/flutter_tts_plugin.h>
-#include <speech_to_text_windows/speech_to_text_windows.h>
+#include <hotkey_manager_windows/hotkey_manager_windows_plugin_c_api.h>
+#include <screen_retriever_windows/screen_retriever_windows_plugin_c_api.h>
+#include <window_manager/window_manager_plugin.h>
 
 void RegisterPlugins(flutter::PluginRegistry* registry) {
   AudioplayersWindowsPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("AudioplayersWindowsPlugin"));
-  FirebaseCorePluginCApiRegisterWithRegistrar(
-      registry->GetRegistrarForPlugin("FirebaseCorePluginCApi"));
+  FlutterAcrylicPluginRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("FlutterAcrylicPlugin"));
   FlutterTtsPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("FlutterTtsPlugin"));
-  SpeechToTextWindowsRegisterWithRegistrar(
-      registry->GetRegistrarForPlugin("SpeechToTextWindows"));
+  HotkeyManagerWindowsPluginCApiRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("HotkeyManagerWindowsPluginCApi"));
+  ScreenRetrieverWindowsPluginCApiRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("ScreenRetrieverWindowsPluginCApi"));
+  WindowManagerPluginRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("WindowManagerPlugin"));
 }
