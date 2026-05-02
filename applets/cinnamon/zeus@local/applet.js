@@ -81,12 +81,11 @@ class ZeusApplet extends Applet.TextIconApplet {
         this._renderHistory();
 
         const inputItem = new PopupMenu.PopupBaseMenuItem({ reactive: false });
-        this._entry = new St.Entry({
-            name: 'zeus-chat-entry',
-            hint_text: 'Mensagem para o ZEUS',
-            track_hover: true,
-            style_class: 'zeus-chat-entry'
-        });
+        this._entry = new St.Entry();
+        this._entry.name = 'zeus-chat-entry';
+        this._entry.hint_text = 'Mensagem para o ZEUS';
+        this._entry.track_hover = true;
+        this._entry.style_class = 'zeus-chat-entry';
         this._entry.clutter_text.connect('activate', () => this._sendChat());
         inputItem.addActor(this._entry, { expand: true });
         this.menu.addMenuItem(inputItem);
