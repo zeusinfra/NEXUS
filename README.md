@@ -1,6 +1,6 @@
 # ZEUS Cognitive AI
 
-ZEUS is a local-first cognitive operating layer that combines a FastAPI backend, Ollama/OpenAI-compatible LLM routing, realtime HUD telemetry, voice/vision tools, Rust-based file watching, and a Flutter desktop bubble.
+ZEUS is a local-first cognitive operating layer that combines a FastAPI backend, Ollama/OpenAI-compatible LLM routing, realtime HUD telemetry, voice/vision tools, Rust-based file watching, a Flutter desktop bubble, and a Linux Mint/Cinnamon panel applet.
 
 The current default profile is **Ollama Cloud through the local Ollama daemon**, using `gemma4:31b-cloud` when the machine is authenticated with `ollama signin`.
 
@@ -8,7 +8,7 @@ The current default profile is **Ollama Cloud through the local Ollama daemon**,
 
 - Backend: FastAPI + Socket.IO + native WebSocket.
 - LLM: Ollama-first, with OpenAI/Gemini support available by environment variables.
-- UI: Web HUD in `public/index.html` and Flutter bubble in `zeus_extension/`.
+- UI: Web HUD in `public/index.html`, Flutter bubble in `zeus_extension/`, and Cinnamon applet in `applets/cinnamon/zeus@local/`.
 - Security: LAN access requires token when enabled; command execution uses allowlist, confirmation, and audit logging.
 - Observability: structured JSON logs, request correlation-id, and health metrics.
 - Tests: Python unit/contract tests plus Node tests for frontend behavior.
@@ -19,9 +19,11 @@ The current default profile is **Ollama Cloud through the local Ollama daemon**,
 graph TD
     User[User] --> WebHUD[Web HUD]
     User --> Bubble[Flutter Bubble]
+    User --> Applet[Cinnamon Applet]
 
     WebHUD --> API[FastAPI Backend]
     Bubble --> API
+    Applet --> API
 
     API --> LLM[LLM Provider]
     API --> Memory[SQLite / Vector Memory]
@@ -38,6 +40,7 @@ graph TD
 | `apps/` | FastAPI app, realtime hub, status routes, orchestration entrypoints. |
 | `zeus_core/` | LLM routing, agents, memory, security guards, command policy, observability. |
 | `public/` | Web HUD and frontend tests. |
+| `applets/` | Linux desktop panel integrations, currently Cinnamon `zeus@local`. |
 | `zeus_extension/` | Flutter desktop bubble. |
 | `watcher_rs/` | Rust filesystem watcher. |
 | `core-rust/` | Rust memory/system components. |
@@ -100,6 +103,25 @@ chmod +x bin/zeus-desktop.sh
 ./bin/zeus-desktop.sh
 ```
 
+Linux Mint/Cinnamon applet:
+
+```bash
+chmod +x bin/install-cinnamon-applet.sh
+./bin/install-cinnamon-applet.sh
+cinnamon-settings applets
+```
+
+Then enable **ZEUS Cognitive AI** in Cinnamon Applets. The applet talks to the local backend through:
+
+```text
+GET  http://127.0.0.1:8080/api/applet/status
+POST http://127.0.0.1:8080/api/applet/chat
+POST http://127.0.0.1:8080/api/applet/voice/start
+POST http://127.0.0.1:8080/api/applet/vision/analyze
+```
+
+The applet shows backend/LLM status in the Cinnamon panel and opens a compact popup with chat, voice, vision, HUD, and backend-start controls. If Cinnamon does not reload the applet after installation, restart Cinnamon with `Alt+F2`, type `r`, and press Enter, or log out and back in.
+
 Web HUD:
 
 ```text
@@ -155,7 +177,7 @@ rg -l "(sk-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{20,}|mongodb\\+srv://|postgresql
 
 Expected result: no tracked secrets. `.env.example` may appear in pattern scans because it intentionally contains placeholder variable names.
 
-## Multi-Remote Mirror
+## Git Remote
 
 Current GitHub remote:
 
@@ -163,31 +185,10 @@ Current GitHub remote:
 https://github.com/geniusdev-tech/zeusOS.git
 ```
 
-Codeberg mirror remote:
-
-```text
-https://codeberg.org/zeusprotocol/zeuscognitiveai.git
-```
-
-Configured remotes:
-
-```text
-origin   -> GitHub
-codeberg -> Codeberg
-mirror   -> push to GitHub and Codeberg
-```
-
-To push separately after review:
+To push after review:
 
 ```bash
 git push origin main
-git push codeberg main
-```
-
-To push both remotes with one command:
-
-```bash
-git push mirror main
 ```
 
 ## Documentation

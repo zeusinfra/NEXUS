@@ -1186,6 +1186,10 @@ class VisionAnalyzeReq(BaseModel):
     ocr_lang: str | None = "por"
 
 
+class AppletVoiceStartReq(BaseModel):
+    duration: int | None = 10
+
+
 class ASRReq(BaseModel):
     audio_data_url: str
     lang: str | None = "pt"
@@ -1354,6 +1358,35 @@ async def api_chat(req: ChatReq, request: Request):
     except Exception as e:
         log_event(logger, 40, "chat_request_failed", error=str(e))
         return {"error": str(e)}
+
+
+@app.post("/api/applet/chat")
+async def api_applet_chat(req: ChatReq, request: Request):
+    req.source = (req.source or "cinnamon_applet").strip() or "cinnamon_applet"
+    req.client_id = (req.client_id or "zeus_cinnamon_applet").strip() or "zeus_cinnamon_applet"
+    return await api_chat(req, request)
+
+
+@app.post("/api/applet/voice/start")
+async def api_applet_voice_start(req: AppletVoiceStartReq, request: Request):
+    if not _is_trusted_request(request):
+        raise HTTPException(status_code=403, detail="Only trusted (local/LAN) requests are allowed.")
+    _require_lan_token_for_request(request)
+
+    duration = max(1, min(int(req.duration or 10), 60))
+    await _handle_arm_voice_duration(duration)
+    return {"ok": True, "stage": "listening", "duration": duration}
+
+
+@app.post("/api/applet/vision/analyze")
+async def api_applet_vision_analyze(request: Request):
+    if not _is_trusted_request(request):
+        raise HTTPException(status_code=403, detail="Only trusted (local/LAN) requests are allowed.")
+    _require_lan_token_for_request(request)
+
+    asyncio.create_task(_handle_bubble_vision())
+    return {"ok": True, "stage": "queued"}
+
 
 async def update_memory_after_chat(user_msg, ai_reply):
     global long_term_memory

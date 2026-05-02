@@ -36,34 +36,42 @@ class ZeusEvent {
 }
 
 class ZeusGatewayService {
-  ZeusGatewayService({required this.wsUrl, required this.httpUrl, this.authToken});
+  ZeusGatewayService(
+      {required this.wsUrl, required this.httpUrl, this.authToken});
 
   final Uri wsUrl;
   final Uri httpUrl;
   final String? authToken;
 
-  final Queue<Map<String, dynamic>> _offlineQueue = Queue<Map<String, dynamic>>();
+  final Queue<Map<String, dynamic>> _offlineQueue =
+      Queue<Map<String, dynamic>>();
   final Map<String, Completer<void>> _pendingAcks = {};
 
   WebSocketChannel? _channel;
   Timer? _reconnectTimer;
   Timer? _heartbeatTimer;
+  Timer? _healthTimer;
   bool _manualDisconnect = false;
   int _reconnectAttempt = 0;
 
-  final StreamController<ZeusEvent> _eventsController = StreamController.broadcast();
-  final StreamController<ZeusConnectionState> _connectionController = StreamController.broadcast();
-  final StreamController<List<Map<String, dynamic>>> _historyController = StreamController.broadcast();
+  final StreamController<ZeusEvent> _eventsController =
+      StreamController.broadcast();
+  final StreamController<ZeusConnectionState> _connectionController =
+      StreamController.broadcast();
+  final StreamController<List<Map<String, dynamic>>> _historyController =
+      StreamController.broadcast();
   final List<Map<String, dynamic>> _history = [];
 
   ZeusConnectionState _connectionState = ZeusConnectionState.disconnected;
 
   Stream<ZeusEvent> get events => _eventsController.stream;
-  Stream<ZeusConnectionState> get connectionState => _connectionController.stream;
+  Stream<ZeusConnectionState> get connectionState =>
+      _connectionController.stream;
   Stream<List<Map<String, dynamic>>> get history => _historyController.stream;
 
   Future<void> connect() async {
     _manualDisconnect = false;
+    _startHealthPolling();
     await _openSocket();
   }
 
@@ -72,7 +80,8 @@ class ZeusGatewayService {
     try {
       final url = authToken == null
           ? wsUrl
-          : wsUrl.replace(queryParameters: {...wsUrl.queryParameters, 'token': authToken});
+          : wsUrl.replace(
+              queryParameters: {...wsUrl.queryParameters, 'token': authToken});
 
       _channel = WebSocketChannel.connect(url);
       _setConnectionState(ZeusConnectionState.connected);
@@ -84,12 +93,17 @@ class ZeusGatewayService {
           final decoded = jsonDecode(data.toString()) as Map<String, dynamic>;
           final event = ZeusEvent.fromJson(decoded);
           _eventsController.add(event);
-          if (event.ack && event.eventId != null && _pendingAcks.containsKey(event.eventId)) {
+          if (event.ack &&
+              event.eventId != null &&
+              _pendingAcks.containsKey(event.eventId)) {
             _pendingAcks.remove(event.eventId)?.complete();
           }
-          _appendHistory({'role': 'assistant', 'content': decoded.toString()});
+          _appendMessageFromServer(decoded);
         } catch (_) {}
-      }, onDone: _handleSocketDrop, onError: (_) => _handleSocketDrop(), cancelOnError: true);
+      },
+          onDone: _handleSocketDrop,
+          onError: (_) => _handleSocketDrop(),
+          cancelOnError: true);
 
       _startHeartbeat();
     } catch (_) {
@@ -121,6 +135,34 @@ class ZeusGatewayService {
         }));
       }
     });
+  }
+
+  void _startHealthPolling() {
+    _healthTimer?.cancel();
+    _checkHttpHealth();
+    _healthTimer = Timer.periodic(
+      const Duration(seconds: 10),
+      (_) => _checkHttpHealth(),
+    );
+  }
+
+  Future<void> _checkHttpHealth() async {
+    try {
+      final healthUrl = httpUrl.replace(path: '/api/health', query: '');
+      final response =
+          await http.get(healthUrl).timeout(const Duration(seconds: 3));
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        if (_connectionState == ZeusConnectionState.disconnected) {
+          _setConnectionState(ZeusConnectionState.connected);
+        }
+      } else if (_channel == null) {
+        _setConnectionState(ZeusConnectionState.disconnected);
+      }
+    } catch (_) {
+      if (_channel == null) {
+        _setConnectionState(ZeusConnectionState.disconnected);
+      }
+    }
   }
 
   Future<void> sendUserInput(String text) async {
@@ -160,17 +202,54 @@ class ZeusGatewayService {
 
   Future<void> _tryHttpFallback(Map<String, dynamic> payload) async {
     try {
-      await http
+      final text = ((payload['payload'] as Map?)?['text'] ?? '').toString();
+      if (text.isEmpty ||
+          text == '__voice_start__' ||
+          text == '__vision_analyze__') {
+        return;
+      }
+
+      final response = await http
           .post(
             httpUrl,
             headers: {
               'Content-Type': 'application/json',
               if (authToken != null) 'Authorization': 'Bearer $authToken',
             },
-            body: jsonEncode(payload),
+            body: jsonEncode({
+              'message': text,
+              'client_msg_id': payload['event_id']?.toString(),
+              'source': 'zeus_bubble_linux',
+              'client_id': 'zeus_bubble_linux',
+            }),
           )
           .timeout(const Duration(seconds: 10));
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic>) {
+          final reply = decoded['reply']?.toString();
+          if (reply != null && reply.isNotEmpty) {
+            _appendHistory({'role': 'assistant', 'content': reply});
+          }
+        }
+      }
     } catch (_) {}
+  }
+
+  void _appendMessageFromServer(Map<String, dynamic> decoded) {
+    final type = decoded['type']?.toString();
+    if (type == 'ack' || type == 'pong' || type == 'init') return;
+
+    final payload = (decoded['payload'] as Map?)?.cast<String, dynamic>();
+    final message =
+        decoded['message']?.toString() ?? payload?['message']?.toString();
+    if (message == null || message.isEmpty) return;
+
+    if (type == 'CHAT_USER') {
+      _appendHistory({'role': 'user', 'content': message});
+    } else if (type == 'CHAT_AI' || type == 'assistant_message') {
+      _appendHistory({'role': 'assistant', 'content': message});
+    }
   }
 
   void _appendHistory(Map<String, dynamic> msg) {
@@ -188,6 +267,7 @@ class ZeusGatewayService {
     _manualDisconnect = true;
     _reconnectTimer?.cancel();
     _heartbeatTimer?.cancel();
+    _healthTimer?.cancel();
     await _channel?.sink.close();
     await _eventsController.close();
     await _connectionController.close();

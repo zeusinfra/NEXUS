@@ -45,4 +45,33 @@ def create_status_router(deps: StatusRouteDeps) -> APIRouter:
         require_access(request)
         return deps.build_api_health()
 
+    @router.get("/api/applet/status")
+    async def get_api_applet_status(request: Request):
+        require_access(request)
+        health = deps.build_api_health()
+        llm = health.get("llm", {})
+        metrics = health.get("metrics", {})
+        config = health.get("config", {})
+        return {
+            "ok": True,
+            "online": True,
+            "llm": {
+                "provider": llm.get("provider"),
+                "model": llm.get("model"),
+                "configured": bool(llm.get("configured")),
+                "base_url": llm.get("base_url"),
+            },
+            "voice": health.get("voice", {}),
+            "vision": health.get("vision", {}),
+            "security": health.get("security", {}),
+            "config": {
+                "env": config.get("env"),
+                "hosted_ollama_api": bool(config.get("hosted_ollama_api")),
+                "warnings": config.get("warnings", []),
+            },
+            "metrics": {
+                "http_requests_total": metrics.get("http_requests_total", 0),
+            },
+        }
+
     return router

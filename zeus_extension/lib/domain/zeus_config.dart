@@ -11,7 +11,7 @@ class ZeusConfig {
 
   static ZeusConfig defaults() => ZeusConfig(
         wsUrl: 'ws://127.0.0.1:8080/ws',
-        httpUrl: 'http://127.0.0.1:8080/chat',
+        httpUrl: 'http://127.0.0.1:8080/api/chat',
       );
 
   ZeusConfig copyWith({

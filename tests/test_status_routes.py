@@ -47,6 +47,18 @@ class StatusRoutesTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["llm"]["provider"], "test")
         self.assertEqual(calls["token"], 1)
 
+    async def test_applet_status_returns_compact_payload(self):
+        router, calls = self._router()
+        endpoint = _endpoint(router, "/api/applet/status", "GET")
+
+        result = await endpoint(SimpleNamespace())
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["online"])
+        self.assertEqual(result["llm"]["provider"], "test")
+        self.assertEqual(result["config"]["warnings"], [])
+        self.assertEqual(calls["token"], 1)
+
     async def test_llm_status_route_returns_sanitized_status(self):
         router, _ = self._router()
         endpoint = _endpoint(router, "/api/llm/status", "GET")
