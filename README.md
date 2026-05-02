@@ -182,7 +182,7 @@ Expected result: no tracked secrets. `.env.example` may appear in pattern scans 
 Current GitHub remote:
 
 ```text
-https://github.com/geniusdev-tech/zeusOS.git
+https://github.com/geniusdev-tech/zeus-cognitive-os.git
 ```
 
 To push after review:
