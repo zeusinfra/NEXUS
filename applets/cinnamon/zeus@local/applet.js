@@ -84,7 +84,6 @@ class ZeusApplet extends Applet.TextIconApplet {
         this._entry = new St.Entry({
             name: 'zeus-chat-entry',
             hint_text: 'Mensagem para o ZEUS',
-            can_focus: true,
             track_hover: true,
             style_class: 'zeus-chat-entry'
         });
