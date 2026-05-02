@@ -23,7 +23,7 @@ _PENDING_CONFIRMATIONS: Dict[str, dict] = {}
 def _tool_mode() -> str:
     # confirm: pede "Sim" antes de executar execute_bash
     # auto: executa sem confirmação
-    mode = os.getenv("ZEUS_TOOL_EXECUTION_MODE", "auto").strip().lower()
+    mode = os.getenv("ZEUS_TOOL_EXECUTION_MODE", "confirm").strip().lower()
     return mode if mode in {"confirm", "auto"} else "confirm"
 
 
@@ -147,6 +147,7 @@ class Agent:
         *,
         client_key: str = "default",
         broadcast: Optional[BroadcastFn] = None,
+        token_callback: Optional[Callable[[str], Awaitable[None]]] = None,
     ):
         self._current_broadcast = broadcast
         mode = _tool_mode()
@@ -174,6 +175,8 @@ class Agent:
                     {"role": "user", "content": f"Tool output ({pending['name']}): {json.dumps(tool_out, ensure_ascii=False)}"},
                 ]
                 async for chunk in self._call_llm_stream(messages):
+                    if token_callback:
+                        await token_callback(chunk)
                     yield chunk
                 return
 
@@ -195,6 +198,8 @@ class Agent:
                     is_tool_call = True
                 
                 if not is_tool_call:
+                    if token_callback:
+                        await token_callback(chunk)
                     await self._broadcast(broadcast, {"type": "CHUNK_AI", "chunk": chunk})
                     yield chunk
             
@@ -240,10 +245,16 @@ class Agent:
         *,
         client_key: str = "default",
         broadcast: Optional[BroadcastFn] = None,
+        token_callback: Optional[Callable[[str], Awaitable[None]]] = None,
     ) -> str:
         # Fallback para versão síncrona/não-streaming (consome o run_stream)
         full_text = ""
-        async for chunk in self.run_stream(user_prompt, client_key=client_key, broadcast=broadcast):
+        async for chunk in self.run_stream(
+            user_prompt,
+            client_key=client_key,
+            broadcast=broadcast,
+            token_callback=token_callback,
+        ):
             full_text += chunk
         return full_text
 

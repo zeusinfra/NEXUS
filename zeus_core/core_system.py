@@ -21,16 +21,21 @@ def _load_local_env():
                 line = line.strip()
                 if line and not line.startswith("#") and "=" in line:
                     k, v = line.split("=", 1)
-                    os.environ[k.strip()] = v.strip().strip('"').strip("'")
+                    os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
 
 _load_local_env()
 
 # Configurações de API
+LLM_PROVIDER = os.getenv("ZEUS_LLM_PROVIDER", "").strip().lower()
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
+OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", os.getenv("ZEUS_OPENAI_MODEL", "gpt-4o-mini"))
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 OLLAMA_URL = os.getenv("ZEUS_LLM_URL", "http://127.0.0.1:11434/api/chat")
-OLLAMA_API_KEY = os.getenv("ZEUS_LLM_API_KEY", os.getenv("ZEUS_OPENWEBUI_API_KEY", ""))
+OLLAMA_API_KEY = os.getenv("ZEUS_LLM_API_KEY", os.getenv("OLLAMA_API_KEY", ""))
 MODEL = os.getenv("ZEUS_LLM_MODEL", "gemma4:31b-cloud")
 DISABLE_OLLAMA = os.getenv("ZEUS_DISABLE_OLLAMA", "0").strip().lower() in {"1", "true", "yes", "on"}
+PREFER_OLLAMA = os.getenv("ZEUS_PREFER_OLLAMA", "0").strip().lower() in {"1", "true", "yes", "on"}
 MAX_PROMPT_CHARS = int(os.getenv("ZEUS_MAX_PROMPT_CHARS", "16000") or "16000")
 
 GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
@@ -55,7 +60,7 @@ def _extract_message_content(data):
             if isinstance(content, str) and content.strip():
                 return content
 
-        # Formato OpenAI/OpenWebUI
+        # Formato OpenAI-compatible
         choices = data.get("choices")
         if isinstance(choices, list) and choices:
             choice = choices[0] or {}
@@ -154,8 +159,124 @@ def _trim_messages(messages):
 
     return list(reversed(trimmed)) or [{"role": "user", "content": "Continue."}]
 
+def _use_openai() -> bool:
+    if LLM_PROVIDER == "openai":
+        return True
+    return bool(OPENAI_API_KEY and not GEMINI_API_KEY and LLM_PROVIDER not in {"gemini", "ollama"})
+
+def _use_ollama() -> bool:
+    return (LLM_PROVIDER == "ollama" or PREFER_OLLAMA) and not DISABLE_OLLAMA
+
+def _active_llm_provider() -> str:
+    if _use_openai():
+        return "openai"
+    if _use_ollama():
+        return "ollama"
+    if GEMINI_API_KEY and _GEMINI_CLIENT:
+        return "gemini"
+    if not DISABLE_OLLAMA:
+        return "ollama"
+    return LLM_PROVIDER or "none"
+
+def get_llm_status() -> dict:
+    provider = _active_llm_provider()
+    model = {
+        "openai": OPENAI_MODEL,
+        "gemini": GEMINI_MODEL_NAME,
+        "ollama": MODEL,
+    }.get(provider)
+    configured = {
+        "openai": bool(OPENAI_API_KEY),
+        "gemini": bool(GEMINI_API_KEY and _GEMINI_CLIENT),
+        "ollama": not DISABLE_OLLAMA,
+    }.get(provider, False)
+
+    return {
+        "provider": provider,
+        "model": model,
+        "configured": configured,
+        "streaming": provider in {"openai", "gemini"},
+        "fallbacks": {
+            "openai_configured": bool(OPENAI_API_KEY),
+            "gemini_configured": bool(GEMINI_API_KEY and _GEMINI_CLIENT),
+            "ollama_enabled": not DISABLE_OLLAMA,
+        },
+        "base_url": OPENAI_BASE_URL if provider == "openai" else OLLAMA_URL if provider == "ollama" else None,
+    }
+
+def _format_openai_error(response) -> str:
+    try:
+        payload = response.json()
+    except Exception:
+        payload = {}
+
+    error = payload.get("error") if isinstance(payload, dict) else {}
+    code = (error or {}).get("code") or ""
+    message = (error or {}).get("message") or response.text[:300]
+
+    if response.status_code == 401:
+        return "OpenAI API key inválida ou ausente. Verifique OPENAI_API_KEY no .env."
+    if response.status_code == 429:
+        if code == "insufficient_quota" or "quota" in message.lower():
+            return "OpenAI sem quota/billing disponível. Ative billing ou adicione créditos na plataforma da API."
+        return "OpenAI retornou limite de uso/rate limit (429). Tente novamente em instantes."
+    if response.status_code == 404:
+        return f"Modelo OpenAI não encontrado ou sem acesso: {OPENAI_MODEL}."
+    return f"OpenAI API retornou {response.status_code}: {message}"
+
+def _format_messages_for_openai(messages):
+    """Mantém compatibilidade com Chat Completions."""
+    formatted = []
+    for m in messages:
+        if not isinstance(m, dict):
+            continue
+        role = m.get("role") or "user"
+        content = m.get("content", "")
+        if role == "model":
+            role = "assistant"
+        if role not in {"system", "developer", "user", "assistant", "tool"}:
+            role = "user"
+        formatted.append({"role": role, "content": str(content)})
+    return formatted or [{"role": "user", "content": "Continue."}]
+
+def _call_openai_chat(messages, *, stream: bool = False):
+    if not OPENAI_API_KEY:
+        raise RuntimeError("OPENAI_API_KEY não configurada.")
+
+    payload = {
+        "model": OPENAI_MODEL,
+        "messages": _format_messages_for_openai(messages),
+        "stream": stream,
+    }
+    headers = {
+        "Authorization": f"Bearer {OPENAI_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    return requests.post(
+        f"{OPENAI_BASE_URL}/chat/completions",
+        json=payload,
+        headers=headers,
+        stream=stream,
+        timeout=300,
+    )
+
 def call_cloud_llm(messages):
     messages = _trim_messages(messages)
+    if _use_openai():
+        try:
+            response = _call_openai_chat(messages, stream=False)
+            if response.status_code == 200:
+                content = _extract_message_content(response.json())
+                if content:
+                    return content
+                return f"Error: No content in OpenAI response payload ({response.text[:200]})"
+            return f"Error: {_format_openai_error(response)}"
+        except Exception as e:
+            return f"OpenAI Connection Error: {str(e)}"
+
+    if _use_ollama():
+        return _call_ollama_chat(messages)
+
     # Prioridade para o Gemini se a chave existir
     if GEMINI_API_KEY and _GEMINI_CLIENT:
         try:
@@ -193,7 +314,9 @@ def call_cloud_llm(messages):
     if DISABLE_OLLAMA:
         return "Error: Gemini unavailable and ZEUS_DISABLE_OLLAMA=1."
 
-    # Fallback para Ollama
+    return _call_ollama_chat(messages)
+
+def _call_ollama_chat(messages):
     headers = {
         "Content-Type": "application/json",
     }
@@ -201,11 +324,24 @@ def call_cloud_llm(messages):
     if OLLAMA_API_KEY:
         headers["Authorization"] = f"Bearer {OLLAMA_API_KEY}"
 
-    payload = {
-        "model": MODEL,
-        "messages": messages,
-        "stream": False,
-    }
+    use_generate_endpoint = OLLAMA_URL.rstrip("/").endswith("/api/generate")
+    if use_generate_endpoint:
+        prompt = "\n\n".join(
+            f"{(m.get('role') or 'user').upper()}: {m.get('content', '')}"
+            for m in messages
+            if isinstance(m, dict)
+        )
+        payload = {
+            "model": MODEL,
+            "prompt": prompt,
+            "stream": False,
+        }
+    else:
+        payload = {
+            "model": MODEL,
+            "messages": messages,
+            "stream": False,
+        }
     
     try:
         response = requests.post(
@@ -214,18 +350,66 @@ def call_cloud_llm(messages):
         
         if response.status_code == 200:
             data = response.json()
+            if use_generate_endpoint:
+                generated = data.get("response")
+                if isinstance(generated, str) and generated.strip():
+                    return generated
             content = _extract_message_content(data)
             if content:
                 return content
             return f"Error: No content in response payload ({json.dumps(data, ensure_ascii=False)[:200]})"
 
-        return f"Error: API returned {response.status_code} - {response.text[:200]}"
+        return f"Error: {_format_ollama_error(response)}"
     except Exception as e:
         return f"Connection Error: {str(e)}"
+
+def _format_ollama_error(response):
+    body = response.text[:300]
+    if response.status_code == 401:
+        return (
+            "Ollama Cloud nao autenticado. Execute `ollama signin` para usar "
+            "modelos cloud via http://127.0.0.1:11434, ou configure "
+            "OLLAMA_API_KEY/ZEUS_LLM_API_KEY para acesso autenticado."
+        )
+    if response.status_code == 404:
+        return (
+            f"Modelo Ollama nao encontrado: {MODEL}. Confirme o nome em "
+            "`ollama list` ou ajuste ZEUS_LLM_MODEL."
+        )
+    return f"API returned {response.status_code} - {body}"
 
 def call_cloud_llm_stream(messages):
     """Versão streaming para interação em tempo real."""
     messages = _trim_messages(messages)
+    if _use_openai():
+        try:
+            response = _call_openai_chat(messages, stream=True)
+            if response.status_code != 200:
+                yield f"Error: {_format_openai_error(response)}"
+                return
+
+            for raw_line in response.iter_lines(decode_unicode=True):
+                if not raw_line or not raw_line.startswith("data: "):
+                    continue
+                data = raw_line[len("data: "):].strip()
+                if data == "[DONE]":
+                    return
+                try:
+                    payload = json.loads(data)
+                    delta = ((payload.get("choices") or [{}])[0].get("delta") or {}).get("content")
+                    if delta:
+                        yield delta
+                except Exception:
+                    continue
+            return
+        except Exception as e:
+            yield f"OpenAI Stream Error: {str(e)}"
+            return
+
+    if _use_ollama():
+        yield _call_ollama_chat(messages)
+        return
+
     if GEMINI_API_KEY and _GEMINI_CLIENT:
         try:
             sys_inst, contents = _format_messages_for_genai(messages)

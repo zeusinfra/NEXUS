@@ -1,9 +1,0 @@
-🌑 Iniciando ZEUS em modo Headless (Cérebro em Background)...
-🦀 Iniciando Microsserviços Rust (Watcher & Memory)...
-🧠 ZEUS Core operacional. Conecte-se via App Mobile.
-Resource Exhaustion Warning: CPU 97.9% RAM 77.3%
-Resource Exhaustion Warning: CPU 97.9% RAM 77.5%
-Resource Exhaustion Warning: CPU 99.4% RAM 76.3%
-Resource Exhaustion Warning: CPU 99.5% RAM 79.9%
-./bin/zeus: line 42: 1193586 Killed                  cargo run --release --bin memory_service > ../../logs/memory.log 2>&1
-./bin/zeus: line 41: 1193585 Killed                  cargo run --release > ../logs/watcher.log 2>&1

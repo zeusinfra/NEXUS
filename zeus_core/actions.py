@@ -9,6 +9,7 @@ import subprocess
 from pathlib import Path
 from typing import Any, Dict
 
+from zeus_core.command_policy import validate_command
 from zeus_core.tools import ToolError, get_time, read_file, write_file
 from zeus_core.vision import (
     analyze_image_with_llm,
@@ -49,22 +50,13 @@ def _resolve_project_path(path: str) -> Path:
 def cmd_control(parameters: dict) -> dict:
     command = (parameters or {}).get("command") or (parameters or {}).get("task") or ""
     timeout_s = int((parameters or {}).get("timeout_s") or 30)
+    confirmed = bool((parameters or {}).get("confirmed"))
     command = str(command).strip()
     if not command:
         raise ToolError("cmd_control requer 'command' (ou 'task').")
 
-    # Bloqueios básicos (defesa em profundidade)
-    blocked_tokens = {
-        "mkfs", "dd", "shutdown", "reboot", "poweroff", "halt",
-        "passwd", "usermod", "useradd", "groupadd", "visudo",
-        "mount", "umount",
-    }
     tokens = shlex.split(command)
-    if tokens and tokens[0] in blocked_tokens:
-        raise ToolError(f"Comando bloqueado por segurança: {tokens[0]}")
-
-    if tokens and tokens[0] == "rm":
-        raise ToolError("Remoção via rm bloqueada. Use file_controller delete.")
+    decision = validate_command(command, tokens, confirmed=confirmed)
 
     root = _project_root()
     try:
@@ -83,6 +75,8 @@ def cmd_control(parameters: dict) -> dict:
 
     return {
         "command": command,
+        "category": decision.category,
+        "requires_confirmation": decision.requires_confirmation,
         "cwd": str(root),
         "exit_code": completed.returncode,
         "stdout": (completed.stdout or "")[:50_000],

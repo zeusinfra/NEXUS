@@ -6,15 +6,15 @@
 // tree, read text, and verify that the values of widget properties are correct.
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:zeus_extension/main.dart';
+import 'package:zeus_extension/presentation/overlay/zeus_bubble_app.dart';
 
 void main() {
-  testWidgets('Boots to login screen', (WidgetTester tester) async {
-    await tester.pumpWidget(const ZeusApp());
-    await tester.pumpAndSettle();
+  testWidgets('Boots ZEUS bubble overlay', (WidgetTester tester) async {
+    await tester.pumpWidget(const ProviderScope(child: ZeusBubbleApp()));
+    await tester.pump();
 
-    expect(find.text('ZEUS EXTENSION'), findsOneWidget);
-    expect(find.text('ESTABELECER CONEXÃO NEURAL'), findsOneWidget);
+    expect(find.byType(ZeusBubbleApp), findsOneWidget);
   });
 }

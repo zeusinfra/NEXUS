@@ -6,6 +6,8 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from zeus_core.core_system import _extract_message_content
+from zeus_core import core_system
+from zeus_core.health_status import build_watcher_status
 from pattern_engine import PatternEngine
 import web_gui
 
@@ -22,6 +24,54 @@ class BackendRegressionTests(unittest.TestCase):
             ]
         }
         self.assertEqual(_extract_message_content(payload), "resposta ok")
+
+    def test_openai_status_does_not_expose_api_key(self):
+        original_provider = core_system.LLM_PROVIDER
+        original_key = core_system.OPENAI_API_KEY
+        original_model = core_system.OPENAI_MODEL
+        try:
+            core_system.LLM_PROVIDER = "openai"
+            core_system.OPENAI_API_KEY = "sk-test-secret"
+            core_system.OPENAI_MODEL = "gpt-4o-mini"
+
+            status = core_system.get_llm_status()
+
+            self.assertEqual(status["provider"], "openai")
+            self.assertEqual(status["model"], "gpt-4o-mini")
+            self.assertTrue(status["configured"])
+            self.assertNotIn("api_key", status)
+            self.assertNotIn("sk-test-secret", str(status))
+        finally:
+            core_system.LLM_PROVIDER = original_provider
+            core_system.OPENAI_API_KEY = original_key
+            core_system.OPENAI_MODEL = original_model
+
+    def test_openai_error_maps_insufficient_quota(self):
+        class Response:
+            status_code = 429
+            text = '{"error":{"code":"insufficient_quota"}}'
+
+            def json(self):
+                return {"error": {"code": "insufficient_quota", "message": "quota exceeded"}}
+
+        msg = core_system._format_openai_error(Response())
+        self.assertIn("billing", msg.lower())
+        self.assertIn("quota", msg.lower())
+
+    def test_ollama_cloud_unauthorized_error_mentions_auth_options(self):
+        class Response:
+            status_code = 401
+            text = "Unauthorized"
+
+        msg = core_system._format_ollama_error(Response())
+        self.assertIn("Ollama Cloud", msg)
+        self.assertIn("ollama signin", msg)
+        self.assertIn("OLLAMA_API_KEY", msg)
+
+    def test_watcher_status_reports_offline_without_process(self):
+        status = build_watcher_status(None, None, None)
+        self.assertEqual(status["status"], "offline")
+        self.assertIsNone(status["pid"])
 
     def test_behavioral_state_ignores_missing_paths(self):
         engine = PatternEngine()

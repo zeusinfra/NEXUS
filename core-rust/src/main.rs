@@ -122,12 +122,12 @@ impl ZeusCore for ZeusCoreService {
 
         tokio::spawn(async move {
             loop {
-                {
+                let update = {
                     let mut sys = system_ref.lock().unwrap();
                     sys.refresh_all();
 
-                    let update = TelemetryUpdate {
-                        cpu_usage: sys.global_cpu_usage(),
+                    TelemetryUpdate {
+                        cpu_usage: sys.global_cpu_info().cpu_usage(),
                         ram_usage: if sys.total_memory() == 0 {
                             0.0
                         } else {
@@ -140,7 +140,7 @@ impl ZeusCore for ZeusCoreService {
                             .take(25)
                             .map(|(pid, proc_)| ProcessInfo {
                                 pid: pid.as_u32(),
-                                name: proc_.name().to_string_lossy().to_string(),
+                                name: proc_.name().to_string(),
                                 cpu_percent: proc_.cpu_usage(),
                                 mem_percent: if sys.total_memory() == 0 {
                                     0.0
@@ -149,11 +149,11 @@ impl ZeusCore for ZeusCoreService {
                                 },
                             })
                             .collect(),
-                    };
-
-                    if tx.send(Ok(update)).await.is_err() {
-                        break;
                     }
+                };
+
+                if tx.send(Ok(update)).await.is_err() {
+                    break;
                 }
                 tokio::time::sleep(Duration::from_secs(2)).await;
             }

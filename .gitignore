@@ -21,14 +21,18 @@ zeus_extension/*.iml
 # Logs / runtime artifacts
 logs/*.log
 logs/*.jsonl
+*.log
 zeus_core.log
 zeus_server.log
+startup_test*.log
 zeus_extension_v1.1.apk
 
 # Environment / Secrets
 .env
 .env.*
 !.env.example
+configs/*.pem
+configs/serviceAccountKey.json
 
 # IDEs / Editors
 .vscode/
@@ -40,6 +44,7 @@ zeus_extension_v1.1.apk
 data/
 *.db
 *.sqlite
+scratch/
 
 # OS files
 .DS_Store

@@ -1,4 +1,0 @@
-Goal: Otimizar workflow do usuário
-Situation: os_pressure_critical
-Plan: Otimizar workflow do usuário mitigando a pressão crítica do sistema
-Reward: 0.6959748054078081

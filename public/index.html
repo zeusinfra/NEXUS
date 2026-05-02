@@ -68,6 +68,26 @@ body{background:radial-gradient(circle at 50% 45%, rgba(0,229,255,.08), transpar
 .stat-box:hover{border-color:rgba(0,229,255,0.3)}
 .stat-box .val{font-family:var(--mono);font-size:.95rem;font-weight:700;color:var(--text);text-shadow:0 0 8px rgba(0,229,255,0.2)}
 .stat-box .lbl{font-size:.55rem;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:1px}
+.health-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.health-chip{min-height:64px;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.07);background:rgba(0,0,0,.22);display:flex;flex-direction:column;justify-content:space-between;gap:6px}
+.health-chip .lbl{font-size:.56rem;color:var(--muted);text-transform:uppercase;letter-spacing:.12em;font-family:var(--mono)}
+.health-chip .val{font-family:var(--mono);font-size:.72rem;color:var(--text);font-weight:700;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.health-chip.ok{border-color:rgba(121,255,210,.22);background:rgba(39,174,96,.08)}
+.health-chip.warn{border-color:rgba(255,200,87,.28);background:rgba(255,200,87,.07)}
+.health-chip.err{border-color:rgba(255,80,80,.28);background:rgba(255,80,80,.07)}
+.health-chip.ok .val{color:var(--c3)}
+.health-chip.warn .val{color:#ffc857}
+.health-chip.err .val{color:#ff7373}
+.state-rail{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
+.state-dot{height:28px;border-radius:999px;border:1px solid rgba(255,255,255,.06);background:rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:.56rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.state-dot.active{border-color:var(--c3);color:var(--c3);box-shadow:0 0 14px rgba(121,255,210,.12)}
+.mini-actions{display:flex;gap:8px;margin-top:10px}
+.mini-btn{height:32px;flex:1;border-radius:999px;border:1px solid rgba(0,229,255,.14);background:rgba(0,0,0,.22);color:var(--muted);font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.1em;cursor:pointer}
+.mini-btn:hover{border-color:var(--c3);color:var(--c3)}
+.config-list{display:grid;gap:7px;margin-top:10px;font-family:var(--mono);font-size:.62rem;color:rgba(224,240,255,.7)}
+.config-line{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid rgba(255,255,255,.05);padding-bottom:5px}
+.config-line span:first-child{color:var(--muted);text-transform:uppercase;letter-spacing:.1em}
+.config-line span:last-child{color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* Log Panel */
 .log-scroll{max-height:260px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(0,229,255,.2) transparent;display:flex;flex-direction:column;gap:8px;padding-right:4px}
@@ -149,6 +169,15 @@ body{background:radial-gradient(circle at 50% 45%, rgba(0,229,255,.08), transpar
 .voice-io.transcribing #pill-in .dot{background:#ffd700;box-shadow:0 0 15px #ffd700}
 .voice-io.speaking #pill-out .dot{background:var(--c3);box-shadow:0 0 15px var(--c3)}
 .voice-io.speaking #pill-out .bars span{animation-duration:0.4s;opacity:0.9;background:var(--c3)}
+.chat-console{width:min(620px,92vw);max-height:170px;margin-top:10px;padding:10px;border-radius:16px;border:1px solid rgba(0,229,255,.12);background:rgba(5,12,22,.5);backdrop-filter:blur(16px);display:flex;flex-direction:column;gap:8px;overflow-y:auto;pointer-events:auto}
+.chat-row{display:grid;grid-template-columns:56px minmax(0,1fr);gap:8px;align-items:start;font-family:var(--mono);font-size:.68rem;line-height:1.45}
+.chat-role{font-size:.55rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);padding-top:2px}
+.chat-text{padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.05);color:rgba(224,240,255,.92);overflow-wrap:anywhere}
+.chat-row.user .chat-role{color:var(--c3)}
+.chat-row.ai .chat-role{color:var(--c)}
+.chat-row.tool .chat-role{color:#ffc857}
+.chat-row.error .chat-role{color:#ff7373}
+.chat-row.error .chat-text{border-color:rgba(255,80,80,.2);background:rgba(255,80,80,.06)}
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes vu{0%,100%{height:3px;opacity:.35}40%{height:12px;opacity:.9}70%{height:6px;opacity:.6}}
 
@@ -228,7 +257,7 @@ body{background:radial-gradient(circle at 50% 45%, rgba(0,229,255,.08), transpar
 <body>
 <div class="app">
   <header class="topbar">
-    <div class="brand">ZEUS CORE <span style="color:var(--c3)">GEMINI 3</span> <span class="dot"></span> <span class="online-tag">Online</span> <span id="rust-badge" class="rust-tag">Rust Engine</span></div>
+    <div class="brand">ZEUS CORE <span style="color:var(--c3)" id="brand-provider">LLM</span> <span class="dot"></span> <span class="online-tag">Online</span> <span id="rust-badge" class="rust-tag">Rust Engine</span></div>
     <div class="top-center"><span class="dot-sm"></span><span id="clock">--:--:--</span> | <span id="date">--</span></div>
     <div class="top-right">
       <span id="weather">⚙</span>
@@ -252,6 +281,36 @@ body{background:radial-gradient(circle at 50% 45%, rgba(0,229,255,.08), transpar
           <div class="stat-box"><div class="val" id="sg-mem">0%</div><div class="lbl">Recall</div></div>
           <div class="stat-box"><div class="val" id="sg-disk">0</div><div class="lbl">Conexões</div></div>
           <div class="stat-box"><div class="val" id="u-evts">0</div><div class="lbl">Eventos</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h3>◈ LLM e Health</h3><span style="font-family:var(--mono);font-size:.6rem;color:var(--muted)" id="health-age">--</span></div>
+      <div class="card-body">
+        <div class="health-grid">
+          <div class="health-chip warn" id="h-llm"><div class="lbl">LLM</div><div class="val">verificando</div></div>
+          <div class="health-chip warn" id="h-model"><div class="lbl">Modelo</div><div class="val">--</div></div>
+          <div class="health-chip warn" id="h-memory"><div class="lbl">Memória</div><div class="val">--</div></div>
+          <div class="health-chip warn" id="h-watcher"><div class="lbl">Watcher</div><div class="val">--</div></div>
+          <div class="health-chip warn" id="h-voice"><div class="lbl">Voz/ASR</div><div class="val">--</div></div>
+          <div class="health-chip warn" id="h-security"><div class="lbl">Segurança</div><div class="val">--</div></div>
+        </div>
+        <div class="state-rail" id="state-rail">
+          <div class="state-dot active" data-state="idle">Idle</div>
+          <div class="state-dot" data-state="listening">Listen</div>
+          <div class="state-dot" data-state="thinking">Think</div>
+          <div class="state-dot" data-state="speaking">Speak</div>
+        </div>
+        <div class="mini-actions">
+          <button class="mini-btn" id="llm-test-btn" type="button">Testar LLM</button>
+          <button class="mini-btn" id="config-toggle-btn" type="button">Config</button>
+        </div>
+        <div class="config-list" id="config-list" hidden>
+          <div class="config-line"><span>Provider</span><span id="cfg-provider">--</span></div>
+          <div class="config-line"><span>Modelo</span><span id="cfg-model">--</span></div>
+          <div class="config-line"><span>LAN</span><span id="cfg-lan">--</span></div>
+          <div class="config-line"><span>Bind</span><span id="cfg-bind">--</span></div>
         </div>
       </div>
     </div>
@@ -299,6 +358,7 @@ body{background:radial-gradient(circle at 50% 45%, rgba(0,229,255,.08), transpar
         </div>
         <div class="sub" id="voice-sub">Aguardando atividade neural...</div>
       </div>
+      <div class="chat-console" id="chat-console"></div>
     </div>
     <!-- Floating Neural Labels -->
     <div id="neural-labels-container" style="position:absolute; inset:0; pointer-events:none; z-index:10; overflow:hidden"></div>
@@ -826,11 +886,16 @@ const voiceIo=document.getElementById('voice-io');
 const voiceSub=document.getElementById('voice-sub');
 const voiceInLabel=document.getElementById('voice-in-label');
 const voiceOutLabel=document.getElementById('voice-out-label');
+const chatConsole=document.getElementById('chat-console');
 let voiceStage='idle';
 let voiceBoost=0;
 const appEl=document.querySelector('.app');
 const toggleSidebarsBtn=document.getElementById('toggle-sidebars-btn');
 const resetOrbBtn=document.getElementById('reset-orb-btn');
+const llmTestBtn=document.getElementById('llm-test-btn');
+const configToggleBtn=document.getElementById('config-toggle-btn');
+const configList=document.getElementById('config-list');
+let latestHealth=null;
 
 function normalizeCpuLoad(value){
   if(Array.isArray(value)){
@@ -872,6 +937,12 @@ function setCoreStatus(text){
   document.getElementById('system-note-body').textContent=text;
 }
 
+function setStateRail(active){
+  document.querySelectorAll('#state-rail .state-dot').forEach(el=>{
+    el.classList.toggle('active',el.dataset.state===active);
+  });
+}
+
 function setVoiceStage(stage){
   voiceStage=stage||'idle';
   voiceIo.classList.remove('idle','listening','transcribing','speaking');
@@ -892,6 +963,7 @@ function setVoiceStage(stage){
     voiceInLabel.textContent='INPUT';
     voiceOutLabel.textContent='OUTPUT';
   }
+  setStateRail(voiceStage==='transcribing'?'thinking':voiceStage);
 }
 
 function syncSidebarButton(){
@@ -902,6 +974,7 @@ function syncSidebarButton(){
 function toggleSidebars(force){
   sidebarsHidden=typeof force==='boolean'?force:!sidebarsHidden;
   appEl.classList.toggle('sidebars-hidden',sidebarsHidden);
+  localStorage.setItem('ZEUS_SIDEBARS_HIDDEN',sidebarsHidden?'1':'0');
   syncSidebarButton();
   pulseOrb(sidebarsHidden ? .24 : .18,sidebarsHidden ? .05 : -.03,0);
   setCoreStatus(sidebarsHidden?'Focus mode enabled.':'Side panels restored.');
@@ -1173,6 +1246,14 @@ Zeus.capabilities = Zeus.capabilities || {asrBackend:false, ocr:false};
 function addMsg(role, text){
   const prefix = role==='user' ? '[USER]' : '[ZEUS]';
   addLog({title: prefix, detail: text}, role==='user' ? 'l' : 'e');
+  if(chatConsole){
+    const row=document.createElement('div');
+    row.className=`chat-row ${role==='user'?'user':role==='ai'?'ai':'tool'}`;
+    row.innerHTML=`<div class="chat-role">${role==='user'?'User':role==='ai'?'ZEUS':'Tool'}</div><div class="chat-text">${escapeHtml(text||'')}</div>`;
+    chatConsole.appendChild(row);
+    while(chatConsole.children.length>18)chatConsole.removeChild(chatConsole.firstChild);
+    chatConsole.scrollTop=chatConsole.scrollHeight;
+  }
   if(role==='ai') {
     pulseOrb(0.3);
     setCoreStatus('Processando resposta neural...');
@@ -1192,12 +1273,100 @@ document.addEventListener('keydown',e=>{
 });
 
 syncSidebarButton();
+if(localStorage.getItem('ZEUS_SIDEBARS_HIDDEN')==='1'){
+  toggleSidebars(true);
+}
+
+function setHealthChip(id,state,value){
+  const el=document.getElementById(id);
+  if(!el)return;
+  el.classList.remove('ok','warn','err');
+  el.classList.add(state||'warn');
+  const val=el.querySelector('.val');
+  if(val)val.textContent=value||'--';
+}
+
+async function refreshHealth(){
+  try{
+    const res=await fetch('/api/health',{cache:'no-store'});
+    if(!res.ok)throw new Error(`HTTP ${res.status}`);
+    const h=await res.json();
+    latestHealth=h;
+    const llm=h.llm||{};
+    const provider=(llm.provider||'none').toUpperCase();
+    document.getElementById('brand-provider').textContent=provider;
+    setHealthChip('h-llm',llm.configured?'ok':'err',`${provider} ${llm.configured?'ON':'OFF'}`);
+    setHealthChip('h-model',llm.model?'ok':'warn',llm.model||'sem modelo');
+    setHealthChip('h-memory',h.memory?.status==='online'?'ok':'warn',h.memory?.status||'unknown');
+    const watcherText=h.watcher?.last_event_age_s!=null ? `online · ${h.watcher.last_event_age_s}s` : (h.watcher?.status||'unknown');
+    setHealthChip('h-watcher',h.watcher?.status==='online'?'ok':'warn',watcherText);
+    const voiceOk=!!h.voice?.enabled;
+    const asrOk=!!h.asr?.backend_available;
+    setHealthChip('h-voice',(voiceOk||asrOk)?'ok':'warn',`${voiceOk?'voz':'texto'} / ${asrOk?'asr':'sem asr'}`);
+    const sec=h.security||{};
+    const cfg=h.config||{};
+    const cfgWarnings=Array.isArray(cfg.warnings)?cfg.warnings.length:0;
+    const secOk=cfgWarnings===0 && (!sec.allow_lan || sec.lan_auth_enabled);
+    const secText=cfgWarnings?`${cfg.env||'env'} · ${cfgWarnings} aviso${cfgWarnings>1?'s':''}`:(sec.allow_lan?`LAN ${sec.lan_auth_enabled?'auth':'aberta'}`:(cfg.env||'local'));
+    setHealthChip('h-security',secOk?'ok':'err',secText);
+    document.getElementById('cfg-provider').textContent=llm.provider||'--';
+    document.getElementById('cfg-model').textContent=llm.model||'--';
+    document.getElementById('cfg-lan').textContent=sec.allow_lan?`enabled / auth=${!!sec.lan_auth_enabled}`:'disabled';
+    document.getElementById('cfg-bind').textContent=sec.bind_host||'--';
+    document.getElementById('health-age').textContent=new Date().toLocaleTimeString('pt-BR',{hour12:false});
+  }catch(err){
+    setHealthChip('h-llm','err','health offline');
+    setHealthChip('h-memory','warn','--');
+    setHealthChip('h-watcher','warn','--');
+    setHealthChip('h-voice','warn','--');
+    setHealthChip('h-security','warn','--');
+    addLog({title:'Health indisponível',detail:String(err&&err.message||err)},'a');
+  }
+}
+
+async function testLlm(){
+  if(!llmTestBtn)return;
+  llmTestBtn.disabled=true;
+  llmTestBtn.textContent='Testando...';
+  setCoreStatus('Testando conectividade do LLM...');
+  try{
+    const res=await fetch('/api/llm/test',{method:'POST'});
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.detail||`HTTP ${res.status}`);
+    if(data.ok){
+      addLog({title:'Teste LLM OK',detail:data.reply||'Modelo respondeu.',meta:`latency=${data.latency_ms}ms`},'l');
+      setCoreStatus(`LLM operacional em ${data.latency_ms}ms.`);
+      setHealthChip('h-llm','ok',`${(data.status?.provider||'LLM').toUpperCase()} OK`);
+    }else{
+      addLog({title:'Teste LLM falhou',detail:data.reply||data.error||'Resposta inválida.',meta:`latency=${data.latency_ms}ms`},'a');
+      setCoreStatus('Teste LLM falhou. Verifique chave, billing ou modelo.');
+      setHealthChip('h-llm','err','teste falhou');
+    }
+  }catch(err){
+    addLog({title:'Teste LLM indisponível',detail:String(err&&err.message||err)},'a');
+    setCoreStatus('Não foi possível testar o LLM.');
+    setHealthChip('h-llm','err','erro');
+  }finally{
+    llmTestBtn.disabled=false;
+    llmTestBtn.textContent='Testar LLM';
+  }
+}
+
+if(llmTestBtn)llmTestBtn.onclick=testLlm;
+if(configToggleBtn)configToggleBtn.onclick=()=>{
+  const hidden=!configList.hidden;
+  configList.hidden=hidden;
+  localStorage.setItem('ZEUS_CONFIG_OPEN',hidden?'0':'1');
+};
+if(configList && localStorage.getItem('ZEUS_CONFIG_OPEN')==='1')configList.hidden=false;
 
 setTimeout(() => {
     resetOrbState();
+    refreshHealth();
     initRustHub();
     connectRealtime();
 }, 100);
+setInterval(refreshHealth,15000);
 
 
 
@@ -1306,6 +1475,7 @@ function handleRealtimeEvent(d){
     setCoreStatus(`Navegacao ativa em ${d.domain||'web'}.`);
   }else if(d.type==='CHAT_USER'){
     window._current_ai_text = '';
+    setStateRail('thinking');
     addMsg('user', d.message);
   }else if(d.type==='CHUNK_AI'){
     if(!window._current_ai_text) window._current_ai_text = '';
@@ -1316,6 +1486,7 @@ function handleRealtimeEvent(d){
     pulseOrb(0.05);
   }else if(d.type==='CHAT_AI'){
     window._current_ai_text = '';
+    setStateRail('idle');
     addMsg('ai', d.message);
   }else if(d.type==='TOOL_LOG'){
     const tool = d.tool || 'tool';
@@ -1329,12 +1500,15 @@ function handleRealtimeEvent(d){
     if(stage==='awaiting_confirmation'){
       detail = `Aguardando confirmação para executar comando.`;
       setCoreStatus(`Trava ativa para ${tool}.`);
+      setStateRail('thinking');
     }else if(stage==='running'){
       detail = `Executando...`;
       setCoreStatus(`Executando ${tool}...`);
+      setStateRail('thinking');
     }else if(stage==='done'){
       detail = `Concluído.`;
       setCoreStatus(`Tool ${tool} concluída.`);
+      setStateRail('idle');
     }else if(stage==='step_start'){
       detail = d.description || 'Iniciando etapa do plano.';
       setCoreStatus(`Plano: ${tool} em execução...`);
@@ -1346,6 +1520,14 @@ function handleRealtimeEvent(d){
       setCoreStatus(`Falha em ${tool}.`);
     }
     addLog({title, detail, meta: metaBits.join(' ')}, stage==='step_failed' ? 'a' : 'e');
+    if(chatConsole && ['awaiting_confirmation','running','done','step_failed'].includes(stage)){
+      const row=document.createElement('div');
+      row.className=`chat-row ${stage==='step_failed'?'error':'tool'}`;
+      row.innerHTML=`<div class="chat-role">${stage==='step_failed'?'Erro':'Tool'}</div><div class="chat-text">${escapeHtml(`${tool}: ${detail}`)}</div>`;
+      chatConsole.appendChild(row);
+      while(chatConsole.children.length>18)chatConsole.removeChild(chatConsole.firstChild);
+      chatConsole.scrollTop=chatConsole.scrollHeight;
+    }
     applyVisualSignal({project:'OS_CORE',behavior:'CODING',entropy:0.22});
   }else if(d.type==='HUD_STATUS'){
     if(d.text) setCoreStatus(d.text);
@@ -1446,6 +1628,7 @@ function initRustHub() {
     ws.onopen = () => {
         console.log("🦀 ZEUS Rust Hub Connected");
         if(badge) badge.classList.add('active');
+        setHealthChip('h-watcher','ok','online');
         setCoreStatus("Motor Rust conectado: Telemetria em tempo real ativa.");
     };
 
@@ -1462,6 +1645,7 @@ function initRustHub() {
 
     ws.onclose = () => {
         if(badge) badge.classList.remove('active');
+        setHealthChip('h-watcher','warn','reconectando');
         setTimeout(initRustHub, 5000); 
     };
 }

@@ -38,18 +38,17 @@ final zeusGatewayProvider = Provider<ZeusGatewayService>((ref) {
 final connectionStateProvider =
     StateProvider<ZeusConnectionState>((_) => ZeusConnectionState.disconnected);
 
-final chatHistoryProvider = StateProvider<List<Map<String, dynamic>>>((_) => const []);
+final chatHistoryProvider =
+    StateProvider<List<Map<String, dynamic>>>((_) => const []);
 
 final bubbleStateProvider =
     StateNotifierProvider<BubbleStateController, BubbleState>((ref) {
-  final controller = BubbleStateController(
+  return BubbleStateController(
     ref.read(zeusGatewayProvider),
     ref.read(connectionStateProvider.notifier),
     ref.read(voiceServiceProvider),
     ref.read(chatHistoryProvider.notifier),
   );
-  ref.onDispose(controller.dispose);
-  return controller;
 });
 
 class ZeusConfigController extends StateNotifier<ZeusConfig> {
@@ -78,9 +77,11 @@ class ZeusConfigController extends StateNotifier<ZeusConfig> {
 }
 
 class BubbleStateController extends StateNotifier<BubbleState> {
-  BubbleStateController(this._gateway, this._connectionStateNotifier, this._voiceService, [this._historyState])
+  BubbleStateController(
+      this._gateway, this._connectionStateNotifier, this._voiceService,
+      [this._historyState])
       : super(BubbleState.idle) {
-    _init();
+    Future.microtask(_init);
   }
 
   final ZeusGatewayService _gateway;
@@ -89,31 +90,45 @@ class BubbleStateController extends StateNotifier<BubbleState> {
   final StateController<List<Map<String, dynamic>>>? _historyState;
   StreamSubscription<ZeusEvent>? _eventSubscription;
   StreamSubscription<ZeusConnectionState>? _connectionSubscription;
+  StreamSubscription<List<Map<String, dynamic>>>? _historySubscription;
 
   Future<void> _init() async {
+    if (!mounted) return;
     _connectionStateNotifier.state = ZeusConnectionState.connecting;
     await _gateway.connect();
+    if (!mounted) return;
     _eventSubscription = _gateway.events.listen(_onEvent);
     _connectionSubscription = _gateway.connectionState.listen((state) {
+      if (!mounted) return;
       _connectionStateNotifier.state = state;
     });
-    _gateway.history.listen((h) {
+    _historySubscription = _gateway.history.listen((h) {
+      if (!mounted) return;
       _historyState?.state = h;
     });
   }
 
   Future<void> activateListening() async {
+    if (!mounted) return;
     state = BubbleState.listening;
     await _gateway.sendUserInput('__voice_start__');
   }
 
   Future<void> sendText(String text) async {
     if (text.trim().isEmpty) return;
+    if (!mounted) return;
     state = BubbleState.thinking;
     await _gateway.sendUserInput(text);
   }
 
+  Future<void> requestVisionAnalysis() async {
+    if (!mounted) return;
+    state = BubbleState.thinking;
+    await _gateway.sendUserInput('__vision_analyze__');
+  }
+
   void _onEvent(ZeusEvent event) {
+    if (!mounted) return;
     switch (event.type) {
       case 'thinking':
         state = BubbleState.thinking;
@@ -128,12 +143,57 @@ class BubbleStateController extends StateNotifier<BubbleState> {
         state = BubbleState.idle;
         break;
       case 'voice_play':
+        state = BubbleState.speaking;
         if (event.payload['audio'] != null) {
           _voiceService.playBase64Audio(event.payload['audio'] as String);
         } else if (event.payload['text'] != null) {
           _voiceService.speak(event.payload['text'] as String);
         }
         break;
+
+      // --- Voice Sensing Pipeline Events ---
+      case 'VOICE_STATE':
+        final stage = event.payload['stage']?.toString() ?? '';
+        switch (stage) {
+          case 'listening':
+            state = BubbleState.listening;
+            break;
+          case 'transcribing':
+            state = BubbleState.thinking;
+            break;
+          case 'speaking':
+            state = BubbleState.speaking;
+            break;
+          case 'idle':
+            state = BubbleState.idle;
+            break;
+        }
+        break;
+
+      case 'AUDIO_RESPONSE':
+        // Backend TTS audio chunk (base64 MP3)
+        final audio = event.payload['audio']?.toString();
+        if (audio != null && audio.isNotEmpty) {
+          state = BubbleState.speaking;
+          _voiceService.playBase64Audio(audio);
+        }
+        break;
+
+      case 'HUD_STATUS':
+        // Status updates — detect cognitive processing
+        final text = event.payload['text']?.toString() ?? '';
+        if (text.contains('processando') || text.contains('cognitivo')) {
+          state = BubbleState.thinking;
+        } else if (text.contains('Aguardando')) {
+          state = BubbleState.idle;
+        }
+        break;
+
+      case 'CHAT_AI':
+        // AI response received — return to idle after a delay
+        state = BubbleState.idle;
+        break;
+
       default:
         break;
     }
@@ -143,6 +203,7 @@ class BubbleStateController extends StateNotifier<BubbleState> {
   void dispose() {
     _eventSubscription?.cancel();
     _connectionSubscription?.cancel();
+    _historySubscription?.cancel();
     super.dispose();
   }
 }

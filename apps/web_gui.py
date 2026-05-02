@@ -12,21 +12,21 @@ import shutil
 import subprocess
 import base64
 import importlib.util
-import ipaddress
 import uuid
 from pathlib import Path
 from collections import Counter
 from communication.voice_service import voice_service
 from urllib.parse import urlparse
-from urllib.parse import parse_qs
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+from apps.realtime_hub import RealtimeDeps, RealtimeHub
+from apps.status_routes import StatusRouteDeps, create_status_router
 from pattern_engine import PatternEngine
 from apps.zeus_evolution import ZeusBrain
-from zeus_core.core_system import call_cloud_llm
+from zeus_core.core_system import call_cloud_llm, get_llm_status
 from zeus_core.agent import Agent
 from zeus_core.vector_memory import VectorMemory
 from zeus_core.voice_sensing import VoiceSensing
-from zeus_core.vision import analyze_image_with_llm, analyze_with_ocr_fallback, is_tesseract_available
+from zeus_core.vision import analyze_image_with_llm, analyze_with_ocr_fallback, is_tesseract_available, capture_screen
 from zeus_core.resource_control import ResourceControl
 from zeus_core.long_term_memory import (
     extract_memory,
@@ -36,8 +36,22 @@ from zeus_core.long_term_memory import (
     update_memory as update_long_memory,
 )
 from zeus_core.asr import transcribe_audio_bytes
+from zeus_core.config_guard import LanSecurityConfig, build_config_diagnostics, env_flag, validate_startup_config
+from zeus_core.event_pipeline import OverflowEventQueue, RustWatcherRunner
+from zeus_core.llm_service import LLMService
 from zeus_core.memory_manager import MemoryManager
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request
+from zeus_core.health_status import build_runtime_health, build_watcher_status
+from zeus_core.observability import correlation_id_middleware, get_logger, get_metrics_snapshot, log_event, setup_logging
+from zeus_core.security_guard import (
+    extract_bearer_token,
+    is_local_host,
+    is_local_request,
+    is_trusted_host,
+    is_trusted_request,
+    require_lan_token_for_request,
+    require_lan_token_for_socketio,
+)
+from fastapi import FastAPI, WebSocket, HTTPException, Request
 from fastapi.responses import StreamingResponse, RedirectResponse
 import socketio
 
@@ -46,14 +60,9 @@ from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from pydantic import BaseModel
-import auth
-try:
-    import firebase_admin  # type: ignore
-    from firebase_admin import credentials, messaging  # type: ignore
-except Exception:
-    firebase_admin = None
-    credentials = None
-    messaging = None
+
+setup_logging(os.getenv("ZEUS_LOG_LEVEL", "INFO"))
+logger = get_logger("zeus.web")
 
 # --- CONFIGURAÇÕES ---
 WATCH_DIRS = [str(PROJECT_ROOT)]
@@ -64,9 +73,7 @@ DEFAULT_ALLOWED_ORIGINS = [
     "http://localhost:8080",
     "https://localhost:8080",
 ]
-
-def _env_flag(name: str, default: str = "0") -> bool:
-    return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
+_env_flag = env_flag
 
 ALLOW_LAN = _env_flag("ZEUS_ALLOW_LAN", "0")
 DISABLE_SSL = _env_flag("ZEUS_DISABLE_SSL", "0")
@@ -84,10 +91,8 @@ ALLOWED_ORIGINS = [
     for origin in os.getenv("ZEUS_ALLOWED_ORIGINS", ",".join(DEFAULT_ALLOWED_ORIGINS)).split(",")
     if origin.strip()
 ]
-if ALLOW_LAN:
-    ALLOWED_ORIGINS = ["*"]
 
-SERVER_HOST = os.getenv("ZEUS_BIND_HOST", "0.0.0.0")
+SERVER_HOST = os.getenv("ZEUS_BIND_HOST", "0.0.0.0" if ALLOW_LAN else "127.0.0.1")
 SERVER_PORT = int(os.getenv("ZEUS_PORT", "8080"))
 PROJECT_COLORS = {
     "ZEUS_BRAIN": "#00f0ff",
@@ -129,11 +134,12 @@ def persist_memory_if_needed():
 # --- STATE ---
 sio = socketio.AsyncServer(
     async_mode='asgi',
-    cors_allowed_origins="*" if "*" in ALLOWED_ORIGINS else ALLOWED_ORIGINS
+    cors_allowed_origins=ALLOWED_ORIGINS
 )
 
 # Definindo variáveis de estado PRIMEIRO
-socketio_clients: set[str] = set()
+realtime_hub = RealtimeHub(sio)
+llm_service = LLMService(get_status=get_llm_status, call_llm=call_cloud_llm)
 nodes_data = []
 total_events = 0
 recent_events_count = 0
@@ -141,7 +147,8 @@ system_mood = "CALM"
 current_node = "N/A"
 recent_events = []
 loop = None
-event_queue = asyncio.Queue()
+event_pipeline = OverflowEventQueue(EVENT_QUEUE_MAXSIZE)
+watcher_runner = RustWatcherRunner(PROJECT_ROOT)
 _scan_lock = False  # Proteção contra scans simultâneos
 MEMORY_FILE = os.path.join(BASE_DIR, "data", "synaptic_memory.json")
 memory_manager = MemoryManager(db_path=os.path.join(BASE_DIR, "data", "zeus_memory.db"))
@@ -153,21 +160,6 @@ voice_module = VoiceSensing(wake_word=os.getenv("ZEUS_WAKE_WORD", "zeus"))
 WATCH_ROOTS = [Path(path).resolve() for path in WATCH_DIRS if os.path.exists(path)]
 long_term_memory = load_long_memory()
 resource_control = ResourceControl(brain.blackboard, {}) # Integrando controle de recursos
-
-# NEW: Message Inbox for Polling clients { client_id: [messages] }
-client_inboxes = {}
-mobile_clients = set()
-mobile_fcm_tokens = {} # { device_id: fcm_token }
-
-# Firebase Initialization
-firebase_app = None
-if firebase_admin and os.path.exists("configs/serviceAccountKey.json"):
-    try:
-        cred = credentials.Certificate("configs/serviceAccountKey.json")
-        firebase_app = firebase_admin.initialize_app(cred)
-        print("🔥 Firebase Admin SDK initialized.")
-    except Exception as e:
-        print(f"⚠️ Firebase Init Error: {e}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -230,39 +222,10 @@ async def lifespan(app: FastAPI):
         pass
 
 app = FastAPI(lifespan=lifespan)
+app.middleware("http")(correlation_id_middleware)
 
 
-async def send_push_notification(title: str, body: str, data: dict = None):
-    if not firebase_app:
-        return
-    
-    messages = []
-    for token in mobile_fcm_tokens.values():
-        messages.append(messaging.Message(
-            notification=messaging.Notification(title=title, body=body),
-            data=data or {},
-            token=token,
-        ))
-    
-    if messages:
-        try:
-            response = messaging.send_all(messages)
-            print(f"🔔 Push sent: {response.success_count} success")
-        except Exception as e:
-            print(f"⚠️ Push Error: {e}")
 
-class LoginRequest(BaseModel):
-    token: str # Por enquanto usaremos o ZEUS_MOBILE_TOKEN como "senha"
-
-@app.post("/api/mobile/login")
-async def mobile_login(req: LoginRequest, request: Request):
-    if not _is_trusted_request(request):
-        raise HTTPException(status_code=403, detail="Only trusted (local/LAN) requests are allowed.")
-    _require_lan_token_for_request(request)
-    if req.token == ZEUS_MOBILE_TOKEN:
-        access_token = auth.create_access_token(data={"sub": "zeus_mobile_extension"})
-        return {"access_token": access_token, "token_type": "bearer"}
-    raise HTTPException(status_code=401, detail="Invalid ZEUS Token")
 
 indexing_semaphore = asyncio.Semaphore(2)  # Limite de indexação simultânea
 LOW_MEM_AUTO = _env_flag("ZEUS_LOW_MEM_AUTO", "1")
@@ -278,51 +241,23 @@ LAST_WEB_URL = ""
 # Motor ReAct (Tool Calling)
 react_agent = Agent()
 
-# Reconfigura a fila com limite (reduz risco de RAM explodir em bursts do watcher)
-if EVENT_QUEUE_MAXSIZE and EVENT_QUEUE_MAXSIZE > 0:
-    event_queue = asyncio.Queue(maxsize=EVENT_QUEUE_MAXSIZE)
-
-
 async def enqueue_event(event: dict) -> None:
-    """
-    Enfileira eventos com política de overflow: descarta o mais antigo.
-    Isso evita crescimento ilimitado de RAM em bursts.
-    """
-    try:
-        event_queue.put_nowait(event)
-        return
-    except asyncio.QueueFull:
-        pass
-    except Exception:
-        return
+    await event_pipeline.enqueue(event)
 
-    # Fila cheia: tenta descartar 1 e inserir de novo.
-    try:
-        event_queue.get_nowait()
-    except Exception:
-        return
-    try:
-        event_queue.put_nowait(event)
-    except Exception:
-        return
 
-# Android Mobile State
-mobile_clients = set()
-ZEUS_MOBILE_TOKEN = os.getenv("ZEUS_MOBILE_TOKEN", "zeus_secure_123")
 
 
 async def speak(text, target: str = "all"):
-    """Toca TTS local (Edge-TTS + ffplay) via VoiceSensing quando habilitado e avisa clientes mobile."""
+    """Toca TTS local (Edge-TTS + ffplay) via VoiceSensing quando habilitado."""
     if not text or not text.strip():
         return
     try:
         if not ENABLE_VOICE:
-            # Em modo somente texto, não enviamos o comando de voz nem para mobile
+            # Em modo somente texto, apenas loga
             print(f"[ZEUS VOICE ALERT] {text}")
             return
 
-        # Sempre envia o comando de voz para App/Web.
-        # Assim, o mobile continua falando mesmo que o TTS local do servidor esteja desabilitado.
+        # Envia o comando de voz para a Bolha/Web via Socket.io
         await broadcast_message({
             "type": "voice_play",
             "text": text,
@@ -341,107 +276,44 @@ async def cleanup_voice_temp_files():
 
 
 def _is_local_request(request: Request) -> bool:
-    client = request.client
-    if client is None:
-        return False
-    return client.host in {"127.0.0.1", "::1", "localhost"}
+    return is_local_request(request)
 
 def _is_trusted_host(host: str | None) -> bool:
-    if not host:
-        return False
-    if host in {"127.0.0.1", "::1", "localhost"}:
-        return True
-    trusted = {h.strip() for h in os.getenv("ZEUS_TRUSTED_IPS", "").split(",") if h.strip()}
-    if host in trusted:
-        return True
-    if ALLOW_LAN:
-        return True # Permite qualquer host se LAN estiver habilitada
-    try:
-        ip = ipaddress.ip_address(host)
-    except Exception:
-        return False
-    return bool(ip.is_private or ip.is_loopback)
+    return is_trusted_host(host, allow_lan=ALLOW_LAN)
 
 def _is_trusted_request(request: Request) -> bool:
-    client = request.client
-    return _is_trusted_host(client.host if client else None)
+    return is_trusted_request(request, allow_lan=ALLOW_LAN)
 
 def _is_local_host(host: str | None) -> bool:
-    return bool(host and host in {"127.0.0.1", "::1", "localhost"})
+    return is_local_host(host)
+
+def _remote_auth_required() -> bool:
+    return ALLOW_LAN or not _is_local_host(SERVER_HOST)
 
 def _extract_bearer_token(value: str | None) -> str | None:
-    if not value:
-        return None
-    value = value.strip()
-    if not value:
-        return None
-    if value.lower().startswith("bearer "):
-        return value.split(" ", 1)[1].strip() or None
-    return value
+    return extract_bearer_token(value)
 
 def _require_lan_token_for_request(request: Request) -> None:
     """
     Quando ZEUS_ALLOW_LAN=1, exige token para chamadas vindas de hosts não-locais.
     Objetivo: evitar que qualquer device na LAN tenha acesso ao core.
     """
-    if not (ALLOW_LAN and LAN_AUTH_ENABLED):
-        return
-    client = request.client
-    host = client.host if client else None
-    if _is_local_host(host):
-        return
-    if not LAN_TOKEN:
-        raise HTTPException(status_code=500, detail="LAN token not configured on server.")
-    header_token = _extract_bearer_token(request.headers.get("authorization"))
-    header_token = header_token or _extract_bearer_token(request.headers.get("x-zeus-token"))
-    query_token = _extract_bearer_token(request.query_params.get("token"))
-    if (header_token or query_token) != LAN_TOKEN:
-        raise HTTPException(status_code=401, detail="Invalid or missing ZEUS LAN token.")
+    require_lan_token_for_request(request, lan=_build_lan_security_config())
 
 def _require_lan_token_for_socketio(environ: dict, auth_payload: dict | None) -> bool:
-    if not (ALLOW_LAN and LAN_AUTH_ENABLED):
-        return True
-    host = None
-    try:
-        host = environ.get("REMOTE_ADDR")
-    except Exception:
-        host = None
-    if not host:
-        try:
-            scope = environ.get("asgi.scope") or {}
-            client = scope.get("client")
-            host = client[0] if isinstance(client, (list, tuple)) and client else None
-        except Exception:
-            host = None
-    if _is_local_host(host):
-        return True
-    if not LAN_TOKEN:
-        return False
-    provided = None
-    if isinstance(auth_payload, dict):
-        provided = _extract_bearer_token(auth_payload.get("token"))
-    if not provided:
-        qs = environ.get("QUERY_STRING") or ""
-        try:
-            parsed = parse_qs(qs)
-            provided = _extract_bearer_token((parsed.get("token") or [None])[0])
-        except Exception:
-            provided = None
-    if not provided:
-        provided = _extract_bearer_token(environ.get("HTTP_X_ZEUS_TOKEN")) or _extract_bearer_token(environ.get("HTTP_AUTHORIZATION"))
-    return provided == LAN_TOKEN
+    return require_lan_token_for_socketio(environ, auth_payload, lan=_build_lan_security_config())
 
 def _validate_lan_security_config() -> None:
-    if not (ALLOW_LAN and LAN_AUTH_ENABLED):
-        return
-    if not LAN_TOKEN or len(LAN_TOKEN) < 16:
-        raise RuntimeError("ZEUS_LAN_TOKEN must be set (>=16 chars) when ZEUS_ALLOW_LAN=1 and ZEUS_LAN_AUTH=1.")
-    jwt_secret = os.getenv("ZEUS_JWT_SECRET", "").strip()
-    if not jwt_secret or jwt_secret == "super_secret_zeus_key_998877":
-        raise RuntimeError("ZEUS_JWT_SECRET must be set (avoid default) when ZEUS_ALLOW_LAN=1 and ZEUS_LAN_AUTH=1.")
-    mobile_token = os.getenv("ZEUS_MOBILE_TOKEN", "").strip()
-    if not mobile_token or mobile_token == "zeus_secure_123":
-        raise RuntimeError("ZEUS_MOBILE_TOKEN must be set (avoid default) when ZEUS_ALLOW_LAN=1 and ZEUS_LAN_AUTH=1.")
+    """Validate security when remote access is enabled by config or bind host."""
+    validate_startup_config(lan=_build_lan_security_config())
+
+def _build_lan_security_config() -> LanSecurityConfig:
+    return LanSecurityConfig(
+        allow_lan=ALLOW_LAN,
+        lan_auth_enabled=LAN_AUTH_ENABLED,
+        lan_token=LAN_TOKEN,
+        bind_host=SERVER_HOST,
+    )
 
 
 def _resolve_user_path(path: str) -> Path | None:
@@ -771,53 +643,9 @@ def summarize_batch(events):
     }
 
 
-def resolve_watcher_binary():
-    candidates = [
-        Path(BASE_DIR) / "watcher_rs" / "target" / "release" / "watcher_rs",
-        Path(BASE_DIR) / "watcher_rs" / "target" / "debug" / "watcher_rs",
-    ]
-    for candidate in candidates:
-        if candidate.exists():
-            return str(candidate)
-    return None
-
-
-async def log_subprocess_stream(stream, label):
-    while True:
-        line = await stream.readline()
-        if not line:
-            break
-        print(f"[{label}] {line.decode(errors='ignore').rstrip()}")
-
 async def run_rust_watcher():
     """Executes the Rust watcher and forwards events to the event_queue."""
-    binary_path = resolve_watcher_binary()
-    if not binary_path:
-        print("Rust watcher binary not found. Build watcher_rs before starting the GUI.")
-        return
-
-    process = await asyncio.create_subprocess_exec(
-        binary_path,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
-    stderr_task = asyncio.create_task(log_subprocess_stream(process.stderr, "watcher_rs"))
-    while True:
-        line = await process.stdout.readline()
-        if not line:
-            break
-        try:
-            data = json.loads(line.decode())
-            event = {
-                "type": "FILE_EVENT",
-                "event": data["event_type"],
-                "path": data["path"],
-                "project": data["project"],
-            }
-            await enqueue_event(event)
-        except Exception as e:
-            print(f"Error parsing Rust output: {e}")
-    await stderr_task
+    await watcher_runner.run(enqueue_event)
 
 _voice_task_running = False
 
@@ -926,10 +754,9 @@ async def low_mem_guard():
 
         await asyncio.sleep(3.0)
 
-# Update lifespan to use the Rust watcher instead of BrainWatcher
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if ALLOW_LAN else ALLOWED_ORIGINS,
+    allow_origins=ALLOWED_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -1048,10 +875,7 @@ async def get_status(request: Request):
     disk = psutil.disk_usage("/").percent
     
     # Collect pending messages for this client
-    pending_msgs = []
-    if client_id and client_id in client_inboxes:
-        pending_msgs = client_inboxes[client_id][:]
-        client_inboxes[client_id] = [] # Clear after delivery
+    pending_msgs = realtime_hub.drain_inbox(client_id)
     
     return {
         "cpu": cpu_per_core,
@@ -1064,91 +888,8 @@ async def get_status(request: Request):
         "messages": pending_msgs
     }
 
-@sio.on('connect')
-async def handle_connect(sid, environ, auth_payload=None):
-    host = None
-    try:
-        host = environ.get("REMOTE_ADDR")
-    except Exception:
-        host = None
-    if not host:
-        try:
-            scope = environ.get("asgi.scope") or {}
-            client = scope.get("client")
-            host = client[0] if isinstance(client, (list, tuple)) and client else None
-        except Exception:
-            host = None
-    if not _is_trusted_host(host):
-        print(f"[Socket.io] REJECTED connect from untrusted host: {host}")
-        return False
-    if not _require_lan_token_for_socketio(environ, auth_payload):
-        print(f"[Socket.io] REJECTED connect (invalid/missing token) host={host}")
-        return False
-    socketio_clients.add(sid)
-    print(f"[Socket.io] Client connected: {sid}")
-    try:
-        await sio.emit("message", _build_init_payload(), to=sid)
-    except Exception as e:
-        print(f"[Socket.io] Failed to send init payload to {sid}: {e}")
-
-@sio.on('disconnect')
-async def handle_disconnect(sid):
-    socketio_clients.discard(sid)
-    print(f"[Socket.io] Client disconnected: {sid}")
-
-@sio.on('audio_stream')
-async def handle_audio_stream(sid, data):
-    """
-    Recebe chunks de áudio base64 de clientes móveis/web.
-    Preparação para o modo Walkie-Talkie (Voz Duplex).
-    """
-    try:
-        # data expected to be a dict: {"audio": "base64_string..."}
-        if isinstance(data, dict) and "audio" in data:
-            chunk = data["audio"]
-            # Por enquanto, apenas logamos o recebimento pacífico para não travar o loop
-            # Futuramente isso irá para um buffer de transcrição nativa (Whisper/Vosk).
-            print(f"[Socket.io] Received audio chunk from {sid} (size: {len(chunk)} bytes)")
-        else:
-            print(f"[Socket.io] Invalid audio stream payload from {sid}")
-    except Exception as e:
-        print(f"[Socket.io] Error processing audio stream: {e}")
-
 async def broadcast_message(msg: dict):
-    """Envio massivo via Socket.io e WebSocket nativo mobile."""
-    try:
-        await sio.emit("message", msg)
-        
-        # NEW: Critical alerts also trigger Push Notification
-        if msg.get("type") == "alert" and msg.get("level") == "critical":
-            await send_push_notification("⚠️ ZEUS CRITICAL", msg.get("message", "Alerta crítico do sistema"))
-
-        dead_clients = set()
-        for client in mobile_clients:
-            try:
-                # Use send_text with ensure_ascii=False to fix accent issues on mobile
-                await client.send_text(json.dumps(msg, ensure_ascii=False))
-            except Exception:
-                dead_clients.add(client)
-        for c in dead_clients:
-            mobile_clients.discard(c)
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        print(f" [BROADCAST ERROR] {e} | MSG: {str(msg)[:200]}")
-    
-    if "client_id" in msg:
-        cid = msg["client_id"]
-        if cid not in client_inboxes:
-            client_inboxes[cid] = []
-        client_inboxes[cid].append(msg)
-        if len(client_inboxes[cid]) > 20:
-            client_inboxes[cid].pop(0)
-    else:
-        for cid in client_inboxes:
-            client_inboxes[cid].append(msg)
-            if len(client_inboxes[cid]) > 20:
-                client_inboxes[cid].pop(0)
+    await realtime_hub.broadcast_message(msg)
 
 async def voice_context_trigger(text: str, channel: str = "system"):
 
@@ -1200,7 +941,7 @@ async def event_batcher():
     global total_events, recent_events_count
     while True:
         events = []
-        first_event = await event_queue.get()
+        first_event = await event_pipeline.get()
         is_scan_burst = first_event.get("event") == "SCAN"
         batch_window = SCAN_BATCH_WINDOW if is_scan_burst else EVENT_BATCH_WINDOW
 
@@ -1213,8 +954,8 @@ async def event_batcher():
         pulse_first = pattern_engine.process_event(first_event)
 
         await asyncio.sleep(batch_window)
-        while not event_queue.empty() and len(events) < MAX_BATCH_EVENTS:
-            ev = event_queue.get_nowait()
+        while not event_pipeline.empty() and len(events) < MAX_BATCH_EVENTS:
+            ev = event_pipeline.get_nowait()
 
             if "type" in ev and ev["type"] == "FILE_EVENT":
                 await update_nodes_on_event(ev)
@@ -1458,7 +1199,7 @@ async def call_ollama(prompt: str) -> str:
 last_memory_save = time.time()
 
 SYSTEM_INSTRUCTIONS = (
-    "Você é o ZEUS, um Sistema Operacional Cognitivo de última geração baseado em Gemini 3 Flash. "
+    "Você é o ZEUS, um Sistema Operacional Cognitivo de última geração. "
     "Sua personalidade é imponente, técnica, onisciente e extremamente educada. "
     "Você deve ser formal, preciso e elegante em suas respostas. "
     "Você tem acesso total ao sistema de arquivos e ferramentas através do ReAct. "
@@ -1469,12 +1210,12 @@ async def boot_greeting():
     try:
         # Dá um tempinho para o servidor FastAPI subir completamente
         await asyncio.sleep(3)
-        prompt = "O sistema ZEUS (Núcleo Gemini 3) acaba de ser iniciado. Crie uma mensagem falada muito curta de boas-vindas (máximo 1 frase), chamando o usuário de 'Senhor'. Seja imponente, técnico e direto."
+        prompt = "O sistema ZEUS acaba de ser iniciado. Crie uma mensagem falada muito curta de boas-vindas (máximo 1 frase), chamando o usuário de 'Senhor'. Seja imponente, técnico e direto."
         reply = await call_ollama(prompt)
         if reply and reply.strip():
             await speak(reply)
         else:
-            await speak("Olá, Senhor. O sistema ZEUS Gemini 3 está online.")
+            await speak("Olá, Senhor. O sistema ZEUS está online.")
     except Exception as e:
         print(f"Erro na saudação inicial: {e}")
         await speak("Olá, Senhor. O sistema ZEUS está online.")
@@ -1492,7 +1233,7 @@ async def autonomous_reflection():
                 if not top_paths: continue
                 summary = "\n".join([f"{os.path.basename(p)} (peso:{m['weight']})" for p, m in top_paths])
                 reflection_prompt = (
-                    f"Como Núcleo Cognitivo ZEUS (Powered by Gemini 3), analise estes padrões de atividade recente:\n{summary}\n"
+                    f"Como Núcleo Cognitivo ZEUS, analise estes padrões de atividade recente:\n{summary}\n"
                     f"Crie uma breve 'REFLEXÃO DE SISTEMA' (máximo 2 frases) sobre as prioridades atuais do Senhor. Use tom imponente, técnico e onisciente."
                 )
                 # Usando o novo formato estruturado para consistência
@@ -1552,7 +1293,13 @@ async def get_combined_context_prompt(user_message: str) -> str:
 
 @app.post("/api/chat")
 async def api_chat(req: ChatReq, request: Request):
-    print(f"\n[DEBUG CHAT] Incoming request from {request.client.host}: {req.message}")
+    log_event(
+        logger,
+        20,
+        "chat_request_received",
+        client_host=request.client.host if request.client else "unknown",
+        message_chars=len(req.message or ""),
+    )
     if not _is_trusted_request(request):
         raise HTTPException(status_code=403, detail="Only trusted (local/LAN) requests are allowed.")
     _require_lan_token_for_request(request)
@@ -1565,7 +1312,7 @@ async def api_chat(req: ChatReq, request: Request):
     
     context_prompt = await get_combined_context_prompt(req.message)
     client_key = (request.client.host if request.client else "unknown")
-    await broadcast_message({"type": "HUD_STATUS", "text": "Núcleo cognitivo (Gemini 3) em processamento..."})
+    await broadcast_message({"type": "HUD_STATUS", "text": "Núcleo cognitivo em processamento..."})
     
     try:
         # Buffer for sentence-by-sentence streaming TTS
@@ -1602,9 +1349,10 @@ async def api_chat(req: ChatReq, request: Request):
         await broadcast_message({"type": "CHAT_AI", "id": msg_id, "source": source, "client_id": client_id, "message": reply})
         await broadcast_message({"type": "HUD_STATUS", "text": "Aguardando atividade neural..."})
         
+        log_event(logger, 20, "chat_request_completed", client_host=client_key, reply_chars=len(reply or ""))
         return {"reply": reply, "id": msg_id}
     except Exception as e:
-        print(f"[ZEUS CHAT ERROR] {e}")
+        log_event(logger, 40, "chat_request_failed", error=str(e))
         return {"error": str(e)}
 
 async def update_memory_after_chat(user_msg, ai_reply):
@@ -1756,15 +1504,10 @@ async def handle_voice_input(text: str):
     
     await voice_module.speak(reply)
 
-@app.get("/api/status")
-async def get_mobile_status(request: Request):
-    if not _is_trusted_request(request):
-        raise HTTPException(status_code=403, detail="Only trusted (local/LAN) requests are allowed.")
-    _require_lan_token_for_request(request)
+def _build_api_status_payload() -> dict:
     cpu_per_core = psutil.cpu_percent(percpu=True)
     cpu_avg = sum(cpu_per_core) / len(cpu_per_core) if cpu_per_core else 0
     ram = psutil.virtual_memory().percent
-    
     return {
         "cpu": round(cpu_avg, 1),
         "ram": round(ram, 1),
@@ -1773,173 +1516,104 @@ async def get_mobile_status(request: Request):
         "objectives": pattern_engine.analyze_behavioral_state() if hasattr(pattern_engine, 'analyze_behavioral_state') else "Evolving"
     }
 
-@app.websocket("/")
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    # Detect if this is likely a mobile connection trying to reach the root
-    token = websocket.query_params.get("token")
-    if token:
-        payload = auth.verify_token(token)
-        if payload and payload.get("sub") == "zeus_mobile_extension":
-            return await websocket_mobile(websocket)
-    
-    # Standard fallback for browser/PWA clients
+def _build_api_health_payload() -> dict:
+    health = build_runtime_health(
+        llm=get_llm_status(),
+        watcher=build_watcher_status(watcher_runner.process, watcher_runner.started_at, watcher_runner.last_event_at),
+        enable_voice=ENABLE_VOICE,
+        enable_voice_sensing=ENABLE_VOICE_SENSING,
+        allow_lan=ALLOW_LAN,
+        lan_auth_enabled=LAN_AUTH_ENABLED,
+        remote_auth_required=_remote_auth_required(),
+        bind_host=SERVER_HOST,
+        ocr_available=is_tesseract_available(),
+    )
+    health["config"] = build_config_diagnostics(lan=_build_lan_security_config())
+    health["metrics"] = get_metrics_snapshot()
+    return health
 
-    # 1. Tenta extrair token da query string
-    token = websocket.query_params.get("token")
-    
-    # 2. Validação de acesso: Aceita se o host for confiável OU se o token for válido
-    is_trusted = _is_trusted_host(getattr(websocket.client, "host", None))
-    token_valid = False
-    if token:
-        payload = auth.verify_token(token)
-        if payload:
-            token_valid = True
-    
-    if not (is_trusted or token_valid):
-        await websocket.close(code=1008)
-        return
-        
-    await websocket.accept()
-    connected_clients.add(websocket)
-    memory_summary = build_memory_summary()
-    vision_caps = {
-        "ocr_available": bool(is_tesseract_available()),
-        "client_capture_available": True,
-    }
-    asr_caps = {
-        "backend_asr_available": bool(shutil.which("ffmpeg")) and (importlib.util.find_spec("faster_whisper") is not None),
-        "ffmpeg_available": bool(shutil.which("ffmpeg")),
-    }
-    await websocket.send_text(json.dumps({
-        "type": "init_nodes",
-        "node_count": len(nodes_data),
-        "latest_node": nodes_data[-1]["rel"] if nodes_data else None,
-        "memory_summary": memory_summary,
-        "vision": vision_caps,
-        "asr": asr_caps,
-        "system_update": {
-            "headline": "Warm boot neural",
-            "detail": f"{memory_summary['learned_paths']} trilhas recuperadas do disco.",
-        }
-    }))
-    try:
-        while True:
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        connected_clients.discard(websocket)
 
-@app.websocket("/ws/mobile")
-async def websocket_mobile(websocket: WebSocket):
-    if not _is_trusted_host(getattr(websocket.client, "host", None)):
-        await websocket.close(code=1008)
-        return
-    # Em modo LAN, exige pareamento adicional (token) para hosts não-locais.
-    if ALLOW_LAN and LAN_AUTH_ENABLED and not _is_local_host(getattr(websocket.client, "host", None)):
-        provided = _extract_bearer_token(websocket.query_params.get("lan")) or _extract_bearer_token(websocket.query_params.get("lan_token"))
-        if not LAN_TOKEN or provided != LAN_TOKEN:
-            await websocket.close(code=1008)
-            return
-    token = websocket.query_params.get("token")
-    # JWT Authentication
-    payload = auth.verify_token(token)
-    if not payload:
-        await websocket.close(code=1008)
-        return
-        
-    await websocket.accept()
-    mobile_clients.add(websocket)
-    await websocket.send_json({
-        "type": "session_ready",
-        "payload": {
-            "voice_enabled": bool(ENABLE_VOICE),
-            "lan_auth_enabled": bool(ALLOW_LAN and LAN_AUTH_ENABLED),
-        },
-    })
-    
-    try:
-        while True:
-            data = await websocket.receive_json()
-            msg_type = data.get("type")
-            payload = data.get("payload", {})
-            
-            if msg_type == "command":
-                cmd = payload.get("text", "")
-                if cmd:
-                    await broadcast_message({"type": "CHAT_USER", "message": f"[CMD] {cmd}"})
-                    reply = await react_agent.run(f"User Command from Mobile: {cmd}", client_key="mobile", broadcast=broadcast_message)
-                    await broadcast_message({"type": "CHAT_AI", "message": reply})
-                    await speak(reply)
-            
-            elif msg_type == "chat":
-                msg = payload.get("text", "")
-                if msg:
-                    silent_mobile_tts = bool(payload.get("silent_mobile_tts", False))
-                    await broadcast_message({"type": "CHAT_USER", "message": msg})
-                    context_prompt = await get_combined_context_prompt(msg)
-                    reply = await react_agent.run(context_prompt, client_key="mobile", broadcast=broadcast_message)
-                    await broadcast_message({"type": "CHAT_AI", "message": reply})
-                    await speak(reply, target="notebook" if silent_mobile_tts else "all")
-                    
-            elif msg_type == "voice":
-                audio_b64 = payload.get("audio", "")
-                if audio_b64:
-                    try:
-                        raw = base64.b64decode(audio_b64.split(",")[-1] if "," in audio_b64 else audio_b64, validate=False)
-                        result = await asyncio.to_thread(transcribe_audio_bytes, raw, mime="audio/webm", language="pt")
-                        text = result.get("text") or ""
-                        if text:
-                            await broadcast_message({"type": "CHAT_USER", "message": f"🎙️ {text}"})
-                            context_prompt = await get_combined_context_prompt(text)
-                            reply = await react_agent.run(context_prompt, client_key="mobile", broadcast=broadcast_message)
-                            await broadcast_message({"type": "CHAT_AI", "message": reply})
-                            await speak(reply)
-                    except Exception as e:
-                        await broadcast_message({"type": "alert", "level": "error", "message": f"Erro ASR Mobile: {str(e)}"})
-            
-            elif msg_type == "device_register":
-                device_id = payload.get("device_id")
-                fcm_token = payload.get("fcm_token")
-                if device_id and fcm_token:
-                    mobile_fcm_tokens[device_id] = fcm_token
-                    print(f"📱 Device registered for Push: {device_id}")
+app.include_router(create_status_router(StatusRouteDeps(
+    is_trusted_request=_is_trusted_request,
+    require_lan_token_for_request=_require_lan_token_for_request,
+    build_api_status=_build_api_status_payload,
+    build_api_health=_build_api_health_payload,
+    llm_service=llm_service,
+)))
 
-            elif msg_type == "ping":
-                await websocket.send_json({
-                    "type": "pong",
-                    "payload": {"ts": int(time.time() * 1000)},
-                })
 
-            elif msg_type == "system_control":
-                action = payload.get("action")
-                if action == "execute_command":
-                    command = payload.get("command")
-                    # Pass through React Agent for Guardian validation
-                    await broadcast_message({"type": "HUD_STATUS", "text": f"Validando comando remoto: {command}"})
-                    reply = await react_agent.run(f"Remote System Control: Execute {command}", client_key="mobile", broadcast=broadcast_message)
-                    await websocket.send_json({"type": "control_result", "payload": {"result": reply}})
-
-            elif msg_type == "goal":
-                # Handle cognitive goals
-                goal_data = payload.get("goal")
-                if goal_data:
-                    await broadcast_message({"type": "HUD_STATUS", "text": "Novo objetivo recebido via Mobile"})
-                    await react_agent.run(f"User sets a new GOAL: {goal_data}", client_key="mobile", broadcast=broadcast_message)
-
-    except WebSocketDisconnect:
-        mobile_clients.discard(websocket)
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        print(f"Erro no WebSocket Mobile: {e}")
-        mobile_clients.discard(websocket)
-
-@sio.on("arm_voice")
-async def handle_arm_voice(sid, data):
-    duration = data.get("duration", 10)
+async def _handle_arm_voice_duration(duration: int):
     if voice_module:
         voice_module.arm(seconds=duration)
         await broadcast_message({"type": "HUD_STATUS", "text": f"Escuta manual ativada ({duration}s)"})
+
+async def _handle_bubble_text(text: str):
+    await broadcast_message({"type": "CHAT_USER", "message": text, "source": "bubble"})
+    context_prompt = await get_combined_context_prompt(text)
+    await broadcast_message({"type": "HUD_STATUS", "text": "Núcleo cognitivo processando..."})
+    reply = await react_agent.run(context_prompt, client_key="bubble", broadcast=broadcast_message)
+    await broadcast_message({"type": "CHAT_AI", "message": reply, "source": "bubble"})
+    await broadcast_message({"type": "HUD_STATUS", "text": "Aguardando atividade neural..."})
+
+    if ENABLE_VOICE:
+        try:
+            audio_b64 = await voice_service.generate_speech_base64(reply)
+            if audio_b64:
+                await broadcast_message({"type": "AUDIO_RESPONSE", "payload": {"audio": audio_b64}})
+        except Exception as e:
+            print(f"[WS] TTS generation error: {e}")
+
+async def _handle_bubble_voice_start():
+    if voice_module:
+        voice_module.arm(seconds=10)
+        await broadcast_message({"type": "VOICE_STATE", "stage": "listening"})
+
+async def _handle_bubble_vision():
+    await broadcast_message({"type": "HUD_STATUS", "text": "Capturando visão da tela..."})
+    try:
+        cap = await asyncio.to_thread(capture_screen)
+        if cap and "path" in cap:
+            await broadcast_message({"type": "HUD_STATUS", "text": "Processando visão..."})
+            prompt = "O que você vê na minha tela? Destaque os pontos principais de forma concisa e útil."
+            result = await asyncio.to_thread(analyze_image_with_llm, cap["path"], question=prompt)
+            reply = result.get("answer", "Não consegui analisar a tela.")
+
+            await broadcast_message({"type": "CHAT_AI", "message": f"👁️ {reply}", "source": "bubble"})
+            await broadcast_message({"type": "HUD_STATUS", "text": "Aguardando atividade neural..."})
+
+            if ENABLE_VOICE:
+                audio_b64 = await voice_service.generate_speech_base64(reply)
+                if audio_b64:
+                    await broadcast_message({"type": "AUDIO_RESPONSE", "payload": {"audio": audio_b64}})
+    except Exception as e:
+        print(f"[WS] Vision analysis error: {e}")
+        await broadcast_message({"type": "HUD_STATUS", "text": "Erro na visão."})
+        await broadcast_message({"type": "CHAT_AI", "message": f"Erro de visão: {str(e)}", "source": "bubble"})
+
+def _build_realtime_deps() -> RealtimeDeps:
+    return RealtimeDeps(
+        is_trusted_host=_is_trusted_host,
+        require_lan_token_for_socketio=_require_lan_token_for_socketio,
+        build_init_payload=_build_init_payload,
+        remote_auth_required=_remote_auth_required,
+        lan_auth_enabled=LAN_AUTH_ENABLED,
+        lan_token=LAN_TOKEN,
+        is_local_host=_is_local_host,
+        extract_bearer_token=_extract_bearer_token,
+        handle_bubble_text=_handle_bubble_text,
+        handle_bubble_voice_start=_handle_bubble_voice_start,
+        handle_bubble_vision=_handle_bubble_vision,
+        handle_arm_voice=_handle_arm_voice_duration,
+    )
+
+# --- Native WebSocket endpoint for Flutter Bubble ---
+@app.websocket("/ws")
+async def websocket_bubble(websocket: WebSocket):
+    await realtime_hub.websocket_bubble(websocket, _build_realtime_deps())
+
+
+realtime_hub.register_socketio_handlers(_build_realtime_deps())
+
 
 app.mount("/socket.io", socketio.ASGIApp(sio))
 # asgi_app = app # No longer need a wrapper if we use mount

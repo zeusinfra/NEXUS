@@ -1,131 +1,197 @@
-# 🧠 ZEUS: Cognitive Operating System & Neural Interface
+# ZEUS Cognitive AI
 
-[![Status](https://img.shields.io/badge/Status-Active-brightgreen.svg?style=for-the-badge)]()
-[![Version](https://img.shields.io/badge/Version-1.1.0-blue.svg?style=for-the-badge)]()
-[![Architecture](https://img.shields.io/badge/Architecture-Decentralized-orange.svg?style=for-the-badge)]()
-[![License](https://img.shields.io/badge/License-MIT-red.svg?style=for-the-badge)](LICENSE)
+ZEUS is a local-first cognitive operating layer that combines a FastAPI backend, Ollama/OpenAI-compatible LLM routing, realtime HUD telemetry, voice/vision tools, Rust-based file watching, and a Flutter desktop bubble.
 
-**ZEUS** is a modular, high-performance cognitive system designed to bridge human intent and machine execution. It integrates advanced LLMs, real-time vision, streaming voice synthesis, and autonomous system monitoring into a unified, **neural-responsive command center**.
+The current default profile is **Ollama Cloud through the local Ollama daemon**, using `gemma4:31b-cloud` when the machine is authenticated with `ollama signin`.
 
----
+## Current Status
 
-## 🌌 The Vision
+- Backend: FastAPI + Socket.IO + native WebSocket.
+- LLM: Ollama-first, with OpenAI/Gemini support available by environment variables.
+- UI: Web HUD in `public/index.html` and Flutter bubble in `zeus_extension/`.
+- Security: LAN access requires token when enabled; command execution uses allowlist, confirmation, and audit logging.
+- Observability: structured JSON logs, request correlation-id, and health metrics.
+- Tests: Python unit/contract tests plus Node tests for frontend behavior.
 
-ZEUS is not just an assistant; it is a **Persistent Neural Interface** that decentralizes intelligence across your workspace. By combining high-speed Rust backends with the cognitive flexibility of Gemini and Ollama, ZEUS manifests as a living digital presence directly on your screen.
+## Architecture
 
-> [!NOTE]
-> **The Cognitive Bubble:** The primary interface of ZEUS is a frameless, transparent, always-on-top Linux Desktop Overlay. It acts as a digital companion that breathes, listens, and speaks in real-time without interrupting your workflow.
-
----
-
-## 🚀 Key Capabilities
-
-* **🫧 The Cognitive Bubble**: A floating, organic Linux overlay. Hit `Alt+Space` to summon it instantly. It features a breathing animation reflecting its current neural state (Idle, Listening, Thinking, Speaking).
-* **🎙️ Neural Voice Pipeline**: Sentence-by-sentence audio streaming via Base64 WebSocket chunks for near-zero latency interaction.
-* **👁️ Vision & Context Awareness**: Real-time analysis of screen, web, and local file states.
-* **🦀 Rust-Powered Sensors**: High-performance filesystem monitoring (`watcher_rs`) for instant, low-overhead event detection.
-* **🧠 Advanced Synaptic Memory**: Hybrid Relational (SQLite) and Vector (SIMD-optimized Cosine Similarity) memory hierarchy.
-
----
-
-## 🏗️ Architecture & Orchestration
-
-The system operates through a polyglot orchestration layer, ensuring low-latency responses and robust memory retention.
-
-### High-Level Flow
 ```mermaid
 graph TD
-    User((User)) <--> Bubble[Linux Desktop Bubble]
-    User <--> Web[Web Command Center]
-    
-    subgraph Core[ZEUS CORE]
-        API[FastAPI Backend]
-        LLM[Cognitive Engine - Gemini/Ollama]
-        Memory[(Synaptic Memory - SQLite/Vector)]
-        Watcher[Rust File Watcher]
-    end
-    
-    Bubble <-->|WS/JWT| API
-    Web <-->|Socket.IO| API
-    API <--> LLM
-    API <--> Memory
-    Watcher -->|Events| API
+    User[User] --> WebHUD[Web HUD]
+    User --> Bubble[Flutter Bubble]
+
+    WebHUD --> API[FastAPI Backend]
+    Bubble --> API
+
+    API --> LLM[LLM Provider]
+    API --> Memory[SQLite / Vector Memory]
+    Watcher[Rust Watcher] --> API
+
+    LLM --> Ollama[Ollama Local / Cloud]
+    LLM --> OpenAI[OpenAI-compatible API]
 ```
 
-### Cognitive Pipeline
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant H as Desktop Bubble / Web HUD
-    participant B as Backend (FastAPI)
-    participant C as Cognitive Core (LLM)
-    participant M as Synaptic Memory
+## Main Directories
 
-    U->>H: Interaction (Voice/Text/Event)
-    H->>B: Encrypted Payload (JWT)
-    B->>M: Context Retrieval (RAG)
-    M-->>B: Relevant Memories
-    B->>C: Augmented Prompt
-    C-->>B: Streaming Response
-    B->>H: Real-time Update
-    B->>M: Consolidate Memory
-```
+| Path | Purpose |
+| --- | --- |
+| `apps/` | FastAPI app, realtime hub, status routes, orchestration entrypoints. |
+| `zeus_core/` | LLM routing, agents, memory, security guards, command policy, observability. |
+| `public/` | Web HUD and frontend tests. |
+| `zeus_extension/` | Flutter desktop bubble. |
+| `watcher_rs/` | Rust filesystem watcher. |
+| `core-rust/` | Rust memory/system components. |
+| `docs/` | Technical reports and execution plans. |
+| `tests/` | Python regression, security, policy, route, and observability tests. |
 
----
+## Environment
 
-## 🛠️ Technical Stack
+Use `.env.example` as the template for local configuration. Do not commit `.env`.
 
-* 🐍 **Backend Core**: Python 3.10+ (FastAPI, Socket.IO)
-* 🧠 **Cognitive Engine**: Gemini Pro API / Ollama (Local Fallback)
-* 🦀 **Performance Layer**: Rust (System Monitoring, Vector Memory, SIMD Tasks)
-* 🦋 **Frontend (Overlay)**: Flutter Desktop (Dart) natively compiled for Linux via GTK/Wayland.
-* 🌐 **Frontend (Web)**: Vanilla JS / HTML5 (Modern HUD Design)
+Recommended local/cloud Ollama profile:
 
----
-
-## 🫧 Quick Start: Launching the Bubble
-
-> [!IMPORTANT]
-> The ZEUS interface currently targets Linux Desktop environments.
-
-### 1. Install OS Dependencies
-Ensure you have the required native libraries for audio and global shortcuts:
-```bash
-sudo apt-get update
-sudo apt-get install -y libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev clang lld libkeybinder-3.0-dev
-```
-
-### 2. Environment Configuration
-Create a `.env` file based on `.env.example`:
 ```env
-GEMINI_API_KEY=your_key_here
-ALLOW_LAN=false
+ZEUS_ENV=local
+ZEUS_LLM_PROVIDER=ollama
+ZEUS_LLM_URL=http://127.0.0.1:11434/api/chat
+ZEUS_LLM_MODEL=gemma4:31b-cloud
+ZEUS_PREFER_OLLAMA=1
+ZEUS_DISABLE_OLLAMA=0
+ZEUS_ALLOW_LAN=0
+ZEUS_LAN_AUTH=1
+ZEUS_ALLOW_INSECURE_DEV_SECRET=0
 ```
 
-### 3. Ignite the System
-Launch the unified orchestration script to compile the Flutter bubble and start the headless Rust/Python backend:
+For Ollama Cloud via the local daemon:
+
+```bash
+ollama signin
+```
+
+For hosted Ollama API usage, configure one of:
+
+```env
+OLLAMA_API_KEY=your_ollama_api_key_here
+ZEUS_LLM_API_KEY=your_ollama_api_key_here
+```
+
+For OpenAI-compatible usage:
+
+```env
+ZEUS_LLM_PROVIDER=openai
+OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_BASE_URL=https://api.openai.com/v1
+```
+
+## Run
+
+Backend/headless:
+
+```bash
+source .venv/bin/activate
+python -m apps.web_gui --headless
+```
+
+Desktop bubble:
+
 ```bash
 chmod +x bin/zeus-desktop.sh
 ./bin/zeus-desktop.sh
 ```
 
-> [!TIP]
-> Use **`Alt+Space`** anywhere in your Linux system to focus the Bubble and start communicating!
+Web HUD:
 
----
+```text
+http://127.0.0.1:8080
+```
 
-## 📜 Repository Structure
+## Test
 
-| Directory | Purpose |
-| --- | --- |
-| `apps/` | Main Python entry points and FastAPI backend orchestrators. |
-| `zeus_core/` | Cognitive logic, LLM agent strategies, and memory managers. |
-| `core-rust/` | High-performance Rust modules (`watcher_rs`, `zeus_memory`). |
-| `zeus_extension/` | Flutter Linux Desktop Overlay (The Cognitive Bubble). |
-| `docs/` | Technical specifications, architecture reports, and analysis. |
+Python:
 
----
+```bash
+python3 -m unittest discover tests
+```
 
-<div align="center">
-  <i>ZEUS — The ultimate interface between human intelligence and machine cognition.</i>
-</div>
+Frontend:
+
+```bash
+node --test public/tests/*.test.js
+```
+
+Rust:
+
+```bash
+cargo test --manifest-path core-rust/Cargo.toml
+cargo test --manifest-path watcher_rs/Cargo.toml
+```
+
+## Security And Repository Hygiene
+
+The repository must not include local secrets, runtime memory, logs, screenshots, private keys, or temporary scratch data.
+
+Ignored/local-only examples:
+
+- `.env`
+- `.env.*`
+- `configs/*.pem`
+- `configs/serviceAccountKey.json`
+- `data/`
+- `logs/`
+- `scratch/`
+- `*.db`
+- `*.sqlite`
+- `*.log`
+- `startup_test*.log`
+
+Before pushing to a public remote, run:
+
+```bash
+git status --short
+git ls-files | rg "^(configs/.*\\.pem|logs/|.*\\.log$|startup_test|scratch/|data/|.*\\.db$|.*\\.sqlite$|\\.env$|\\.env\\.)"
+rg -l "(sk-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{20,}|mongodb\\+srv://|postgresql://|hvs\\.|private_key|serviceAccountKey)" --glob '!data/**' --glob '!logs/**' --glob '!scratch/**'
+```
+
+Expected result: no tracked secrets. `.env.example` may appear in pattern scans because it intentionally contains placeholder variable names.
+
+## Multi-Remote Mirror
+
+Current GitHub remote:
+
+```text
+https://github.com/geniusdev-tech/zeusOS.git
+```
+
+Codeberg mirror remote:
+
+```text
+https://codeberg.org/zeusprotocol/zeuscognitiveai.git
+```
+
+Configured remotes:
+
+```text
+origin   -> GitHub
+codeberg -> Codeberg
+mirror   -> push to GitHub and Codeberg
+```
+
+To push separately after review:
+
+```bash
+git push origin main
+git push codeberg main
+```
+
+To push both remotes with one command:
+
+```bash
+git push mirror main
+```
+
+## Documentation
+
+- `docs/RELATORIO_SISTEMA_2026-05-02.md`
+- `docs/PLANO_EXECUCAO_ZEUS_2026-05-02.md`
+- `docs/ANALISE_SISTEMA_DETALHADA.md`

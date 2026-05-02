@@ -3,9 +3,14 @@ from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+from zeus_core.config_guard import env_flag, validate_jwt_secret
 
 # Configurações de Segurança
-SECRET_KEY = os.getenv("ZEUS_JWT_SECRET", "super_secret_zeus_key_998877")
+ALLOW_INSECURE_DEV_SECRET = env_flag("ZEUS_ALLOW_INSECURE_DEV_SECRET", "0")
+SECRET_KEY = validate_jwt_secret(
+    os.getenv("ZEUS_JWT_SECRET", ""),
+    allow_insecure_dev_secret=ALLOW_INSECURE_DEV_SECRET,
+)
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 1 semana para mobile
 
