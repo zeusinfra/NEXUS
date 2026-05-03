@@ -95,6 +95,18 @@ class CommandPolicyTests(unittest.TestCase):
         self.assertIn("command_policy_rejected", events)
         self._log_patcher.start()
 
+    def test_interpreter_execution_flags_require_confirmation(self):
+        with patch.dict(os.environ, {"ZEUS_CMD_ALLOWLIST": "python3,node"}, clear=False):
+            with self.assertRaisesRegex(ToolError, "confirmação"):
+                validate_command("python3 -c print(1)", ["python3", "-c", "print(1)"], confirmed=False)
+            with self.assertRaisesRegex(ToolError, "confirmação"):
+                validate_command("python3 script.py", ["python3", "script.py"], confirmed=False)
+            with self.assertRaisesRegex(ToolError, "confirmação"):
+                validate_command("node -e console.log(1)", ["node", "-e", "console.log(1)"], confirmed=False)
+
+            py_decision = validate_command("python3 -c print(1)", ["python3", "-c", "print(1)"], confirmed=True)
+            self.assertEqual(py_decision.category, "exec")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -32,10 +32,26 @@ impl ZeusCoreService {
     }
 
     // Basic Guardian Check (Safety First)
-    fn is_command_safe(&self, command: &str) -> bool {
+    fn safe_command_args(command: &str) -> Option<Vec<String>> {
+        let blocked_tokens = ["|", "&&", "||", ";", ">", ">>", "<", "$(", "`"];
+        if blocked_tokens.iter().any(|token| command.contains(token)) {
+            return None;
+        }
+
+        let args: Vec<String> = command
+            .split_whitespace()
+            .map(|part| part.to_string())
+            .collect();
+        if args.is_empty() {
+            return None;
+        }
+
         let allowlist = ["ls", "pwd", "echo", "cat", "whoami", "date"];
-        let cmd = command.trim();
-        allowlist.iter().any(|a| cmd == *a || cmd.starts_with(&format!("{} ", a)))
+        if allowlist.contains(&args[0].as_str()) {
+            Some(args)
+        } else {
+            None
+        }
     }
 }
 
@@ -60,18 +76,17 @@ impl ZeusCore for ZeusCoreService {
             }));
         }
 
-        if !self.is_command_safe(&cmd) {
+        let Some(args) = ZeusCoreService::safe_command_args(&cmd) else {
             return Ok(Response::new(ActionResponse {
                 success: false,
                 output: "".into(),
                 error: "GUARDIAN_BLOCK: Dangerous command detected".into(),
                 backup_id: "".into(),
             }));
-        }
+        };
 
-        let output = Command::new("sh")
-            .arg("-c")
-            .arg(&cmd)
+        let output = Command::new(&args[0])
+            .args(&args[1..])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
@@ -174,6 +189,28 @@ impl ZeusCore for ZeusCoreService {
             success: true,
             current_mode: mode.clone(),
         }))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ZeusCoreService;
+
+    #[test]
+    fn safe_command_args_accepts_simple_allowlisted_commands() {
+        let args = ZeusCoreService::safe_command_args("echo hello").unwrap();
+        assert_eq!(args, vec!["echo".to_string(), "hello".to_string()]);
+    }
+
+    #[test]
+    fn safe_command_args_rejects_shell_control() {
+        assert!(ZeusCoreService::safe_command_args("echo ok && rm file").is_none());
+        assert!(ZeusCoreService::safe_command_args("cat file > out").is_none());
+    }
+
+    #[test]
+    fn safe_command_args_rejects_non_allowlisted_commands() {
+        assert!(ZeusCoreService::safe_command_args("python3 -c print(1)").is_none());
     }
 }
 

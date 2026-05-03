@@ -10,6 +10,108 @@ SYS="python3"
 # Usa venv se existir, senão usa sistema
 PY="$SYS"
 [[ -f "$VENV" ]] && PY="$VENV"
+mkdir -p "$ROOT_DIR/logs"
+
+WATCHER_PID=""
+MEMORY_PID=""
+
+service_responds() {
+    curl -sS --max-time 0.7 "$1" >/dev/null 2>&1
+}
+
+backend_responds() {
+    curl -sS --max-time 2 "http://127.0.0.1:${ZEUS_PORT:-8080}/api/health" >/dev/null 2>&1
+}
+
+backend_port_open() {
+    timeout 1 bash -c "</dev/tcp/127.0.0.1/${ZEUS_PORT:-8080}" >/dev/null 2>&1
+}
+
+backend_pids() {
+    pgrep -f "python(3)? -m apps.web_gui|/python -m apps.web_gui|/python3 -m apps.web_gui" 2>/dev/null || true
+}
+
+stop_stale_backend() {
+    local pids
+    pids="$(backend_pids)"
+    [[ -z "$pids" ]] && return 0
+    echo "⚠️  Backend existe, mas não responde. Encerrando processo travado: $pids"
+    kill $pids >/dev/null 2>&1 || true
+    sleep 2
+}
+
+ensure_server_background() {
+    if backend_responds; then
+        echo "✅ Backend ZEUS já está respondendo."
+        return 0
+    fi
+
+    if backend_port_open; then
+        echo "⏳ Porta ${ZEUS_PORT:-8080} já está aberta. Aguardando health check..."
+        for _ in $(seq 1 20); do
+            if backend_responds; then
+                echo "✅ Backend ZEUS pronto em http://127.0.0.1:${ZEUS_PORT:-8080}"
+                return 0
+            fi
+            sleep 1
+        done
+        echo "❌ Porta ${ZEUS_PORT:-8080} está ocupada, mas /api/health não respondeu." >&2
+        return 1
+    fi
+
+    stop_stale_backend
+    if backend_responds; then
+        echo "✅ Backend ZEUS voltou a responder."
+        return 0
+    fi
+
+    if backend_port_open; then
+        echo "❌ Porta ${ZEUS_PORT:-8080} ficou ocupada antes do start. Abortando para evitar duplicidade." >&2
+        return 1
+    fi
+
+    echo "🌑 Iniciando backend ZEUS em background..."
+    (
+        cd "$ROOT_DIR"
+        exec "$DIR/zeus" server
+    ) > "$ROOT_DIR/zeus_server.log" 2>&1 &
+
+    for _ in $(seq 1 30); do
+        if backend_responds; then
+            echo "✅ Backend ZEUS pronto em http://127.0.0.1:${ZEUS_PORT:-8080}"
+            return 0
+        fi
+        sleep 1
+    done
+
+    echo "❌ Backend não respondeu dentro do tempo esperado. Veja zeus_server.log." >&2
+    return 1
+}
+
+start_rust_services() {
+    echo "🦀 Iniciando Microsserviços Rust (Watcher & Memory)..."
+    if service_responds "http://127.0.0.1:8081/ws"; then
+        echo "✅ Watcher Rust já está respondendo na porta 8081."
+    else
+        (cd "$ROOT_DIR/watcher_rs" && cargo run --release > "$ROOT_DIR/logs/watcher.log" 2>&1) &
+        WATCHER_PID=$!
+    fi
+
+    if service_responds "http://127.0.0.1:8082/health"; then
+        echo "✅ Memory Service já está respondendo na porta 8082."
+    else
+        (cd "$ROOT_DIR/core-rust/zeus_memory" && cargo run --release --bin memory_service > "$ROOT_DIR/logs/memory.log" 2>&1) &
+        MEMORY_PID=$!
+    fi
+    sleep 2
+}
+
+cleanup_started_services() {
+    [[ -n "$WATCHER_PID" ]] && kill "$WATCHER_PID" >/dev/null 2>&1 || true
+    [[ -n "$MEMORY_PID" ]] && kill "$MEMORY_PID" >/dev/null 2>&1 || true
+}
+
+trap cleanup_started_services EXIT INT TERM
 
 # Força UTF-8
 export PYTHONIOENCODING=utf-8
@@ -24,10 +126,7 @@ case "$1" in
     sphere|gui|3d|web)
         echo "🧠 Iniciando ZEUS Command Center (Browser)..."
         echo "🌐 Acesse: http://127.0.0.1:8080"
-        echo "🦀 Iniciando Microsserviços Rust (Watcher & Memory)..."
-        (cd watcher_rs && cargo run --release > ../logs/watcher.log 2>&1) &
-        (cd core-rust/zeus_memory && cargo run --release --bin memory_service > ../../logs/memory.log 2>&1) &
-        sleep 2
+        start_rust_services
         "$PY" -m apps.web_gui
         ;;
     v4|core4|daemon)
@@ -37,20 +136,25 @@ case "$1" in
         ;;
     server|headless)
         echo "🌑 Iniciando ZEUS em modo Headless (Cérebro em Background)..."
-        echo "🦀 Iniciando Microsserviços Rust (Watcher & Memory)..."
-        (cd watcher_rs && cargo run --release > ../logs/watcher.log 2>&1) &
-        (cd core-rust/zeus_memory && cargo run --release --bin memory_service > ../../logs/memory.log 2>&1) &
-        sleep 2
+        if backend_responds; then
+            echo "✅ Backend ZEUS já está respondendo em http://127.0.0.1:${ZEUS_PORT:-8080}"
+            exit 0
+        fi
+        if backend_port_open; then
+            echo "❌ Porta ${ZEUS_PORT:-8080} já está ocupada, mas /api/health não respondeu. Use './bin/zeus ensure-server' para diagnosticar." >&2
+            exit 1
+        fi
+        stop_stale_backend
+        start_rust_services
         echo "🧠 ZEUS Core operacional. Conecte-se via App Mobile."
         "$PY" -m apps.web_gui --headless
         ;;
+    ensure-server)
+        ensure_server_background
+        ;;
     desktop|app)
         echo "🖥️  Iniciando ZEUS Command Center (Desktop App)..."
-        echo "🦀 Iniciando Microsserviços Rust (Watcher & Memory)..."
-        # Inicia Watcher na 8081 e Memory na 8082 em background
-        (cd watcher_rs && cargo run --release > ../logs/watcher.log 2>&1) &
-        (cd core-rust/zeus_memory && cargo run --release --bin memory_service > ../../logs/memory.log 2>&1) &
-        sleep 2
+        start_rust_services
         "$PY" -m apps.web_gui --desktop
         ;;
     evolve|think|ev)
@@ -74,6 +178,7 @@ case "$1" in
         echo "╚════════════════════════════════════╝"
         echo ""
         echo "  ./zeus web           → Iniciar Servidor (Browser)"
+        echo "  ./zeus ensure-server → Garantir backend headless online"
         echo "  ./zeus desktop       → Iniciar App Desktop (PyQt)"
         echo "  ./zeus logs          → Ver logs em tempo real"
         echo "  ./zeus setup-aliases → Instalar aliases zeus-server/zeus-desktop"

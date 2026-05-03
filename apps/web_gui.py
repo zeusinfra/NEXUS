@@ -116,6 +116,9 @@ MAX_SYNAPTIC_PATHS = int(os.getenv("ZEUS_MAX_SYNAPTIC_PATHS", "20000") or "20000
 MAX_CONNECTIONS_PER_NODE = int(os.getenv("ZEUS_MAX_CONNECTIONS_PER_NODE", "25") or "25")
 SYNAPTIC_PRUNE_INTERVAL_SECONDS = float(os.getenv("ZEUS_SYNAPTIC_PRUNE_INTERVAL_SECONDS", "60") or "60")
 EVENT_QUEUE_MAXSIZE = int(os.getenv("ZEUS_EVENT_QUEUE_MAXSIZE", "2000") or "2000")
+MAX_CHAT_MESSAGE_CHARS = int(os.getenv("ZEUS_MAX_CHAT_MESSAGE_CHARS", "16000") or "16000")
+MAX_WEB_CONTEXT_CHARS = int(os.getenv("ZEUS_MAX_WEB_CONTEXT_CHARS", "50000") or "50000")
+MAX_VISION_IMAGE_BYTES = int(os.getenv("ZEUS_MAX_VISION_IMAGE_BYTES", str(6 * 1024 * 1024)) or str(6 * 1024 * 1024))
 
 # Diretórios pesados a serem ignorados completamente
 IGNORED_DIRS = {
@@ -828,12 +831,20 @@ async def receive_web_context(data: dict, request: Request):
     """
     Recebe contexto de extensões de navegador (URL, Título, Seleção de texto).
     """
-    url = data.get("url")
-    title = data.get("title")
-    content = data.get("content") or ""
+    if not _is_trusted_request(request):
+        raise HTTPException(status_code=403, detail="Only trusted (local/LAN) requests are allowed.")
+    _require_lan_token_for_request(request)
+
+    url = str(data.get("url") or "").strip()
+    title = str(data.get("title") or "").strip()[:300]
+    content = str(data.get("content") or "")
     
     if not url:
-        return {"status": "error", "message": "No URL provided"}
+        raise HTTPException(status_code=400, detail="No URL provided.")
+    if len(url) > 2048:
+        raise HTTPException(status_code=400, detail="URL too long.")
+    if len(content) > MAX_WEB_CONTEXT_CHARS:
+        content = content[:MAX_WEB_CONTEXT_CHARS]
 
     # Injeta como um evento de sistema
     event = {
@@ -1307,14 +1318,20 @@ async def api_chat(req: ChatReq, request: Request):
     if not _is_trusted_request(request):
         raise HTTPException(status_code=403, detail="Only trusted (local/LAN) requests are allowed.")
     _require_lan_token_for_request(request)
+
+    user_message = (req.message or "").strip()
+    if not user_message:
+        raise HTTPException(status_code=400, detail="message is required.")
+    if len(user_message) > MAX_CHAT_MESSAGE_CHARS:
+        raise HTTPException(status_code=413, detail=f"message exceeds {MAX_CHAT_MESSAGE_CHARS} characters.")
     
     msg_id = (req.client_msg_id or "").strip() or str(uuid.uuid4())
     source = (req.source or "api").strip().lower()[:32]
     client_id = (req.client_id or "").strip()[:64] or None
     
-    await broadcast_message({"type": "CHAT_USER", "id": msg_id, "source": source, "client_id": client_id, "message": req.message})
+    await broadcast_message({"type": "CHAT_USER", "id": msg_id, "source": source, "client_id": client_id, "message": user_message})
     
-    context_prompt = await get_combined_context_prompt(req.message)
+    context_prompt = await get_combined_context_prompt(user_message)
     client_key = (request.client.host if request.client else "unknown")
     await broadcast_message({"type": "HUD_STATUS", "text": "Núcleo cognitivo em processamento..."})
     
@@ -1349,7 +1366,7 @@ async def api_chat(req: ChatReq, request: Request):
                 await broadcast_message({"type": "AUDIO_RESPONSE", "audio": audio_b64})
 
         # Final memory update and logs
-        asyncio.create_task(update_memory_after_chat(req.message, reply))
+        asyncio.create_task(update_memory_after_chat(user_message, reply))
         await broadcast_message({"type": "CHAT_AI", "id": msg_id, "source": source, "client_id": client_id, "message": reply})
         await broadcast_message({"type": "HUD_STATUS", "text": "Aguardando atividade neural..."})
         
@@ -1357,7 +1374,7 @@ async def api_chat(req: ChatReq, request: Request):
         return {"reply": reply, "id": msg_id}
     except Exception as e:
         log_event(logger, 40, "chat_request_failed", error=str(e))
-        return {"error": str(e)}
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/api/applet/chat")
@@ -1421,10 +1438,15 @@ async def api_vision_analyze(req: VisionAnalyzeReq, request: Request):
     ocr_lang = (req.ocr_lang or "por").strip()
 
     header, b64 = data_url.split("base64,", 1)
+    estimated_bytes = (len(b64) * 3) // 4
+    if estimated_bytes > MAX_VISION_IMAGE_BYTES:
+        raise HTTPException(status_code=413, detail=f"image exceeds {MAX_VISION_IMAGE_BYTES} bytes.")
     try:
-        raw = base64.b64decode(b64, validate=False)
+        raw = base64.b64decode(b64, validate=True)
     except Exception:
         raise HTTPException(status_code=400, detail="base64 inválido.")
+    if len(raw) > MAX_VISION_IMAGE_BYTES:
+        raise HTTPException(status_code=413, detail=f"image exceeds {MAX_VISION_IMAGE_BYTES} bytes.")
 
     out_dir = os.path.join(BASE_DIR, "scratch", "screens")
     os.makedirs(out_dir, exist_ok=True)

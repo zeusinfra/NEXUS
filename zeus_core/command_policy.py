@@ -10,6 +10,7 @@ from zeus_core.tools import ToolError
 
 READ_COMMANDS = {"ls", "pwd", "echo", "cat", "sed", "rg", "find", "wc", "git", "python3", "node", "npm", "cargo"}
 WRITE_COMMANDS = {"cp", "mv", "mkdir", "touch", "chmod", "chown", "git"}
+CONFIRMATION_ONLY_COMMANDS = {"python3", "python", "node", "npm", "npx", "cargo"}
 BLOCKED_COMMANDS = {
     "mkfs",
     "dd",
@@ -27,6 +28,21 @@ BLOCKED_COMMANDS = {
     "rm",
 }
 SHELL_CONTROL_TOKENS = {"|", "&&", "||", ";", ">", ">>", "<", "$(", "`"}
+RISKY_INTERPRETER_FLAGS = {
+    "python": {"-c", "-m"},
+    "python3": {"-c", "-m"},
+    "node": {"-e", "--eval", "-p", "--print", "-r", "--require"},
+}
+SAFE_INTERPRETER_ARGS = {
+    "python": {"--version", "-V"},
+    "python3": {"--version", "-V"},
+    "node": {"--version", "-v"},
+}
+RISKY_PACKAGE_SUBCOMMANDS = {
+    "npm": {"exec", "explore", "install", "i", "link", "rebuild", "run", "run-script", "start", "test"},
+    "npx": {"*"},
+    "cargo": {"bench", "build", "clippy", "fix", "install", "publish", "run", "test"},
+}
 
 
 logger = get_logger("zeus.command_policy")
@@ -58,7 +74,28 @@ def classify_command(tokens: list[str]) -> CommandDecision:
     exe = Path(tokens[0]).name if tokens else ""
     if exe in WRITE_COMMANDS:
         return CommandDecision(exe=exe, category="write", requires_confirmation=True)
+    if _requires_confirmation_for_args(exe, tokens[1:]):
+        return CommandDecision(exe=exe, category="exec", requires_confirmation=True)
     return CommandDecision(exe=exe, category="read", requires_confirmation=False)
+
+
+def _requires_confirmation_for_args(exe: str, args: list[str]) -> bool:
+    if exe in RISKY_INTERPRETER_FLAGS:
+        risky_flags = RISKY_INTERPRETER_FLAGS[exe]
+        safe_args = SAFE_INTERPRETER_ARGS.get(exe, set())
+        return bool(args) and (
+            any(arg in risky_flags for arg in args)
+            or any(arg not in safe_args for arg in args)
+        )
+
+    risky_subcommands = RISKY_PACKAGE_SUBCOMMANDS.get(exe)
+    if risky_subcommands:
+        if "*" in risky_subcommands:
+            return True
+        first_arg = next((arg for arg in args if not arg.startswith("-")), "")
+        return first_arg in risky_subcommands
+
+    return exe in CONFIRMATION_ONLY_COMMANDS and bool(args)
 
 
 def validate_command(command: str, tokens: list[str], *, confirmed: bool = False) -> CommandDecision:

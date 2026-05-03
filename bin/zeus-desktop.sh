@@ -8,9 +8,6 @@ ROOT_DIR="$(dirname "$DIR")"
 echo "🧠 Iniciando ZEUS Cognitive Bubble (Overlay)..."
 
 # 1. Start backend if not running
-pkill -f "watcher_rs" || true
-pkill -f "memory_service" || true
-
 if ! curl -fsS "http://127.0.0.1:8080/api/health" > /dev/null; then
     echo "🌑 Iniciando backend do ZEUS em modo headless..."
     "$DIR/zeus" server &

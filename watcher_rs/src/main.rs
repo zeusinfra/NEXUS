@@ -143,3 +143,24 @@ fn is_ignored(path: &Path) -> bool {
     }
     false
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{get_project, is_ignored};
+    use std::path::Path;
+
+    #[test]
+    fn get_project_classifies_known_roots() {
+        assert_eq!(get_project(Path::new("/home/zeus/Documentos/ZEUS_BRAIN/a.md")), "ZEUS_BRAIN");
+        assert_eq!(get_project(Path::new("/home/zeus/Documentos/ZEUS_SYSTEM/a.md")), "ZEUS_SYSTEM");
+        assert_eq!(get_project(Path::new("/tmp/a.md")), "unknown");
+    }
+
+    #[test]
+    fn is_ignored_blocks_runtime_and_hidden_paths() {
+        assert!(is_ignored(Path::new("/repo/.git/config")));
+        assert!(is_ignored(Path::new("/repo/logs/app.log")));
+        assert!(is_ignored(Path::new("/repo/zeus_extension/lib/main.dart")));
+        assert!(!is_ignored(Path::new("/repo/apps/web_gui.py")));
+    }
+}

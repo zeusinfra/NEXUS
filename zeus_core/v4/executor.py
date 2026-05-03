@@ -104,7 +104,7 @@ class ShadowExecutor:
             cmd = str(action.get("command") or "").strip()
             if not cmd:
                 return StepResult(step=step.step, ok=True, duration_s=0.0, risk=assessment.level, impact=step.estimated_impact)
-            sim = await self._simulate_shell(cmd)
+            sim = await self._simulate_command(cmd)
             dt = time.time() - t0
             return StepResult(
                 step=step.step,
@@ -139,10 +139,8 @@ class ShadowExecutor:
         cmd = str(action.get("command") or "").strip()
         if not cmd:
             return True
-        argv = shlex.split(cmd)
+        argv = self._argv_for_allowed_command(cmd)
         if not argv:
-            return True
-        if argv[0] not in self.allowlist:
             return False
         try:
             timeout_s = float(os.getenv("ZEUS_V4_REAL_TIMEOUT_SEC", "12"))
@@ -165,14 +163,29 @@ class ShadowExecutor:
             return False
         return proc.returncode == 0
 
-    async def _simulate_shell(self, command: str) -> dict[str, Any]:
+    def _argv_for_allowed_command(self, command: str) -> list[str]:
+        if any(token in command for token in ("|", "&&", "||", ";", ">", ">>", "<", "$(", "`")):
+            return []
+        try:
+            argv = shlex.split(command)
+        except ValueError:
+            return []
+        if not argv or Path(argv[0]).name not in self.allowlist:
+            return []
+        return argv
+
+    async def _simulate_command(self, command: str) -> dict[str, Any]:
         try:
             timeout_s = float(os.getenv("ZEUS_V4_SHADOW_TIMEOUT_SEC", "10"))
         except Exception:
             timeout_s = 10.0
 
-        proc = await asyncio.create_subprocess_shell(
-            command,
+        argv = self._argv_for_allowed_command(command)
+        if not argv:
+            return {"success": False, "confidence": 0.0, "output": "", "error": "Command blocked by v4 allowlist", "return_code": None}
+
+        proc = await asyncio.create_subprocess_exec(
+            *argv,
             cwd=str(self.shadow_root),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,

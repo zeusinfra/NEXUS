@@ -1,0 +1,200 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import json
+import os
+import sys
+import threading
+import urllib.error
+import urllib.request
+
+from PyQt6.QtCore import QObject, Qt, pyqtSignal
+from PyQt6.QtGui import QFont
+from PyQt6.QtWidgets import (
+    QApplication,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMainWindow,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
+
+
+BACKEND = (sys.argv[1] if len(sys.argv) > 1 else os.getenv("ZEUS_BACKEND_URL", "http://127.0.0.1:8080")).rstrip("/")
+
+
+class Signals(QObject):
+    reply = pyqtSignal(str)
+    error = pyqtSignal(str)
+
+
+class Bubble(QLabel):
+    def __init__(self, text: str, role: str):
+        super().__init__(text)
+        self.setWordWrap(True)
+        self.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Minimum)
+        if role == "user":
+            self.setStyleSheet(
+                "background:#2563eb;color:white;border-radius:14px;"
+                "padding:10px 12px;font-size:14px;"
+            )
+        else:
+            self.setStyleSheet(
+                "background:#1f2937;color:#e5e7eb;border-radius:14px;"
+                "padding:10px 12px;font-size:14px;"
+            )
+
+
+class ChatWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.signals = Signals()
+        self.signals.reply.connect(lambda text: self.add_message(text, "assistant"))
+        self.signals.error.connect(lambda text: self.add_message("Erro: " + text, "assistant"))
+
+        self.setWindowTitle("ZEUS Chat")
+        self.resize(430, 640)
+        self.setMinimumSize(360, 460)
+
+        root = QWidget()
+        root.setStyleSheet("background:#0b1220;color:#e5e7eb;")
+        layout = QVBoxLayout(root)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(10)
+
+        header = QLabel("ZEUS")
+        header.setFont(QFont("Sans Serif", 16, QFont.Weight.Bold))
+        header.setStyleSheet("color:#f8fafc;")
+        layout.addWidget(header)
+
+        self.status = QLabel("Backend: verificando...")
+        self.status.setStyleSheet("color:#94a3b8;font-size:12px;")
+        layout.addWidget(self.status)
+
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        self.scroll.setStyleSheet("QScrollArea{background:#0b1220;border:0;}")
+
+        self.messages_widget = QWidget()
+        self.messages_layout = QVBoxLayout(self.messages_widget)
+        self.messages_layout.setContentsMargins(0, 6, 0, 6)
+        self.messages_layout.setSpacing(8)
+        self.messages_layout.addStretch(1)
+        self.scroll.setWidget(self.messages_widget)
+        layout.addWidget(self.scroll, 1)
+
+        input_row = QHBoxLayout()
+        self.input = QLineEdit()
+        self.input.setPlaceholderText("Mensagem para o ZEUS")
+        self.input.returnPressed.connect(self.send_message)
+        self.input.setStyleSheet(
+            "QLineEdit{background:#111827;color:#f8fafc;border:1px solid #334155;"
+            "border-radius:18px;padding:10px 12px;font-size:14px;}"
+        )
+        input_row.addWidget(self.input, 1)
+
+        self.send = QPushButton("Enviar")
+        self.send.clicked.connect(self.send_message)
+        self.send.setStyleSheet(
+            "QPushButton{background:#22c55e;color:#04130a;border:0;border-radius:18px;"
+            "padding:10px 14px;font-weight:700;}"
+            "QPushButton:disabled{background:#334155;color:#94a3b8;}"
+        )
+        input_row.addWidget(self.send)
+        layout.addLayout(input_row)
+
+        self.setCentralWidget(root)
+        self.check_status()
+
+    def check_status(self):
+        def worker():
+            try:
+                with urllib.request.urlopen(BACKEND + "/api/applet/status", timeout=3) as response:
+                    data = json.loads(response.read().decode("utf-8"))
+                llm = data.get("llm") or {}
+                provider = llm.get("provider") or "llm"
+                model = llm.get("model") or "modelo"
+                self.signals.reply.emit(f"Conectado: {provider} / {model}")
+                self.status.setText(f"Backend online: {provider} / {model}")
+            except Exception as exc:
+                self.status.setText("Backend offline")
+                self.signals.error.emit(str(exc))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def add_message(self, text: str, role: str):
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        bubble = Bubble(text, "user" if role == "user" else "assistant")
+        bubble.setMaximumWidth(330)
+        if role == "user":
+            row.addStretch(1)
+            row.addWidget(bubble)
+        else:
+            row.addWidget(bubble)
+            row.addStretch(1)
+
+        self.messages_layout.insertLayout(self.messages_layout.count() - 1, row)
+        self.scroll.verticalScrollBar().setValue(self.scroll.verticalScrollBar().maximum())
+
+    def send_message(self):
+        text = self.input.text().strip()
+        if not text:
+            return
+
+        self.input.clear()
+        self.add_message(text, "user")
+        self.send.setEnabled(False)
+        self.status.setText("ZEUS pensando...")
+
+        def worker():
+            payload = json.dumps(
+                {
+                    "message": text,
+                    "source": "cinnamon_applet_chat",
+                    "client_id": "zeus_applet_chat",
+                }
+            ).encode("utf-8")
+            req = urllib.request.Request(
+                BACKEND + "/api/applet/chat",
+                data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=120) as response:
+                    data = json.loads(response.read().decode("utf-8"))
+                reply = data.get("reply") or data.get("error") or "Sem resposta."
+                self.signals.reply.emit(str(reply))
+                self.status.setText("Backend online")
+            except urllib.error.HTTPError as exc:
+                try:
+                    body = exc.read().decode("utf-8")
+                except Exception:
+                    body = str(exc)
+                self.signals.error.emit(body)
+                self.status.setText("Erro no chat")
+            except Exception as exc:
+                self.signals.error.emit(str(exc))
+                self.status.setText("Erro no chat")
+            finally:
+                self.send.setEnabled(True)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+
+def main() -> int:
+    app = QApplication(sys.argv)
+    win = ChatWindow()
+    win.show()
+    return app.exec()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

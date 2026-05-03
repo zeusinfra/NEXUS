@@ -4,8 +4,12 @@ import subprocess
 import shutil
 import logging
 import datetime
+import shlex
 from pathlib import Path
 from typing import Dict, Any, Optional
+
+from zeus_core.command_policy import validate_command
+from zeus_core.tools import ToolError
 
 class ExecutionEngine:
     """
@@ -46,7 +50,7 @@ class ExecutionEngine:
         
         return backups_created
 
-    async def execute_action(self, command: str, target_files: list = None) -> Dict[str, Any]:
+    async def execute_action(self, command: str, target_files: list = None, confirmed: bool = False) -> Dict[str, Any]:
         """
         Executes a validated and simulated command.
         Provides automatic backup and rollback capabilities.
@@ -59,10 +63,10 @@ class ExecutionEngine:
         self.logger.info(f"Executing Action: {command}")
         
         try:
-            # Execute as subprocess with timeout
+            tokens = shlex.split(command)
+            decision = validate_command(command, tokens, confirmed=confirmed)
             result = subprocess.run(
-                command, 
-                shell=True, 
+                tokens,
                 capture_output=True, 
                 text=True, 
                 timeout=30
@@ -73,6 +77,8 @@ class ExecutionEngine:
             action_record = {
                 "timestamp": datetime.datetime.now().isoformat(),
                 "command": command,
+                "category": decision.category,
+                "requires_confirmation": decision.requires_confirmation,
                 "success": success,
                 "output": result.stdout,
                 "error": result.stderr,
@@ -87,6 +93,9 @@ class ExecutionEngine:
             
             return action_record
             
+        except ToolError as e:
+            self.logger.warning(f"Execution blocked by policy: {e}")
+            return {"success": False, "error": str(e), "output": "", "blocked": True}
         except Exception as e:
             self.logger.error(f"Execution Critical Error: {e}")
             return {"success": False, "error": str(e), "output": ""}

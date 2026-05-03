@@ -96,6 +96,12 @@ source .venv/bin/activate
 python -m apps.web_gui --headless
 ```
 
+Backend health guard:
+
+```bash
+./bin/zeus ensure-server
+```
+
 Desktop bubble:
 
 ```bash
@@ -120,7 +126,16 @@ POST http://127.0.0.1:8080/api/applet/voice/start
 POST http://127.0.0.1:8080/api/applet/vision/analyze
 ```
 
-The applet shows backend/LLM status in the Cinnamon panel and opens a compact popup with chat, voice, vision, HUD, and backend-start controls. If Cinnamon does not reload the applet after installation, restart Cinnamon with `Alt+F2`, type `r`, and press Enter, or log out and back in.
+The applet shows backend/LLM status in the Cinnamon panel. Click behavior:
+
+- backend online: opens the external PyQt chat window from `bin/zeus-applet-chat`;
+- backend offline: runs `./bin/zeus ensure-server`.
+
+The applet intentionally avoids Cinnamon popup widgets because some Cinnamon/GJS versions reject popup menu parameters and unload the applet. If Cinnamon does not reload the applet after installation, run:
+
+```bash
+gdbus call --session --dest org.Cinnamon --object-path /org/Cinnamon --method org.Cinnamon.ReloadXlet zeus@local APPLET
+```
 
 Web HUD:
 
@@ -166,6 +181,13 @@ Ignored/local-only examples:
 - `*.sqlite`
 - `*.log`
 - `startup_test*.log`
+
+Runtime hardening currently enforced by the backend:
+
+- `/api/status`, `/api/health`, `/api/chat`, `/api/web-context`, applet routes, ASR, and vision endpoints require trusted local/LAN access.
+- LAN mode should set `ZEUS_ALLOW_LAN=1`, `ZEUS_LAN_AUTH=1`, and a strong `ZEUS_LAN_TOKEN`.
+- `ZEUS_MAX_CHAT_MESSAGE_CHARS`, `ZEUS_MAX_WEB_CONTEXT_CHARS`, and `ZEUS_MAX_VISION_IMAGE_BYTES` cap user-provided payload sizes.
+- Command execution uses `ZEUS_CMD_ALLOWLIST`; interpreter execution flags such as `python3 -c`, `python3 -m`, and `node -e` require explicit confirmation.
 
 Before pushing to a public remote, run:
 

@@ -1,23 +1,4 @@
-fastapi
-psutil
-pydantic
-requests
-uvicorn
-PyQt6
-PyQt6-WebEngine
-numpy
-SpeechRecognition
-PyAudio
-edge-tts
-mss
-pillow
-playwright
-faster-whisper
-soundfile
-
-google-genai
-sounddevice
-python-jose[cryptography]
-passlib[bcrypt]
-firebase-admin
-python-multipart
+-r requirements-base.txt
+-r requirements-desktop.txt
+-r requirements-browser.txt
+-r requirements-voice.txt

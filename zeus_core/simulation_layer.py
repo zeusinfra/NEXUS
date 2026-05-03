@@ -4,8 +4,12 @@ import shutil
 import subprocess
 import json
 import logging
+import shlex
 from typing import Dict, Any, Optional, Tuple
 from pathlib import Path
+
+from zeus_core.command_policy import validate_command
+from zeus_core.tools import ToolError
 
 class SimulationLayer:
     """
@@ -48,10 +52,10 @@ class SimulationLayer:
         # Redirect command to run inside shadow root
         # This is a simplified simulation: executing in /tmp/zeus_shadow
         try:
-            # Use a timeout to prevent simulation from hanging
+            tokens = shlex.split(command)
+            validate_command(command, tokens, confirmed=False)
             result = subprocess.run(
-                command, 
-                shell=True, 
+                tokens,
                 cwd=str(self.shadow_root), 
                 capture_output=True, 
                 text=True, 
@@ -80,6 +84,8 @@ class SimulationLayer:
             
         except subprocess.TimeoutExpired:
             return {"success": False, "confidence": 0.0, "error": "Simulation Timeout", "output": ""}
+        except ToolError as e:
+            return {"success": False, "confidence": 0.0, "error": str(e), "output": "", "blocked": True}
         except Exception as e:
             return {"success": False, "confidence": 0.0, "error": str(e), "output": ""}
 

@@ -88,6 +88,9 @@ def execute_bash(command: str, *, timeout_s: int = 30) -> dict:
 
     root = _project_root()
     args = shlex.split(command)
+    from zeus_core.command_policy import validate_command
+
+    decision = validate_command(command, args, confirmed=False)
     try:
         completed = subprocess.run(
             args,
@@ -104,6 +107,8 @@ def execute_bash(command: str, *, timeout_s: int = 30) -> dict:
 
     return {
         "command": command,
+        "category": decision.category,
+        "requires_confirmation": decision.requires_confirmation,
         "cwd": str(root),
         "exit_code": completed.returncode,
         "stdout": (completed.stdout or "")[:50_000],
@@ -112,5 +117,35 @@ def execute_bash(command: str, *, timeout_s: int = 30) -> dict:
 
 
 # Compat: algumas camadas podem importar execute_bash; o padrão Mark-like é cmd_control
-def cmd_control(command: str, *, timeout_s: int = 30) -> dict:
-    return execute_bash(command, timeout_s=timeout_s)
+def cmd_control(command: str, *, timeout_s: int = 30, confirmed: bool = False) -> dict:
+    if not isinstance(command, str) or not command.strip():
+        raise ToolError("Comando inválido.")
+
+    root = _project_root()
+    args = shlex.split(command)
+    from zeus_core.command_policy import validate_command
+
+    decision = validate_command(command, args, confirmed=confirmed)
+    try:
+        completed = subprocess.run(
+            args,
+            cwd=str(root),
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
+            check=False,
+        )
+    except FileNotFoundError as e:
+        raise ToolError(f"Comando não encontrado: {args[0]}") from e
+    except subprocess.TimeoutExpired as e:
+        raise ToolError(f"Timeout ao executar comando após {timeout_s}s.") from e
+
+    return {
+        "command": command,
+        "category": decision.category,
+        "requires_confirmation": decision.requires_confirmation,
+        "cwd": str(root),
+        "exit_code": completed.returncode,
+        "stdout": (completed.stdout or "")[:50_000],
+        "stderr": (completed.stderr or "")[:50_000],
+    }
