@@ -22,7 +22,7 @@ APP_ID = "local.zeus.CognitiveChat"
 
 class ZeusGtkChat(Gtk.Application):
     def __init__(self) -> None:
-        super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
+        super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE)
         self.window: Gtk.ApplicationWindow | None = None
         self.messages_box: Gtk.Box | None = None
         self.scroller: Gtk.ScrolledWindow | None = None
@@ -38,6 +38,10 @@ class ZeusGtkChat(Gtk.Application):
         self.window.present()
         self._check_status()
 
+    def do_command_line(self, command_line) -> int:
+        self.activate()
+        return 0
+
     def _build_window(self) -> Gtk.ApplicationWindow:
         self._install_css()
 
@@ -46,6 +50,7 @@ class ZeusGtkChat(Gtk.Application):
         window.set_default_size(460, 660)
         window.set_size_request(360, 460)
         window.get_style_context().add_class("zeus-root")
+        window.connect("key-press-event", self._on_key_press)
 
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         root.get_style_context().add_class("zeus-root")
@@ -139,6 +144,18 @@ class ZeusGtkChat(Gtk.Application):
             provider,
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
         )
+
+    def _on_key_press(self, widget, event) -> bool:
+        if event.keyval in (Gdk.KEY_l, Gdk.KEY_L) and (event.state & Gdk.ModifierType.CONTROL_MASK):
+            self._clear_messages()
+            return True
+        return False
+
+    def _clear_messages(self) -> None:
+        if self.messages_box is not None:
+            for child in self.messages_box.get_children():
+                self.messages_box.remove(child)
+            self._add_message("Chat limpo.", "assistant")
 
     def _add_message(self, text: str, role: str) -> None:
         if self.messages_box is None:

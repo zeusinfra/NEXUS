@@ -20,6 +20,7 @@ from urllib.parse import urlparse
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 from apps.realtime_hub import RealtimeDeps, RealtimeHub
 from apps.status_routes import StatusRouteDeps, create_status_router
+from apps.lifecycle_manager import LifecycleManager
 from pattern_engine import PatternEngine
 from apps.zeus_evolution import ZeusBrain
 from zeus_core.core_system import call_cloud_llm, get_llm_status
@@ -40,6 +41,8 @@ from zeus_core.config_guard import LanSecurityConfig, build_config_diagnostics, 
 from zeus_core.event_pipeline import OverflowEventQueue, RustWatcherRunner
 from zeus_core.llm_service import LLMService
 from zeus_core.memory_manager import MemoryManager
+from zeus_core.events.watcher import watch_vault
+from zeus_core.events.sync_worker import sync_worker_loop
 from zeus_core.health_status import build_runtime_health, build_watcher_status
 from zeus_core.observability import correlation_id_middleware, get_logger, get_metrics_snapshot, log_event, setup_logging
 from zeus_core.security_guard import (
@@ -86,6 +89,7 @@ ENABLE_INTERNAL_WATCHER = _env_flag("ZEUS_ENABLE_INTERNAL_WATCHER", "0")
 ENABLE_AUTONOMOUS_TASKS = _env_flag("ZEUS_ENABLE_AUTONOMOUS_TASKS", "0")
 ENABLE_BOOT_GREETING = _env_flag("ZEUS_ENABLE_BOOT_GREETING", "0")
 ENABLE_RESOURCE_MONITOR = _env_flag("ZEUS_ENABLE_RESOURCE_MONITOR", "0")
+ENABLE_SECOND_BRAIN = _env_flag("ZEUS_ENABLE_SECOND_BRAIN", "0")
 ENABLE_OPEN_FILE = _env_flag("ZEUS_ENABLE_OPEN_FILE", "0")
 LAN_AUTH_ENABLED = _env_flag("ZEUS_LAN_AUTH", "1" if ALLOW_LAN else "0")
 LAN_TOKEN = os.getenv("ZEUS_LAN_TOKEN", "").strip()
@@ -168,6 +172,8 @@ WATCH_ROOTS = [Path(path).resolve() for path in WATCH_DIRS if os.path.exists(pat
 long_term_memory = load_long_memory()
 resource_control = ResourceControl(brain.blackboard, {}) # Integrando controle de recursos
 
+lifecycle_manager = LifecycleManager(globals())
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global loop, _memory_save_lock
@@ -189,7 +195,7 @@ async def lifespan(app: FastAPI):
     # Monitorar navegações web apenas com opt-in explícito
     global _web_sensing_task
     if ENABLE_BROWSER_SENSING:
-        _web_sensing_task = asyncio.create_task(web_sensing_loop())
+        _web_sensing_task = asyncio.create_task(lifecycle_manager.web_sensing_loop())
     
     # Inicia o batcher e tarefas proativas opcionais
     asyncio.create_task(event_batcher())
@@ -203,7 +209,7 @@ async def lifespan(app: FastAPI):
     # Inicia o Sensing de Voz (apenas se disponível e habilitado)
     global _voice_task
     if ENABLE_VOICE and ENABLE_VOICE_SENSING:
-        _voice_task = asyncio.create_task(_safe_voice_task())
+        _voice_task = asyncio.create_task(lifecycle_manager.safe_voice_task())
     
     # Reflexao cognitiva autonoma fica opt-in no perfil applet/headless.
     if ENABLE_AUTONOMOUS_TASKS:
@@ -211,11 +217,21 @@ async def lifespan(app: FastAPI):
 
     # Guardião de low-mem (desativa features pesadas automaticamente)
     if LOW_MEM_AUTO:
-        asyncio.create_task(low_mem_guard())
+        asyncio.create_task(lifecycle_manager.low_mem_guard())
     
     # Saudacao inicial com a cognicao
     if ENABLE_BOOT_GREETING:
-        asyncio.create_task(boot_greeting())
+        asyncio.create_task(lifecycle_manager.boot_greeting())
+
+    # Second Brain Tasks
+    global _watcher_task, _sync_worker_task
+    _watcher_task = None
+    _sync_worker_task = None
+    vault_path = os.getenv("ZEUS_VAULT_PATH", "/home/zeus/Documentos/Brain")
+    if ENABLE_SECOND_BRAIN and os.path.exists(vault_path):
+        print(f"[ZEUS] Iniciando Second Brain integrando {vault_path}")
+        _watcher_task = asyncio.create_task(watch_vault(vault_path))
+        _sync_worker_task = asyncio.create_task(sync_worker_loop())
     
     yield
     # Salvar Memória ao fechar
@@ -230,6 +246,13 @@ async def lifespan(app: FastAPI):
     try:
         if _voice_task:
             _voice_task.cancel()
+    except Exception:
+        pass
+    try:
+        if _watcher_task:
+            _watcher_task.cancel()
+        if _sync_worker_task:
+            _sync_worker_task.cancel()
     except Exception:
         pass
 
@@ -659,112 +682,7 @@ async def run_rust_watcher():
     """Executes the Rust watcher and forwards events to the event_queue."""
     await watcher_runner.run(enqueue_event)
 
-_voice_task_running = False
 
-async def _safe_voice_task():
-    """Inicia o módulo de voz local contínuo com proteção contra múltiplas instâncias."""
-    global _voice_task_running
-    try:
-        voice_module.broadcast = broadcast_message
-        voice_module.llm_callback = handle_voice_input
-        
-        while True:
-            if not ENABLE_VOICE or LOW_MEM_ACTIVE:
-                if voice_module.is_listening:
-                    voice_module.stop()
-                    _voice_task_running = False
-                await asyncio.sleep(5.0)
-                continue
-            if resource_control.is_critical():
-                if voice_module.is_listening:
-                    print("[ZEUS RESOURCE ALERT] Critical Load. Pausing Voice Sensing...")
-                    voice_module.stop()
-                    _voice_task_running = False
-                await asyncio.sleep(10.0)
-                continue
-            
-            if not voice_module.is_listening and not _voice_task_running:
-                _voice_task_running = True
-                print("[ZEUS] Iniciando módulo de voz local...")
-                asyncio.create_task(voice_module.run())
-            
-            await asyncio.sleep(5.0) # Check every 5s
-    except Exception as e:
-        print(f"Erro crítico no _safe_voice_task: {e}")
-        _voice_task_running = False
-
-
-async def low_mem_guard():
-    """
-    Modo low-mem automático:
-    - Desativa Voz e Web Sensing em alta pressão de RAM
-    - Reduz concorrência de indexação e força poda de memória
-    """
-    global ENABLE_VOICE, ENABLE_BROWSER_SENSING, LOW_MEM_ACTIVE, indexing_semaphore, _web_sensing_task
-
-    while True:
-        try:
-            snapshot = resource_control.get_system_snapshot()
-            ram = float(snapshot.get("ram", 0.0))
-        except Exception:
-            ram = 0.0
-
-        if not LOW_MEM_ACTIVE and ram >= LOW_MEM_ENTER_RAM:
-            LOW_MEM_ACTIVE = True
-            print(f"[ZEUS LOW-MEM] Entering low-mem mode (RAM={ram}%).")
-
-            # Desativa voz (pesado: Whisper/TTS)
-            ENABLE_VOICE = False
-            try:
-                if voice_module.is_listening:
-                    voice_module.stop()
-            except Exception:
-                pass
-
-            # Desativa web sensing (evita loops e automações)
-            ENABLE_BROWSER_SENSING = False
-            try:
-                if _web_sensing_task:
-                    _web_sensing_task.cancel()
-                    _web_sensing_task = None
-            except Exception:
-                pass
-
-            # Reduz indexação concorrente
-            try:
-                indexing_semaphore = asyncio.Semaphore(1)
-            except Exception:
-                pass
-
-            # Poda agressiva para reduzir RAM
-            try:
-                prune_synaptic_memory(force=True)
-            except Exception:
-                pass
-
-        elif LOW_MEM_ACTIVE and ram <= LOW_MEM_EXIT_RAM:
-            LOW_MEM_ACTIVE = False
-            print(f"[ZEUS LOW-MEM] Exiting low-mem mode (RAM={ram}%).")
-
-            # Reabilita se o usuário tiver habilitado via env na inicialização
-            # (não ligamos automaticamente se estava desligado por configuração)
-            if _env_flag("ZEUS_ENABLE_VOICE", "1"):
-                ENABLE_VOICE = True
-            if _env_flag("ZEUS_ENABLE_BROWSER_SENSING", "0"):
-                ENABLE_BROWSER_SENSING = True
-                if _web_sensing_task is None:
-                    try:
-                        _web_sensing_task = asyncio.create_task(web_sensing_loop())
-                    except Exception:
-                        pass
-
-            # Retorna concorrência padrão
-            try:
-                indexing_semaphore = asyncio.Semaphore(2)
-            except Exception:
-                pass
-
-        await asyncio.sleep(3.0)
 
 app.add_middleware(
     CORSMiddleware,
@@ -927,35 +845,7 @@ async def voice_context_trigger(text: str, channel: str = "system"):
     full_text = f"{prefix}{text}"
     await speak(full_text)
 
-async def web_sensing_loop():
-    """Monitora navegações web e injeta como eventos na rede neural."""
-    while True:
-        await asyncio.sleep(5.0)
-        url = get_browser_history()
-        if url:
-            web_context = classify_web_context(url)
-            event = {
-                "type": "FILE_EVENT",
-                "event": "WEB_VISIT",
-                "path": url,
-                "project": "WEB_SENSING",
-            }
-            await enqueue_event(event)
-            await broadcast_message({
-                "type": "WEB_EVENT", 
-                "url": url, 
-                "project": "WEB_SENSING"
-                ,
-                "domain": web_context["domain"],
-                "category": web_context["category"],
-                "path_hint": web_context["path"],
-                "log": {
-                    "channel": "web",
-                    "title": "Navegação detectada",
-                    "detail": f"{web_context['domain']} entrou no radar.",
-                    "meta": f"categoria={web_context['category']}",
-                }
-            })
+
 
 async def event_batcher():
     global total_events, recent_events_count
@@ -1230,19 +1120,7 @@ SYSTEM_INSTRUCTIONS = (
     "Aja como uma inteligência superior que auxilia o usuário com precisão absoluta."
 )
 
-async def boot_greeting():
-    try:
-        # Dá um tempinho para o servidor FastAPI subir completamente
-        await asyncio.sleep(3)
-        prompt = "O sistema ZEUS acaba de ser iniciado. Crie uma mensagem falada muito curta de boas-vindas (máximo 1 frase), chamando o usuário de 'Senhor'. Seja imponente, técnico e direto."
-        reply = await call_ollama(prompt)
-        if reply and reply.strip():
-            await speak(reply)
-        else:
-            await speak("Olá, Senhor. O sistema ZEUS está online.")
-    except Exception as e:
-        print(f"Erro na saudação inicial: {e}")
-        await speak("Olá, Senhor. O sistema ZEUS está online.")
+
 async def autonomous_reflection():
     """
     ZEUS analisa seus próprios padrões salvos no SQLite durante o IDLE.

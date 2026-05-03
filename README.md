@@ -1,6 +1,6 @@
 # ZEUS Cognitive AI
 
-ZEUS is a local-first cognitive operating layer that combines a FastAPI backend, Ollama/OpenAI-compatible LLM routing, realtime HUD telemetry, voice/vision tools, Rust-based file watching, and a Linux Mint/Cinnamon panel applet.
+ZEUS is a local-first cognitive operating layer that combines a FastAPI backend, Ollama/OpenAI-compatible LLM routing, realtime HUD telemetry, voice/vision tools, Rust-based file watching, a Linux Mint/Cinnamon panel applet, and an event-driven **Second Brain Orchestrator** connecting Obsidian, Notion, and Linear.
 
 The current default profile is **Ollama Cloud through the local Ollama daemon**, using `gemma4:31b-cloud` when the machine is authenticated with `ollama signin`.
 
@@ -10,6 +10,7 @@ Current product direction: **the Cinnamon applet is the primary desktop interfac
 
 - Backend: FastAPI + Socket.IO + native WebSocket.
 - LLM: Ollama-first, with OpenAI/Gemini support available by environment variables.
+- Second Brain: Event-driven orchestration syncing local Obsidian notes to Notion and Linear via markdown tags (`#to-notion`, `#to-linear`).
 - UI: Web HUD in `public/index.html`, Cinnamon applet in `applets/cinnamon/zeus@local/`, and GTK chat in `bin/zeus-gtk-chat`.
 - Security: LAN access requires token when enabled; command execution uses allowlist, confirmation, and audit logging.
 - Observability: structured JSON logs, request correlation-id, and health metrics.
@@ -21,13 +22,19 @@ Current product direction: **the Cinnamon applet is the primary desktop interfac
 graph TD
     User[User] --> WebHUD[Web HUD]
     User --> Applet[Cinnamon Applet]
+    User --> Obsidian[Obsidian Vault]
 
     WebHUD --> API[FastAPI Backend]
     Applet --> API
+    Obsidian --> Watcher[File Watcher]
 
+    Watcher --> API
     API --> LLM[LLM Provider]
     API --> Memory[SQLite / Vector Memory]
-    Watcher[Rust Watcher] --> API
+    API --> EventBus[Event Bus & Classifier]
+    
+    EventBus --> Notion[Notion API]
+    EventBus --> Linear[Linear API]
 
     LLM --> Ollama[Ollama Local / Cloud]
     LLM --> OpenAI[OpenAI-compatible API]
@@ -38,7 +45,7 @@ graph TD
 | Path | Purpose |
 | --- | --- |
 | `apps/` | FastAPI app, realtime hub, status routes, orchestration entrypoints. |
-| `zeus_core/` | LLM routing, agents, memory, security guards, command policy, observability. |
+| `zeus_core/` | LLM routing, agents, memory, security guards, event bus, integrations (Notion, Linear), observability. |
 | `public/` | Web HUD and frontend tests. |
 | `applets/` | Linux desktop panel integrations, currently Cinnamon `zeus@local`. |
 | `bin/zeus-gtk-chat` | Lightweight GTK desktop chat launched by the applet. |
@@ -63,6 +70,16 @@ ZEUS_DISABLE_OLLAMA=0
 ZEUS_ALLOW_LAN=0
 ZEUS_LAN_AUTH=1
 ZEUS_ALLOW_INSECURE_DEV_SECRET=0
+
+# Second Brain Integrations
+ZEUS_VAULT_PATH=/home/zeus/Documentos/Brain
+ZEUS_DB_PATH=./zeus_events.db
+NOTION_TOKEN=your_notion_token
+NOTION_DATABASE_ID=your_database_id
+LINEAR_API_KEY=your_linear_key
+LINEAR_TEAM_ID=your_team_id
+ZEUS_ENABLE_NOTION=true
+ZEUS_ENABLE_LINEAR=true
 ```
 
 For Ollama Cloud via the local daemon:
@@ -214,6 +231,7 @@ git push origin main
 
 ## Documentation
 
+- `docs/ZEUS_SECOND_BRAIN_ARCHITECTURE.md`
 - `docs/RELATORIO_SISTEMA_2026-05-02.md`
 - `docs/PLANO_EXECUCAO_ZEUS_2026-05-02.md`
 - `docs/ANALISE_SISTEMA_DETALHADA.md`

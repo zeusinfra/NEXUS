@@ -1,0 +1,116 @@
+import os
+import requests
+import json
+from dotenv import load_dotenv
+
+load_dotenv()
+
+NOTION_TOKEN = os.getenv("NOTION_TOKEN")
+NOTION_DATABASE_ID = os.getenv("NOTION_DATABASE_ID")
+NOTION_ENABLED = os.getenv("ZEUS_ENABLE_NOTION", "false").lower() in {"1", "true", "yes", "on"}
+NOTION_VERSION = "2022-06-28"
+
+BASE_URL = "https://api.notion.com/v1"
+
+def _get_headers():
+    return {
+        "Authorization": f"Bearer {NOTION_TOKEN}",
+        "Content-Type": "application/json",
+        "Notion-Version": NOTION_VERSION
+    }
+
+def _markdown_to_blocks(content: str) -> list:
+    """Conversor simplificado de MD para Notion Blocks. Em prod, usar 'notion-blockify' ou similar."""
+    blocks = []
+    lines = content.split('\n')
+    for line in lines:
+        if not line.strip():
+            continue
+        # Trata tudo como parágrafo (simplificação para a Fase 3)
+        blocks.append({
+            "object": "block",
+            "type": "paragraph",
+            "paragraph": {
+                "rich_text": [
+                    {
+                        "type": "text",
+                        "text": {
+                            "content": line[:2000] # Limite de chars do Notion por text block
+                        }
+                    }
+                ]
+            }
+        })
+    return blocks
+
+def create_notion_page(title: str, content: str, tags: list[str], source_path: str) -> dict:
+    if not NOTION_ENABLED:
+        print("[Notion] Integração desabilitada. Ignorando sincronização.")
+        return {"error": "Disabled"}
+    if not NOTION_TOKEN or not NOTION_DATABASE_ID:
+        print("[Notion] Configuração ausente. Ignorando sincronização.")
+        return {"error": "Not configured"}
+
+    url = f"{BASE_URL}/pages"
+    
+    # Formata as tags para multiselect
+    multi_select_tags = [{"name": t.replace('#', '')} for t in tags if t]
+    
+    payload = {
+        "parent": {"database_id": NOTION_DATABASE_ID},
+        "properties": {
+            "Name": {
+                "title": [
+                    {
+                        "text": {"content": title}
+                    }
+                ]
+            },
+            "Source Path": {
+                "rich_text": [
+                    {
+                        "text": {"content": source_path}
+                    }
+                ]
+            },
+            "Tags": {
+                "multi_select": multi_select_tags
+            }
+        },
+        "children": _markdown_to_blocks(content)
+    }
+
+    try:
+        response = requests.post(url, headers=_get_headers(), json=payload, timeout=10)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"[Notion] Erro ao criar página: {e}")
+        return {"error": str(e)}
+
+def update_notion_page(page_id: str, content: str) -> dict:
+    # A atualização de conteúdo no Notion requer deletar blocos antigos e inserir novos (APPEND).
+    # Para simplificar, estamos apenas atualizando properties aqui.
+    print("[Notion] Atualização de blocos requer lógica complexa (Append/Delete block children). Omitido por enquanto.")
+    return {"status": "not_implemented"}
+
+def search_notion(query: str) -> list[dict]:
+    if not NOTION_ENABLED:
+        return []
+    if not NOTION_TOKEN: return []
+    
+    url = f"{BASE_URL}/search"
+    payload = {
+        "query": query,
+        "sort": {
+            "direction": "descending",
+            "timestamp": "last_edited_time"
+        }
+    }
+    try:
+        response = requests.post(url, headers=_get_headers(), json=payload, timeout=10)
+        response.raise_for_status()
+        return response.json().get('results', [])
+    except Exception as e:
+        print(f"[Notion] Erro ao buscar: {e}")
+        return []

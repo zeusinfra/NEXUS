@@ -3,6 +3,8 @@ const Mainloop = imports.mainloop;
 const Gio = imports.gi.Gio;
 const GLib = imports.gi.GLib;
 const Settings = imports.ui.settings;
+const Soup = imports.gi.Soup;
+const ByteArray = imports.byteArray;
 
 const APPLET_UUID = 'zeus@local';
 const APPLET_VERSION = '1.0.4';
@@ -39,6 +41,16 @@ class ZeusApplet extends Applet.TextIconApplet {
         this.set_applet_tooltip('ZEUS ' + APPLET_VERSION + ': verificando backend...');
 
         this._initSettings(instanceId);
+
+        try {
+            this._soupSession = new Soup.Session();
+            this._soupSession.timeout = 4;
+        } catch (e) {
+            // Fallback for older Soup
+            this._soupSession = new Soup.SessionAsync();
+            this._soupSession.timeout = 4;
+        }
+
         this._refreshStatus();
         this._pollTimer = Mainloop.timeout_add_seconds(POLL_SECONDS, () => {
             this._refreshStatus();
@@ -77,31 +89,44 @@ class ZeusApplet extends Applet.TextIconApplet {
         }
     }
 
-    _runCurl(args, timeoutSeconds, callback) {
-        const argv = ['curl', '-sS', '--max-time', String(timeoutSeconds)].concat(args);
-        let proc;
-        try {
-            proc = Gio.Subprocess.new(
-                argv,
-                Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE
-            );
-        } catch (e) {
-            callback(false, '', String(e));
+    _httpRequest(url, callback) {
+        let msg = Soup.Message.new('GET', url);
+        if (!msg) {
+            callback(false, '', 'Invalid URL');
             return;
         }
 
-        proc.communicate_utf8_async(null, null, (subprocess, result) => {
-            try {
-                const [, stdout, stderr] = subprocess.communicate_utf8_finish(result);
-                callback(subprocess.get_successful(), stdout || '', stderr || '');
-            } catch (e) {
-                callback(false, '', String(e));
-            }
-        });
+        if (this._soupSession.send_and_read_async) {
+            // Soup 3.0
+            this._soupSession.send_and_read_async(msg, GLib.PRIORITY_DEFAULT, null, (session, result) => {
+                try {
+                    let bytes = session.send_and_read_finish(result);
+                    let ok = (msg.get_status() === Soup.Status.OK);
+                    let body = '';
+                    if (bytes) {
+                        try {
+                            body = new TextDecoder().decode(bytes.get_data());
+                        } catch (e) {
+                            body = ByteArray.toString(bytes.get_data());
+                        }
+                    }
+                    callback(ok, body, '');
+                } catch (e) {
+                    callback(false, '', String(e));
+                }
+            });
+        } else {
+            // Soup 2.4
+            this._soupSession.queue_message(msg, (session, message) => {
+                let ok = (message.status_code === Soup.Status.OK);
+                let body = message.response_body ? message.response_body.data : '';
+                callback(ok, body, '');
+            });
+        }
     }
 
     _refreshStatus() {
-        this._runCurl([this._backendUrl + '/api/applet/status'], 4, (ok, stdout, stderr) => {
+        this._httpRequest(this._backendUrl + '/api/applet/status', (ok, stdout, stderr) => {
             if (!ok) {
                 this._online = false;
                 this.set_applet_icon_symbolic_name('network-offline-symbolic');
