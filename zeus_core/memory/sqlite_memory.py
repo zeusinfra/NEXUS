@@ -140,3 +140,60 @@ def link_external_resource(obsidian_path: str, notion_id: str = None, linear_id:
     
     conn.commit()
     conn.close()
+
+
+def get_sync_status() -> dict:
+    """Returns sync event counters and last sync timestamps."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    status = {"total_events": 0, "pending": 0, "processed": 0, "error": 0, "last_sync": None}
+    
+    try:
+        cursor.execute("SELECT status, COUNT(*) FROM events GROUP BY status")
+        for event_status, count in cursor.fetchall():
+            status[event_status or "unknown"] = count
+            status["total_events"] += count
+        
+        cursor.execute("SELECT MAX(processed_at) FROM events WHERE status = 'processed'")
+        row = cursor.fetchone()
+        if row and row[0]:
+            status["last_sync"] = row[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM sync_logs")
+        status["total_sync_ops"] = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT MAX(created_at) FROM sync_logs")
+        row = cursor.fetchone()
+        if row and row[0]:
+            status["last_sync_op"] = row[0]
+    except Exception as e:
+        status["error_detail"] = str(e)
+    
+    conn.close()
+    return status
+
+
+def log_sync_event(source: str, target: str, source_path: str, target_id: str = None, status: str = "success", error_message: str = None):
+    """Registra uma operação de sincronização no banco."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO sync_logs (source, target, source_path, target_id, status, error_message)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (source, target, source_path, target_id, status, error_message))
+    conn.commit()
+    conn.close()
+
+
+def was_already_synced(source: str, target: str, source_path: str) -> bool:
+    """Verifica se um item já foi sincronizado com sucesso para evitar duplicatas."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT COUNT(*) FROM sync_logs 
+        WHERE source = ? AND target = ? AND source_path = ? AND status = 'success'
+    ''', (source, target, source_path))
+    count = cursor.fetchone()[0]
+    conn.close()
+    return count > 0

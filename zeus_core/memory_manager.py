@@ -196,3 +196,108 @@ class MemoryManager:
         
         conn.close()
         return memory
+
+    def export_sync_snapshot(self, top_nodes: int = 20, top_synapses: int = 15, top_patterns: int = 10) -> dict:
+        """
+        Exports a clean snapshot of the synaptic memory state for synchronization.
+        Returns top nodes by weight, strongest synapses, and recent patterns.
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        # Top nodes by weight
+        cursor.execute('SELECT path, weight, last_accessed FROM nodes ORDER BY weight DESC LIMIT ?', (top_nodes,))
+        nodes = [{"path": r[0], "weight": r[1], "last_accessed": r[2]} for r in cursor.fetchall()]
+
+        # Strongest synapses
+        cursor.execute('''
+            SELECT source, target, weight, last_interaction 
+            FROM synapses ORDER BY weight DESC LIMIT ?
+        ''', (top_synapses,))
+        synapses = [{"source": r[0], "target": r[1], "weight": r[2], "last_interaction": r[3]} for r in cursor.fetchall()]
+
+        # Recent patterns
+        cursor.execute('''
+            SELECT type, context, timestamp, importance 
+            FROM patterns ORDER BY timestamp DESC LIMIT ?
+        ''', (top_patterns,))
+        patterns = [{"type": r[0], "context": r[1], "timestamp": r[2], "importance": r[3]} for r in cursor.fetchall()]
+
+        # Summary stats
+        cursor.execute('SELECT COUNT(*) FROM nodes')
+        total_nodes = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM synapses')
+        total_synapses = cursor.fetchone()[0]
+
+        conn.close()
+
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "total_nodes": total_nodes,
+            "total_synapses": total_synapses,
+            "top_nodes": nodes,
+            "top_synapses": synapses,
+            "recent_patterns": patterns,
+            "sensory_buffer_size": len(self.sensory_history),
+        }
+
+    # Extensions that are internal runtime artifacts, not meaningful code activity
+    _NOISE_EXTENSIONS = {'.db', '.db-journal', '.db-wal', '.db-shm', '.log', '.tmp',
+                         '.apk', '.so', '.bin', '.json', '.pyc', '.lock', '.pid',
+                         '.jar', '.ap_', '.txt', '.dex', '.class', '.idx', '.pack'}
+
+    def _is_noise_path(self, path: str) -> bool:
+        """Filters out internal system/runtime files from anomaly detection."""
+        basename = os.path.basename(path)
+        _, ext = os.path.splitext(basename)
+        return ext.lower() in self._NOISE_EXTENSIONS
+
+    def get_anomalies(self, weight_threshold: int = 200) -> list:
+        """
+        Detects anomalous activity spikes — nodes or synapses with unusually high weight.
+        Filters out internal runtime artifacts (db, log, tmp, apk, so).
+        Returns a list of anomaly dicts suitable for creating Linear issues.
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        anomalies = []
+
+        # Nodes with weight above threshold (fetch extra to compensate for filtering)
+        cursor.execute('SELECT path, weight, last_accessed FROM nodes WHERE weight > ? ORDER BY weight DESC LIMIT 30', (weight_threshold,))
+        for r in cursor.fetchall():
+            if self._is_noise_path(r[0]):
+                continue
+            anomalies.append({
+                "type": "high_activity_node",
+                "path": r[0],
+                "weight": r[1],
+                "last_accessed": r[2],
+                "title": f"Atividade anômala: {os.path.basename(r[0])}",
+                "description": f"Nó sináptico '{r[0]}' atingiu peso {r[1]}, indicando foco intenso ou loop de processamento.",
+                "priority": "high" if r[1] > weight_threshold * 2 else "medium",
+            })
+            if len(anomalies) >= 5:
+                break
+
+        # Synapses with extreme weight
+        synapse_count = 0
+        cursor.execute('SELECT source, target, weight FROM synapses WHERE weight > ? ORDER BY weight DESC LIMIT 20', (weight_threshold,))
+        for r in cursor.fetchall():
+            if self._is_noise_path(r[0]) or self._is_noise_path(r[1]):
+                continue
+            anomalies.append({
+                "type": "strong_synapse",
+                "source": r[0],
+                "target": r[1],
+                "weight": r[2],
+                "title": f"Sinapse forte: {os.path.basename(r[0])} ↔ {os.path.basename(r[1])}",
+                "description": f"Conexão entre '{r[0]}' e '{r[1]}' com peso {r[2]}. Pode indicar dependência crítica.",
+                "priority": "medium",
+            })
+            synapse_count += 1
+            if synapse_count >= 3:
+                break
+
+        conn.close()
+        return anomalies
+

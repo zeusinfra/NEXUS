@@ -114,3 +114,58 @@ def search_notion(query: str) -> list[dict]:
     except Exception as e:
         print(f"[Notion] Erro ao buscar: {e}")
         return []
+
+
+def upsert_notion_page(title: str, content: str, tags: list[str], source_path: str) -> dict:
+    """
+    Cria ou atualiza uma página no Notion Database.
+    Busca por título existente para evitar duplicatas.
+    """
+    if not NOTION_ENABLED:
+        return {"error": "Disabled"}
+    if not NOTION_TOKEN or not NOTION_DATABASE_ID:
+        return {"error": "Not configured"}
+
+    # 1. Busca página existente pelo título no database
+    search_url = f"{BASE_URL}/databases/{NOTION_DATABASE_ID}/query"
+    search_payload = {
+        "filter": {
+            "property": "Name",
+            "title": {
+                "equals": title
+            }
+        },
+        "page_size": 1
+    }
+
+    existing_page_id = None
+    try:
+        resp = requests.post(search_url, headers=_get_headers(), json=search_payload, timeout=10)
+        resp.raise_for_status()
+        results = resp.json().get("results", [])
+        if results:
+            existing_page_id = results[0]["id"]
+    except Exception as e:
+        print(f"[Notion] Erro ao buscar página existente: {e}")
+
+    if existing_page_id:
+        # 2a. Atualizar página existente: append de blocos novos
+        append_url = f"{BASE_URL}/blocks/{existing_page_id}/children"
+        # Adiciona separador visual antes do conteúdo atualizado
+        separator_block = {"object": "block", "type": "divider", "divider": {}}
+        new_blocks = [separator_block] + _markdown_to_blocks(content)
+
+        try:
+            resp = requests.patch(append_url, headers=_get_headers(), json={"children": new_blocks}, timeout=10)
+            resp.raise_for_status()
+            print(f"[Notion] Página '{title}' atualizada (ID: {existing_page_id})")
+            return {"id": existing_page_id, "action": "updated"}
+        except Exception as e:
+            print(f"[Notion] Erro ao atualizar página: {e}")
+            return {"error": str(e)}
+    else:
+        # 2b. Criar página nova
+        result = create_notion_page(title, content, tags, source_path)
+        if "id" in result:
+            result["action"] = "created"
+        return result

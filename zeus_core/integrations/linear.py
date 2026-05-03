@@ -138,3 +138,30 @@ def get_issue_context(issue_id: str) -> dict:
     except Exception as e:
         print(f"[Linear] Erro ao buscar contexto da issue: {e}")
         return {}
+
+
+def create_insight_issue(title: str, description: str, priority: str = "medium", source: str = "zeus-sync-engine") -> dict:
+    """
+    Wrapper simplificado para criação automática de issues a partir de insights do sync engine.
+    Adiciona prefixo [ZEUS Insight] e metadata de origem.
+    """
+    if not LINEAR_ENABLED:
+        return {"error": "Disabled"}
+    if not LINEAR_API_KEY or not LINEAR_TEAM_ID:
+        return {"error": "Not configured"}
+
+    prefixed_title = f"[ZEUS Insight] {title}"
+    full_description = (
+        f"{description}\n\n"
+        f"---\n"
+        f"*Gerado automaticamente pelo ZEUS Sync Engine*\n"
+        f"*Fonte: {source}*"
+    )
+
+    return create_linear_issue(
+        title=prefixed_title,
+        description=full_description,
+        labels=["zeus-insight"],
+        priority=priority,
+        source_path=source,
+    )

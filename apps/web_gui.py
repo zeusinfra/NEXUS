@@ -43,6 +43,7 @@ from zeus_core.llm_service import LLMService
 from zeus_core.memory_manager import MemoryManager
 from zeus_core.events.watcher import watch_vault
 from zeus_core.events.sync_worker import sync_worker_loop
+from zeus_core.events.sync_engine import sync_synaptic_to_obsidian, sync_longterm_to_notion, sync_insights_to_linear
 from zeus_core.cognitive.context_engine import build_current_context
 from zeus_core.memory.sqlite_memory import get_connection as get_second_brain_connection
 from zeus_core.health_status import build_runtime_health, build_watcher_status
@@ -226,14 +227,20 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(lifecycle_manager.boot_greeting())
 
     # Second Brain Tasks
-    global _watcher_task, _sync_worker_task
+    global _watcher_task, _sync_worker_task, _sync_engine_tasks
     _watcher_task = None
     _sync_worker_task = None
+    _sync_engine_tasks = []
     vault_path = os.getenv("ZEUS_VAULT_PATH", "/home/zeus/Documentos/Brain")
     if ENABLE_SECOND_BRAIN and os.path.exists(vault_path):
         print(f"[ZEUS] Iniciando Second Brain integrando {vault_path}")
         _watcher_task = asyncio.create_task(watch_vault(vault_path))
         _sync_worker_task = asyncio.create_task(sync_worker_loop())
+        # Real-Time Memory Sync Workers
+        print("[ZEUS] Iniciando Sync Engine (Sináptico→Obsidian, LongTerm→Notion, Insights→Linear)")
+        _sync_engine_tasks.append(asyncio.create_task(sync_synaptic_to_obsidian(memory_manager, interval=60.0)))
+        _sync_engine_tasks.append(asyncio.create_task(sync_longterm_to_notion(interval=300.0)))
+        _sync_engine_tasks.append(asyncio.create_task(sync_insights_to_linear(memory_manager, interval=300.0)))
     
     yield
     # Salvar Memória ao fechar
@@ -255,6 +262,8 @@ async def lifespan(app: FastAPI):
             _watcher_task.cancel()
         if _sync_worker_task:
             _sync_worker_task.cancel()
+        for task in _sync_engine_tasks:
+            task.cancel()
     except Exception:
         pass
 

@@ -61,3 +61,56 @@ def write_obsidian_insight(title: str, content: str, folder: str = "Insights") -
         f.write(header + content)
         
     return file_path
+
+
+def write_sync_note(subfolder: str, filename: str, content: str) -> str:
+    """
+    Escreve uma nota de sincronização na estrutura ZEUS_Sync/ do vault.
+    Cria subpastas automaticamente. Sobrescreve o arquivo se existir.
+    """
+    sync_folder = os.path.join(VAULT_PATH, "ZEUS_Sync", subfolder)
+    os.makedirs(sync_folder, exist_ok=True)
+    
+    safe_name = re.sub(r'[\\/*?:"<>|]', "", filename)
+    if not safe_name.endswith('.md'):
+        safe_name += '.md'
+    
+    file_path = os.path.join(sync_folder, safe_name)
+    
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    header = f"---\ntags: [zeus-sync, auto-generated]\ndate: {timestamp}\n---\n\n"
+    
+    with open(file_path, 'w', encoding='utf-8') as f:
+        f.write(header + content)
+    
+    return file_path
+
+
+def update_daily_log(entries: list[str], date_str: str = None) -> str:
+    """
+    Append de entradas ao log diário em ZEUS_Sync/Daily/.
+    Cria o arquivo se não existir, adicionando novas entradas sem apagar as antigas.
+    """
+    if date_str is None:
+        date_str = datetime.now().strftime("%Y-%m-%d")
+    
+    daily_folder = os.path.join(VAULT_PATH, "ZEUS_Sync", "Daily")
+    os.makedirs(daily_folder, exist_ok=True)
+    
+    file_path = os.path.join(daily_folder, f"{date_str}.md")
+    
+    if os.path.exists(file_path):
+        with open(file_path, 'r', encoding='utf-8') as f:
+            existing = f.read()
+    else:
+        existing = f"---\ntags: [zeus-daily, auto-generated]\ndate: {date_str}\n---\n\n# ZEUS Daily Log — {date_str}\n\n"
+    
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    new_block = f"\n## {timestamp}\n\n"
+    for entry in entries:
+        new_block += f"- {entry}\n"
+    
+    with open(file_path, 'w', encoding='utf-8') as f:
+        f.write(existing + new_block)
+    
+    return file_path
