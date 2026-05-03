@@ -18,14 +18,17 @@ As seguintes variáveis devem ser preenchidas no seu `.env` para habilitar o flu
 ```ini
 ZEUS_VAULT_PATH=/home/zeus/Documentos/Brain
 ZEUS_DB_PATH=./zeus_events.db
+ZEUS_ENABLE_SECOND_BRAIN=1
 
 # Notion
 NOTION_TOKEN=secret_xxx
 NOTION_DATABASE_ID=xxx
+ZEUS_ENABLE_NOTION=true
 
 # Linear
 LINEAR_API_KEY=your_linear_api_key_here
 LINEAR_TEAM_ID=xxx
+ZEUS_ENABLE_LINEAR=true
 ```
 
 ## Como usar (Tags)

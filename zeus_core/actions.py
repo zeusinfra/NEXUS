@@ -20,6 +20,9 @@ from zeus_core.vision import (
     ocr_image,
 )
 from zeus_core.browser_control import browser_control
+from zeus_core.integrations.linear import create_linear_issue, get_active_issues
+from zeus_core.integrations.notion import create_notion_page, search_notion
+from zeus_core.integrations.obsidian import read_note, write_obsidian_insight
 
 
 def _project_root() -> Path:
@@ -293,6 +296,60 @@ def install_tesseract(parameters: dict) -> dict:
     return {**common, "distro_id": distro_id or None, "instructions": "\n".join(instructions)}
 
 
+def obsidian_read_note(parameters: dict) -> dict:
+    path = str((parameters or {}).get("path") or "").strip()
+    if not path:
+        raise ToolError("obsidian_read_note requer 'path'.")
+    note = read_note(path)
+    return {
+        "title": note["title"],
+        "tags": note["tags"],
+        "internal_links": note["internal_links"],
+        "path": note["path"],
+        "content": note["content"][:4000],
+        "truncated": len(note["content"]) > 4000,
+    }
+
+
+def obsidian_write_insight(parameters: dict) -> dict:
+    title = str((parameters or {}).get("title") or "ZEUS Insight").strip()
+    content = str((parameters or {}).get("content") or "").strip()
+    if not content:
+        raise ToolError("obsidian_write_insight requer 'content'.")
+    path = write_obsidian_insight(title, content)
+    return {"path": path, "written": True}
+
+
+def notion_create_page(parameters: dict) -> dict:
+    title = str((parameters or {}).get("title") or "ZEUS Note").strip()
+    content = str((parameters or {}).get("content") or "").strip()
+    tags = list((parameters or {}).get("tags") or [])
+    response = create_notion_page(title, content, tags, "ZEUS Agent")
+    return {"ok": "error" not in response, "response": response}
+
+
+def notion_search(parameters: dict) -> dict:
+    query = str((parameters or {}).get("query") or "").strip()
+    if not query:
+        raise ToolError("notion_search requer 'query'.")
+    results = search_notion(query)
+    return {"count": len(results), "results": results[:5]}
+
+
+def linear_create_issue(parameters: dict) -> dict:
+    title = str((parameters or {}).get("title") or "ZEUS Task").strip()
+    description = str((parameters or {}).get("description") or "").strip()
+    labels = list((parameters or {}).get("labels") or [])
+    priority = str((parameters or {}).get("priority") or "medium").strip()
+    response = create_linear_issue(title, description, labels, priority, "ZEUS Agent")
+    return {"ok": "error" not in response, "response": response}
+
+
+def linear_current_context(parameters: dict) -> dict:
+    issues = get_active_issues()
+    return {"count": len(issues), "issues": issues[:10]}
+
+
 def get_actions() -> Dict[str, Any]:
     return {
         "get_time": lambda params: get_time(),
@@ -301,4 +358,10 @@ def get_actions() -> Dict[str, Any]:
         "screen_process": screen_process,
         "install_tesseract": install_tesseract,
         "browser_control": browser_control,
+        "obsidian_read_note": obsidian_read_note,
+        "obsidian_write_insight": obsidian_write_insight,
+        "notion_create_page": notion_create_page,
+        "notion_search": notion_search,
+        "linear_create_issue": linear_create_issue,
+        "linear_current_context": linear_current_context,
     }

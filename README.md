@@ -78,6 +78,7 @@ NOTION_TOKEN=your_notion_token
 NOTION_DATABASE_ID=your_database_id
 LINEAR_API_KEY=your_linear_key
 LINEAR_TEAM_ID=your_team_id
+ZEUS_ENABLE_SECOND_BRAIN=1
 ZEUS_ENABLE_NOTION=true
 ZEUS_ENABLE_LINEAR=true
 ```

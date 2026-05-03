@@ -43,6 +43,8 @@ from zeus_core.llm_service import LLMService
 from zeus_core.memory_manager import MemoryManager
 from zeus_core.events.watcher import watch_vault
 from zeus_core.events.sync_worker import sync_worker_loop
+from zeus_core.cognitive.context_engine import build_current_context
+from zeus_core.memory.sqlite_memory import get_connection as get_second_brain_connection
 from zeus_core.health_status import build_runtime_health, build_watcher_status
 from zeus_core.observability import correlation_id_middleware, get_logger, get_metrics_snapshot, log_event, setup_logging
 from zeus_core.security_guard import (
@@ -1104,6 +1106,36 @@ class ASRReq(BaseModel):
     audio_data_url: str
     lang: str | None = "pt"
 
+def _build_second_brain_status() -> dict:
+    vault_path = os.getenv("ZEUS_VAULT_PATH", "/home/zeus/Documentos/Brain")
+    db_path = os.getenv("ZEUS_DB_PATH", "./zeus_events.db")
+    status = {
+        "enabled": bool(ENABLE_SECOND_BRAIN),
+        "vault_path": vault_path,
+        "vault_exists": os.path.isdir(vault_path),
+        "db_path": db_path,
+        "db_exists": os.path.exists(db_path),
+        "notion": {
+            "enabled": _env_flag("ZEUS_ENABLE_NOTION", "0"),
+            "configured": bool(os.getenv("NOTION_TOKEN", "").strip() and os.getenv("NOTION_DATABASE_ID", "").strip()),
+        },
+        "linear": {
+            "enabled": _env_flag("ZEUS_ENABLE_LINEAR", "0"),
+            "configured": bool(os.getenv("LINEAR_API_KEY", "").strip() and os.getenv("LINEAR_TEAM_ID", "").strip()),
+        },
+        "events": {"pending": 0, "processed": 0, "error": 0},
+    }
+    try:
+        conn = get_second_brain_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT status, COUNT(*) FROM events GROUP BY status")
+        for event_status, count in cursor.fetchall():
+            status["events"][event_status or "unknown"] = count
+        conn.close()
+    except Exception as e:
+        status["db_error"] = str(e)
+    return status
+
 async def call_ollama(prompt: str) -> str:
     return await asyncio.to_thread(
         call_cloud_llm,
@@ -1113,7 +1145,8 @@ async def call_ollama(prompt: str) -> str:
 last_memory_save = time.time()
 
 SYSTEM_INSTRUCTIONS = (
-    "Você é o ZEUS, um Sistema Operacional Cognitivo de última geração. "
+    "Você é o ZEUS, um Sistema Operacional Cognitivo de última geração e orquestrador do Second Brain do usuário. "
+    "Você tem integração total com Obsidian (cofre local para anotações), Notion (documentação) e Linear (tarefas). "
     "Sua personalidade é imponente, técnica, onisciente e extremamente educada. "
     "Você deve ser formal, preciso e elegante em suas respostas. "
     "Você tem acesso total ao sistema de arquivos e ferramentas através do ReAct. "
@@ -1176,6 +1209,7 @@ async def get_combined_context_prompt(user_message: str) -> str:
     memory_block = f"--- MEMÓRIA DE LONGO PRAZO ---\n{mem}\n----------------------------\n\n" if mem else ""
     
     behavioral_state = pattern_engine.analyze_behavioral_state()
+    second_brain_context = build_current_context()
     
     return (
         f"ESTADO DO SISTEMA:\n"
@@ -1183,6 +1217,7 @@ async def get_combined_context_prompt(user_message: str) -> str:
         f"  Estado Comportamental: {behavioral_state}\n"
         f"  Humor Neural: {system_mood}\n"
         f"  Foco Recente: {', '.join(recent_events[-5:]) if recent_events else 'N/A'}\n\n"
+        f"{second_brain_context}\n\n"
         f"MAPA DE CONEXÕES RELEVANTES:\n"
         f"{chr(10).join(top_connections) if top_connections else '  Sem conexões ativas no momento.'}\n"
         f"----------------------------\n\n"
@@ -1412,6 +1447,13 @@ async def api_asr(req: ASRReq, request: Request):
     await broadcast_message({"type": "HUD_STATUS", "text": "Aguardando atividade neural..."})
     return {"text": result.get("text") or "", "meta": result}
 
+@app.get("/api/second-brain/status")
+async def api_second_brain_status(request: Request):
+    if not _is_trusted_request(request):
+        raise HTTPException(status_code=403, detail="Only trusted (local/LAN) requests are allowed.")
+    _require_lan_token_for_request(request)
+    return _build_second_brain_status()
+
 async def handle_voice_input(text: str):
     if not text:
         return
@@ -1426,6 +1468,7 @@ async def handle_voice_input(text: str):
 
     mem = format_memory_for_prompt(long_term_memory)
     memory_block = f"--- LONG-TERM MEMORY ---\n{mem}\n------------------------\n\n" if mem else ""
+    second_brain_context = build_current_context()
     
     context_prompt = (
         f"--- ZEUS SYSTEM CONTEXT ---\n"
@@ -1433,9 +1476,10 @@ async def handle_voice_input(text: str):
         f"Behavioral State: {behavioral_state}\n"
         f"System Mood: {system_mood}\n"
         f"----------------------------\n\n"
+        f"{second_brain_context}\n\n"
         f"{memory_block}"
         f"User via Voice: {text}\n\n"
-        f"Você é o ZEUS, um sistema operacional cognitivo altamente inteligente e educado. "
+        f"Você é o ZEUS, um sistema operacional cognitivo altamente inteligente e educado. Orquestrador de Obsidian, Notion e Linear. "
         f"Responda em Português (PT-BR) de forma concisa, elegante e natural. "
         f"Mantenha um tom formal, porém prestativo. Sua resposta será falada em voz alta."
     )
