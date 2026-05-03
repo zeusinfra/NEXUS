@@ -9,11 +9,6 @@ __pycache__/
 # Rust
 **/target/
 
-# Flutter
-zeus_extension/.dart_tool/
-zeus_extension/build/
-zeus_extension/.idea/
-zeus_extension/*.iml
 **/build/
 **/intermediates/
 **/outputs/
@@ -25,7 +20,6 @@ logs/*.jsonl
 zeus_core.log
 zeus_server.log
 startup_test*.log
-zeus_extension_v1.1.apk
 
 # Environment / Secrets
 .env

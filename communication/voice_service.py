@@ -33,7 +33,7 @@ class VoiceService:
             with open(temp_file, "rb") as f:
                 audio_data = f.read()
             
-            # Retorna como base64 para o Flutter tocar
+            # Retorna como base64 para clientes locais tocarem.
             return base64.b64encode(audio_data).decode("utf-8")
         except Exception as e:
             print(f"[VOICE SERVICE ERROR] {e}")

@@ -16,9 +16,6 @@ rm -rf \
   .ruff_cache || true
 
 echo "[cleanup] Removing Rust build artifacts..."
-rm -rf watcher_rs/target core-rust/target || true
-
-echo "[cleanup] Removing Flutter build artifacts..."
-rm -rf zeus_extension/.dart_tool zeus_extension/build zeus_extension/.idea zeus_extension/*.iml || true
+rm -rf watcher_rs/target core-rust/target core-rust/zeus_memory/target core-rust/zeus_synapse/target || true
 
 echo "[cleanup] Done."

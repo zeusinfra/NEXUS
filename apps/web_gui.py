@@ -124,7 +124,7 @@ MAX_VISION_IMAGE_BYTES = int(os.getenv("ZEUS_MAX_VISION_IMAGE_BYTES", str(6 * 10
 IGNORED_DIRS = {
     ".venv", "__pycache__", ".obsidian", ".git", "node_modules", 
     "target", "dist", ".gemini", ".config", ".cache", "venv",
-    ".rustup", ".cargo", ".npm", ".ruff_cache", "build", "zeus_extension",
+    ".rustup", ".cargo", ".npm", ".ruff_cache", "build",
     "CVS", ".svn", ".idea", ".vscode", "AppData", "Local", "Roaming"
 }
 
@@ -1401,7 +1401,7 @@ async def api_applet_vision_analyze(request: Request):
         raise HTTPException(status_code=403, detail="Only trusted (local/LAN) requests are allowed.")
     _require_lan_token_for_request(request)
 
-    asyncio.create_task(_handle_bubble_vision())
+    asyncio.create_task(_handle_client_vision())
     return {"ok": True, "stage": "queued"}
 
 
@@ -1602,12 +1602,12 @@ async def _handle_arm_voice_duration(duration: int):
         voice_module.arm(seconds=duration)
         await broadcast_message({"type": "HUD_STATUS", "text": f"Escuta manual ativada ({duration}s)"})
 
-async def _handle_bubble_text(text: str):
-    await broadcast_message({"type": "CHAT_USER", "message": text, "source": "bubble"})
+async def _handle_client_text(text: str):
+    await broadcast_message({"type": "CHAT_USER", "message": text, "source": "local_client"})
     context_prompt = await get_combined_context_prompt(text)
     await broadcast_message({"type": "HUD_STATUS", "text": "Núcleo cognitivo processando..."})
-    reply = await react_agent.run(context_prompt, client_key="bubble", broadcast=broadcast_message)
-    await broadcast_message({"type": "CHAT_AI", "message": reply, "source": "bubble"})
+    reply = await react_agent.run(context_prompt, client_key="local_client", broadcast=broadcast_message)
+    await broadcast_message({"type": "CHAT_AI", "message": reply, "source": "local_client"})
     await broadcast_message({"type": "HUD_STATUS", "text": "Aguardando atividade neural..."})
 
     if ENABLE_VOICE:
@@ -1618,12 +1618,12 @@ async def _handle_bubble_text(text: str):
         except Exception as e:
             print(f"[WS] TTS generation error: {e}")
 
-async def _handle_bubble_voice_start():
+async def _handle_client_voice_start():
     if voice_module:
         voice_module.arm(seconds=10)
         await broadcast_message({"type": "VOICE_STATE", "stage": "listening"})
 
-async def _handle_bubble_vision():
+async def _handle_client_vision():
     await broadcast_message({"type": "HUD_STATUS", "text": "Capturando visão da tela..."})
     try:
         cap = await asyncio.to_thread(capture_screen)
@@ -1633,7 +1633,7 @@ async def _handle_bubble_vision():
             result = await asyncio.to_thread(analyze_image_with_llm, cap["path"], question=prompt)
             reply = result.get("answer", "Não consegui analisar a tela.")
 
-            await broadcast_message({"type": "CHAT_AI", "message": f"👁️ {reply}", "source": "bubble"})
+            await broadcast_message({"type": "CHAT_AI", "message": f"👁️ {reply}", "source": "local_client"})
             await broadcast_message({"type": "HUD_STATUS", "text": "Aguardando atividade neural..."})
 
             if ENABLE_VOICE:
@@ -1643,7 +1643,7 @@ async def _handle_bubble_vision():
     except Exception as e:
         print(f"[WS] Vision analysis error: {e}")
         await broadcast_message({"type": "HUD_STATUS", "text": "Erro na visão."})
-        await broadcast_message({"type": "CHAT_AI", "message": f"Erro de visão: {str(e)}", "source": "bubble"})
+        await broadcast_message({"type": "CHAT_AI", "message": f"Erro de visão: {str(e)}", "source": "local_client"})
 
 def _build_realtime_deps() -> RealtimeDeps:
     return RealtimeDeps(
@@ -1655,16 +1655,16 @@ def _build_realtime_deps() -> RealtimeDeps:
         lan_token=LAN_TOKEN,
         is_local_host=_is_local_host,
         extract_bearer_token=_extract_bearer_token,
-        handle_bubble_text=_handle_bubble_text,
-        handle_bubble_voice_start=_handle_bubble_voice_start,
-        handle_bubble_vision=_handle_bubble_vision,
+        handle_client_text=_handle_client_text,
+        handle_client_voice_start=_handle_client_voice_start,
+        handle_client_vision=_handle_client_vision,
         handle_arm_voice=_handle_arm_voice_duration,
     )
 
-# --- Native WebSocket endpoint for Flutter Bubble ---
+# --- Native WebSocket endpoint for local desktop clients ---
 @app.websocket("/ws")
-async def websocket_bubble(websocket: WebSocket):
-    await realtime_hub.websocket_bubble(websocket, _build_realtime_deps())
+async def websocket_client(websocket: WebSocket):
+    await realtime_hub.websocket_client(websocket, _build_realtime_deps())
 
 
 realtime_hub.register_socketio_handlers(_build_realtime_deps())
@@ -1678,56 +1678,7 @@ if __name__ == "__main__":
     import uvicorn
     import sys
 
-    if "--desktop" in sys.argv:
-        # Modo Desktop com GUI
-        from PyQt6.QtWidgets import QApplication, QMainWindow
-        from PyQt6.QtWebEngineWidgets import QWebEngineView
-        from PyQt6.QtCore import QUrl
-        import threading
-
-        def run_uvicorn():
-            try:
-                ssl_opts = {}
-                if (not DISABLE_SSL) and os.path.exists("configs/key.pem") and os.path.exists("configs/cert.pem"):
-                    ssl_opts = {"ssl_keyfile": "configs/key.pem", "ssl_certfile": "configs/cert.pem"}
-                uvicorn.run(app, host=SERVER_HOST, port=SERVER_PORT, log_level="error", **ssl_opts)
-            except Exception as e:
-                print(f"Server Error: {e}")
-
-        t = threading.Thread(target=run_uvicorn, daemon=True)
-        t.start()
-        time.sleep(2)
-
-        qt_app = QApplication(sys.argv)
-        window = QMainWindow()
-        window.setWindowTitle("ZEUS Command Center")
-        window.resize(1440, 810)
-        
-        # QWebEngineView Configs
-        browser = QWebEngineView()
-        settings = browser.settings()
-        settings.setAttribute(settings.WebAttribute.LocalStorageEnabled, True)
-        settings.setAttribute(settings.WebAttribute.PlaybackRequiresUserGesture, False)
-        settings.setAttribute(settings.WebAttribute.JavascriptCanAccessClipboard, True)
-        
-        use_https = (not DISABLE_SSL) and os.path.exists("configs/key.pem")
-        browser.setUrl(QUrl(f"https://127.0.0.1:{SERVER_PORT}" if use_https else f"http://127.0.0.1:{SERVER_PORT}"))
-        
-        # Permissões automáticas (Microfone, etc)
-        def handle_feature_permission(url, feature):
-            browser.page().setFeaturePermission(url, feature, browser.page().FeaturePermission.PermissionGrantedByUser)
-        
-        browser.page().featurePermissionRequested.connect(handle_feature_permission)
-        
-        def handle_cert_error(error):
-            error.acceptCertificate()
-            return True
-        browser.page().certificateError.connect(handle_cert_error)
-        
-        window.setCentralWidget(browser)
-        window.show()
-        sys.exit(qt_app.exec())
-    elif "--headless" in sys.argv or "--server" in sys.argv:
+    if "--headless" in sys.argv or "--server" in sys.argv:
         # Modo Servidor Puro (Headless)
         print(f"🌑 ZEUS em modo HEADLESS operacional em {SERVER_HOST}:{SERVER_PORT}")
         ssl_opts = {}

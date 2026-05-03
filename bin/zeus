@@ -73,11 +73,15 @@ ensure_server_background() {
     echo "🌑 Iniciando backend ZEUS em background..."
     (
         cd "$ROOT_DIR"
-        exec "$DIR/zeus" server
-    ) > "$ROOT_DIR/zeus_server.log" 2>&1 &
+        setsid -f nohup "$DIR/zeus" server > "$ROOT_DIR/zeus_server.log" 2>&1
+    )
 
     for _ in $(seq 1 30); do
         if backend_responds; then
+            sleep 1
+            if ! backend_responds; then
+                continue
+            fi
             echo "✅ Backend ZEUS pronto em http://127.0.0.1:${ZEUS_PORT:-8080}"
             return 0
         fi
@@ -146,16 +150,11 @@ case "$1" in
         fi
         stop_stale_backend
         start_rust_services
-        echo "🧠 ZEUS Core operacional. Conecte-se via App Mobile."
+        echo "🧠 ZEUS Core operacional. Conecte-se via Applet/HUD."
         "$PY" -m apps.web_gui --headless
         ;;
     ensure-server)
         ensure_server_background
-        ;;
-    desktop|app)
-        echo "🖥️  Iniciando ZEUS Command Center (Desktop App)..."
-        start_rust_services
-        "$PY" -m apps.web_gui --desktop
         ;;
     evolve|think|ev)
         echo "🌀 Iniciando Motor de Evolução..."
@@ -168,8 +167,8 @@ case "$1" in
     setup-aliases)
         echo "🔧  Configurando aliases globais em ~/.bashrc..."
         grep -q "alias zeus-server" ~/.bashrc || echo "alias zeus-server='cd $ROOT_DIR && ./bin/zeus web > zeus_server.log 2>&1 & sleep 1 && tail -f zeus_server.log'" >> ~/.bashrc
-        grep -q "alias zeus-desktop" ~/.bashrc || echo "alias zeus-desktop='cd $ROOT_DIR && ./bin/zeus desktop'" >> ~/.bashrc
-        echo "✅  Aliases criados: 'zeus-server' e 'zeus-desktop'."
+        grep -q "alias zeus-chat" ~/.bashrc || echo "alias zeus-chat='cd $ROOT_DIR && ./bin/zeus-gtk-chat'" >> ~/.bashrc
+        echo "✅  Aliases criados: 'zeus-server' e 'zeus-chat'."
         echo "🔄  Execute 'source ~/.bashrc' para ativar."
         ;;
     *)
@@ -179,9 +178,8 @@ case "$1" in
         echo ""
         echo "  ./zeus web           → Iniciar Servidor (Browser)"
         echo "  ./zeus ensure-server → Garantir backend headless online"
-        echo "  ./zeus desktop       → Iniciar App Desktop (PyQt)"
         echo "  ./zeus logs          → Ver logs em tempo real"
-        echo "  ./zeus setup-aliases → Instalar aliases zeus-server/zeus-desktop"
+        echo "  ./zeus setup-aliases → Instalar aliases zeus-server/zeus-chat"
         echo "  ./zeus v4            → Core v4 (loop contínuo)"
         echo "  ./zeus evolve        → Motor de Evolução"
         echo ""

@@ -139,7 +139,6 @@ fn is_ignored(path: &Path) -> bool {
     for part in path.components() {
         let p = part.as_os_str().to_string_lossy();
         if p.starts_with('.') || ignored.contains(&p.as_ref()) { return true; }
-        if p == "zeus_extension" { return true; }
     }
     false
 }
@@ -160,7 +159,7 @@ mod tests {
     fn is_ignored_blocks_runtime_and_hidden_paths() {
         assert!(is_ignored(Path::new("/repo/.git/config")));
         assert!(is_ignored(Path::new("/repo/logs/app.log")));
-        assert!(is_ignored(Path::new("/repo/zeus_extension/lib/main.dart")));
+        assert!(is_ignored(Path::new("/repo/target/debug/app")));
         assert!(!is_ignored(Path::new("/repo/apps/web_gui.py")));
     }
 }

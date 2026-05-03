@@ -12,7 +12,7 @@ SECRET_KEY = validate_jwt_secret(
     allow_insecure_dev_secret=ALLOW_INSECURE_DEV_SECRET,
 )
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 1 semana para mobile
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 

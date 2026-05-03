@@ -5,7 +5,7 @@ const GLib = imports.gi.GLib;
 const Settings = imports.ui.settings;
 
 const APPLET_UUID = 'zeus@local';
-const APPLET_VERSION = '1.0.3';
+const APPLET_VERSION = '1.0.4';
 const DEFAULT_BACKEND = 'http://127.0.0.1:8080';
 const PROJECT_ROOT = '__ZEUS_PROJECT_ROOT__';
 const POLL_SECONDS = 10;
@@ -134,7 +134,7 @@ class ZeusApplet extends Applet.TextIconApplet {
 
     _openChat() {
         const root = _projectRoot();
-        const chat = GLib.build_filenamev([root, 'bin', 'zeus-applet-chat']);
+        const chat = GLib.build_filenamev([root, 'bin', 'zeus-gtk-chat']);
         try {
             GLib.spawn_async(
                 root,

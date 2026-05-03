@@ -1,14 +1,16 @@
 # ZEUS Cognitive AI
 
-ZEUS is a local-first cognitive operating layer that combines a FastAPI backend, Ollama/OpenAI-compatible LLM routing, realtime HUD telemetry, voice/vision tools, Rust-based file watching, a Flutter desktop bubble, and a Linux Mint/Cinnamon panel applet.
+ZEUS is a local-first cognitive operating layer that combines a FastAPI backend, Ollama/OpenAI-compatible LLM routing, realtime HUD telemetry, voice/vision tools, Rust-based file watching, and a Linux Mint/Cinnamon panel applet.
 
 The current default profile is **Ollama Cloud through the local Ollama daemon**, using `gemma4:31b-cloud` when the machine is authenticated with `ollama signin`.
+
+Current product direction: **the Cinnamon applet is the primary desktop interface**. The desktop chat is GTK and is launched from the Cinnamon applet.
 
 ## Current Status
 
 - Backend: FastAPI + Socket.IO + native WebSocket.
 - LLM: Ollama-first, with OpenAI/Gemini support available by environment variables.
-- UI: Web HUD in `public/index.html`, Flutter bubble in `zeus_extension/`, and Cinnamon applet in `applets/cinnamon/zeus@local/`.
+- UI: Web HUD in `public/index.html`, Cinnamon applet in `applets/cinnamon/zeus@local/`, and GTK chat in `bin/zeus-gtk-chat`.
 - Security: LAN access requires token when enabled; command execution uses allowlist, confirmation, and audit logging.
 - Observability: structured JSON logs, request correlation-id, and health metrics.
 - Tests: Python unit/contract tests plus Node tests for frontend behavior.
@@ -18,11 +20,9 @@ The current default profile is **Ollama Cloud through the local Ollama daemon**,
 ```mermaid
 graph TD
     User[User] --> WebHUD[Web HUD]
-    User --> Bubble[Flutter Bubble]
     User --> Applet[Cinnamon Applet]
 
     WebHUD --> API[FastAPI Backend]
-    Bubble --> API
     Applet --> API
 
     API --> LLM[LLM Provider]
@@ -41,7 +41,7 @@ graph TD
 | `zeus_core/` | LLM routing, agents, memory, security guards, command policy, observability. |
 | `public/` | Web HUD and frontend tests. |
 | `applets/` | Linux desktop panel integrations, currently Cinnamon `zeus@local`. |
-| `zeus_extension/` | Flutter desktop bubble. |
+| `bin/zeus-gtk-chat` | Lightweight GTK desktop chat launched by the applet. |
 | `watcher_rs/` | Rust filesystem watcher. |
 | `core-rust/` | Rust memory/system components. |
 | `docs/` | Technical reports and execution plans. |
@@ -102,13 +102,6 @@ Backend health guard:
 ./bin/zeus ensure-server
 ```
 
-Desktop bubble:
-
-```bash
-chmod +x bin/zeus-desktop.sh
-./bin/zeus-desktop.sh
-```
-
 Linux Mint/Cinnamon applet:
 
 ```bash
@@ -128,8 +121,14 @@ POST http://127.0.0.1:8080/api/applet/vision/analyze
 
 The applet shows backend/LLM status in the Cinnamon panel. Click behavior:
 
-- backend online: opens the external PyQt chat window from `bin/zeus-applet-chat`;
+- backend online: opens the external GTK chat window from `bin/zeus-gtk-chat`;
 - backend offline: runs `./bin/zeus ensure-server`.
+
+GTK chat dependency on Debian/Ubuntu/Linux Mint:
+
+```bash
+sudo apt install python3-gi gir1.2-gtk-3.0
+```
 
 The applet intentionally avoids Cinnamon popup widgets because some Cinnamon/GJS versions reject popup menu parameters and unload the applet. If Cinnamon does not reload the applet after installation, run:
 

@@ -18,9 +18,9 @@ class RealtimeDeps:
     lan_token: str
     is_local_host: Callable[[str | None], bool]
     extract_bearer_token: Callable[[str | None], str | None]
-    handle_bubble_text: Callable[[str], Awaitable[None]]
-    handle_bubble_voice_start: Callable[[], Awaitable[None]]
-    handle_bubble_vision: Callable[[], Awaitable[None]]
+    handle_client_text: Callable[[str], Awaitable[None]]
+    handle_client_voice_start: Callable[[], Awaitable[None]]
+    handle_client_vision: Callable[[], Awaitable[None]]
     handle_arm_voice: Callable[[int], Awaitable[None]]
 
 
@@ -107,7 +107,7 @@ class RealtimeHub:
         self.client_inboxes[client_id] = []
         return pending
 
-    async def websocket_bubble(self, websocket: WebSocket, deps: RealtimeDeps) -> None:
+    async def websocket_client(self, websocket: WebSocket, deps: RealtimeDeps) -> None:
         host = getattr(websocket.client, "host", None)
         if not deps.is_trusted_host(host):
             await websocket.close(code=1008)
@@ -122,7 +122,7 @@ class RealtimeHub:
 
         await websocket.accept()
         self.ws_clients.add(websocket)
-        print(f"[WS] Bubble connected: {websocket.client}")
+        print(f"[WS] Client connected: {websocket.client}")
 
         try:
             await websocket.send_text(json.dumps(deps.build_init_payload(), ensure_ascii=False))
@@ -154,11 +154,11 @@ class RealtimeHub:
                 if msg_type == "user_input":
                     text = (data.get("payload") or {}).get("text", "").strip()
                     if text and text not in ("__voice_start__", "__vision_analyze__"):
-                        await deps.handle_bubble_text(text)
+                        await deps.handle_client_text(text)
                     elif text == "__voice_start__":
-                        await deps.handle_bubble_voice_start()
+                        await deps.handle_client_voice_start()
                     elif text == "__vision_analyze__":
-                        await deps.handle_bubble_vision()
+                        await deps.handle_client_vision()
 
                 elif msg_type == "ping":
                     await websocket.send_text(
@@ -171,10 +171,10 @@ class RealtimeHub:
         except WebSocketDisconnect:
             pass
         except Exception as e:
-            print(f"[WS] Bubble error: {e}")
+            print(f"[WS] Client error: {e}")
         finally:
             self.ws_clients.discard(websocket)
-            print(f"[WS] Bubble disconnected: {websocket.client}")
+            print(f"[WS] Client disconnected: {websocket.client}")
 
     @staticmethod
     def _host_from_environ(environ: dict) -> str | None:
