@@ -82,6 +82,10 @@ print(f"DEBUG: ALLOW_LAN={ALLOW_LAN}, DISABLE_SSL={DISABLE_SSL}")
 ENABLE_VOICE = _env_flag("ZEUS_ENABLE_VOICE", "1")
 ENABLE_VOICE_SENSING = _env_flag("ZEUS_ENABLE_VOICE_SENSING", "0")
 ENABLE_BROWSER_SENSING = _env_flag("ZEUS_ENABLE_BROWSER_SENSING", "0")
+ENABLE_INTERNAL_WATCHER = _env_flag("ZEUS_ENABLE_INTERNAL_WATCHER", "0")
+ENABLE_AUTONOMOUS_TASKS = _env_flag("ZEUS_ENABLE_AUTONOMOUS_TASKS", "0")
+ENABLE_BOOT_GREETING = _env_flag("ZEUS_ENABLE_BOOT_GREETING", "0")
+ENABLE_RESOURCE_MONITOR = _env_flag("ZEUS_ENABLE_RESOURCE_MONITOR", "0")
 ENABLE_OPEN_FILE = _env_flag("ZEUS_ENABLE_OPEN_FILE", "0")
 LAN_AUTH_ENABLED = _env_flag("ZEUS_LAN_AUTH", "1" if ALLOW_LAN else "0")
 LAN_TOKEN = os.getenv("ZEUS_LAN_TOKEN", "").strip()
@@ -178,35 +182,40 @@ async def lifespan(app: FastAPI):
     # Limpar arquivos temporários de voz antigos
     asyncio.create_task(cleanup_voice_temp_files())
     
-    # Start the Rust watcher as a background task
-    asyncio.create_task(run_rust_watcher())
+    # Watcher interno fica opt-in; o launcher ja sobe o watcher Rust dedicado.
+    if ENABLE_INTERNAL_WATCHER:
+        asyncio.create_task(run_rust_watcher())
     
     # Monitorar navegações web apenas com opt-in explícito
     global _web_sensing_task
     if ENABLE_BROWSER_SENSING:
         _web_sensing_task = asyncio.create_task(web_sensing_loop())
     
-    # Inicia o batcher e tarefas proativas
+    # Inicia o batcher e tarefas proativas opcionais
     asyncio.create_task(event_batcher())
-    asyncio.create_task(autonomous_audit())
+    if ENABLE_AUTONOMOUS_TASKS:
+        asyncio.create_task(autonomous_audit())
     
     asyncio.create_task(metrics_loop())
-    asyncio.create_task(resource_control.monitor_and_report()) # Inicia telemetria de recursos
+    if ENABLE_RESOURCE_MONITOR:
+        asyncio.create_task(resource_control.monitor_and_report())
     
     # Inicia o Sensing de Voz (apenas se disponível e habilitado)
     global _voice_task
     if ENABLE_VOICE and ENABLE_VOICE_SENSING:
         _voice_task = asyncio.create_task(_safe_voice_task())
     
-    # NEW: Reflexão Cognitiva Autônoma
-    asyncio.create_task(autonomous_reflection())
+    # Reflexao cognitiva autonoma fica opt-in no perfil applet/headless.
+    if ENABLE_AUTONOMOUS_TASKS:
+        asyncio.create_task(autonomous_reflection())
 
     # Guardião de low-mem (desativa features pesadas automaticamente)
     if LOW_MEM_AUTO:
         asyncio.create_task(low_mem_guard())
     
-    # Saudação inicial com a cognição
-    asyncio.create_task(boot_greeting())
+    # Saudacao inicial com a cognicao
+    if ENABLE_BOOT_GREETING:
+        asyncio.create_task(boot_greeting())
     
     yield
     # Salvar Memória ao fechar
