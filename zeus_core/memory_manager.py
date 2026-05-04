@@ -7,6 +7,8 @@ from datetime import datetime
 from typing import Dict, Any, List, Optional
 import logging
 
+from zeus_core.path_filters import is_runtime_noise_path
+
 try:
     from zeus_synapse import SynapseManagerRust
     SYNAPSE_RUST_AVAILABLE = True
@@ -90,6 +92,9 @@ class MemoryManager:
     # --- L2: Working Memory Methods (SQLite) ---
     def update_synapse(self, source: str, target: str, weight_inc: int = 1):
         """Updates or creates a connection between two nodes in L2."""
+        if is_runtime_noise_path(source) or is_runtime_noise_path(target):
+            return
+
         if self.rust_synapse:
             try:
                 self.rust_synapse.update_synapse(source, target, weight_inc)
@@ -248,6 +253,8 @@ class MemoryManager:
 
     def _is_noise_path(self, path: str) -> bool:
         """Filters out internal system/runtime files from anomaly detection."""
+        if is_runtime_noise_path(path):
+            return True
         basename = os.path.basename(path)
         _, ext = os.path.splitext(basename)
         return ext.lower() in self._NOISE_EXTENSIONS
@@ -300,4 +307,3 @@ class MemoryManager:
 
         conn.close()
         return anomalies
-

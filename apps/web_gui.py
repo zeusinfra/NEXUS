@@ -41,6 +41,7 @@ from zeus_core.config_guard import LanSecurityConfig, build_config_diagnostics, 
 from zeus_core.event_pipeline import OverflowEventQueue, RustWatcherRunner
 from zeus_core.llm_service import LLMService
 from zeus_core.memory_manager import MemoryManager
+from zeus_core.path_filters import is_runtime_noise_path
 from zeus_core.response_text import display_text, speech_text
 from zeus_core.events.watcher import watch_vault
 from zeus_core.events.sync_worker import sync_worker_loop
@@ -541,6 +542,8 @@ async def _safe_save_memory():
 async def update_nodes_on_event(event):
     global nodes_data
     path = event["path"]
+    if is_runtime_noise_path(path):
+        return
     
     # Record sensation in L1
     memory_manager.record_sensation(event)

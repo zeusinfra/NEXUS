@@ -1,11 +1,12 @@
 import os
 import asyncio
 from zeus_core.events.event_bus import publish_file_event
+from zeus_core.path_filters import IGNORED_RUNTIME_DIRS, is_runtime_noise_path
 
 # In-memory cache of file modification times
 _mtime_cache = {}
 
-IGNORED_DIRS = {'.trash', '.git', '.obsidian', 'node_modules', '.venv', '__pycache__'}
+IGNORED_DIRS = IGNORED_RUNTIME_DIRS | {'.trash'}
 
 async def watch_vault(vault_path: str, poll_interval: float = 2.0, force_initial_scan: bool = False):
     """
@@ -36,10 +37,9 @@ def _initial_scan(vault_path: str, force: bool = False):
         dirs[:] = [d for d in dirs if d not in IGNORED_DIRS and not d.startswith('.')]
         
         for file in files:
-            if not file.endswith('.md'):
-                continue
-            
             path = os.path.join(root, file)
+            if not file.endswith('.md') or is_runtime_noise_path(path):
+                continue
             try:
                 mtime = os.stat(path).st_mtime
                 _mtime_cache[path] = mtime
@@ -57,10 +57,9 @@ def _scan_for_changes(vault_path: str):
         dirs[:] = [d for d in dirs if d not in IGNORED_DIRS and not d.startswith('.')]
         
         for file in files:
-            if not file.endswith('.md'):
-                continue
-            
             path = os.path.join(root, file)
+            if not file.endswith('.md') or is_runtime_noise_path(path):
+                continue
             try:
                 mtime = os.stat(path).st_mtime
                 last_mtime = _mtime_cache.get(path)

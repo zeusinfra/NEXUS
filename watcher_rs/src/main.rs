@@ -135,10 +135,57 @@ fn get_project(path: &Path) -> String {
 }
 
 fn is_ignored(path: &Path) -> bool {
-    let ignored = [".git", ".venv", "node_modules", "__pycache__", "target", "dist", "build", "logs"];
+    let ignored = [
+        ".git",
+        ".venv",
+        "__pycache__",
+        "node_modules",
+        "target",
+        "dist",
+        "build",
+        "logs",
+        "data",
+        "scratch",
+        ".obsidian",
+        ".pytest_cache",
+        ".ruff_cache",
+    ];
     for part in path.components() {
         let p = part.as_os_str().to_string_lossy();
         if p.starts_with('.') || ignored.contains(&p.as_ref()) { return true; }
+    }
+    let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
+        return false;
+    };
+    let runtime_files = [
+        "zeus_events.db",
+        "zeus_events.db-journal",
+        "zeus_events.db-wal",
+        "zeus_events.db-shm",
+        "zeus_core.log",
+        "zeus_server.log",
+    ];
+    if runtime_files.contains(&name) {
+        return true;
+    }
+    let lowered = name.to_ascii_lowercase();
+    let runtime_suffixes = [
+        ".db",
+        ".sqlite",
+        ".sqlite3",
+        ".db-journal",
+        ".db-wal",
+        ".db-shm",
+        ".log",
+        ".tmp",
+        ".pyc",
+        ".lock",
+        ".pid",
+        ".onnx",
+        ".mp3",
+    ];
+    if runtime_suffixes.iter().any(|suffix| lowered.ends_with(suffix)) {
+        return true;
     }
     false
 }
@@ -159,6 +206,9 @@ mod tests {
     fn is_ignored_blocks_runtime_and_hidden_paths() {
         assert!(is_ignored(Path::new("/repo/.git/config")));
         assert!(is_ignored(Path::new("/repo/logs/app.log")));
+        assert!(is_ignored(Path::new("/repo/data/zeus_memory.db")));
+        assert!(is_ignored(Path::new("/repo/zeus_events.db-journal")));
+        assert!(is_ignored(Path::new("/repo/zeus_core.log")));
         assert!(is_ignored(Path::new("/repo/target/debug/app")));
         assert!(!is_ignored(Path::new("/repo/apps/web_gui.py")));
     }
