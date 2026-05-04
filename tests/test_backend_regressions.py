@@ -100,6 +100,37 @@ class BackendRegressionTests(unittest.TestCase):
         self.assertEqual(status["status"], "offline")
         self.assertIsNone(status["pid"])
 
+    def test_external_watcher_status_handles_restarts(self):
+        class Proc1:
+            info = {
+                "pid": 1111,
+                "cmdline": ["/repo/watcher_rs/target/release/watcher_rs"],
+                "create_time": time.time() - 100,
+            }
+            
+        class Proc2:
+            info = {
+                "pid": 2222,
+                "cmdline": ["/repo/watcher_rs/target/release/watcher_rs"],
+                "create_time": time.time() - 5,
+            }
+
+        with patch("zeus_core.health_status._watcher_port_open", return_value=True):
+            # Simulando a primeira execução
+            with patch("zeus_core.health_status.psutil.process_iter", return_value=[Proc1()]):
+                status1 = build_external_watcher_status("/repo", port=8081)
+                self.assertEqual(status1["pid"], 1111)
+                self.assertGreaterEqual(status1["uptime_s"], 99)
+                self.assertLessEqual(status1["uptime_s"], 101)
+
+            # Simulando restart (novo PID, tempo de atividade resetado)
+            with patch("zeus_core.health_status.psutil.process_iter", return_value=[Proc2()]):
+                status2 = build_external_watcher_status("/repo", port=8081)
+                self.assertEqual(status2["pid"], 2222)
+                self.assertGreaterEqual(status2["uptime_s"], 4)
+                self.assertLessEqual(status2["uptime_s"], 6)
+
+
     def test_behavioral_state_ignores_missing_paths(self):
         engine = PatternEngine()
         engine.process_event({"type": "FILE_EVENT", "event": "Create", "path": None})
