@@ -59,6 +59,8 @@ class SecondBrainTests(unittest.TestCase):
 
         self.assertIn("ZEUS_ENABLE_SECOND_BRAIN=0", env_example)
         self.assertIn("ZEUS_ENABLE_SECOND_BRAIN_SYNC_ENGINE=0", env_example)
+        self.assertIn("ZEUS_ENABLE_NOTION_AUTO_SYNC=0", env_example)
+        self.assertIn("ZEUS_ENABLE_LINEAR_AUTO_SYNC=0", env_example)
 
     def test_context_area_mapping_links_information_to_domain(self):
         self.assertEqual(_area_from_tags('["#bug", "#infra"]'), "tarefa/operação")

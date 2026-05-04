@@ -94,6 +94,9 @@ ENABLE_BOOT_GREETING = _env_flag("ZEUS_ENABLE_BOOT_GREETING", "0")
 ENABLE_RESOURCE_MONITOR = _env_flag("ZEUS_ENABLE_RESOURCE_MONITOR", "0")
 ENABLE_SECOND_BRAIN = _env_flag("ZEUS_ENABLE_SECOND_BRAIN", "0")
 ENABLE_SECOND_BRAIN_SYNC_ENGINE = _env_flag("ZEUS_ENABLE_SECOND_BRAIN_SYNC_ENGINE", "0")
+ENABLE_OBSIDIAN_AUTO_SYNC = _env_flag("ZEUS_ENABLE_OBSIDIAN_AUTO_SYNC", "0")
+ENABLE_NOTION_AUTO_SYNC = _env_flag("ZEUS_ENABLE_NOTION_AUTO_SYNC", "0")
+ENABLE_LINEAR_AUTO_SYNC = _env_flag("ZEUS_ENABLE_LINEAR_AUTO_SYNC", "0")
 ENABLE_OPEN_FILE = _env_flag("ZEUS_ENABLE_OPEN_FILE", "0")
 LAN_AUTH_ENABLED = _env_flag("ZEUS_LAN_AUTH", "1" if ALLOW_LAN else "0")
 LAN_TOKEN = os.getenv("ZEUS_LAN_TOKEN", "").strip()
@@ -237,10 +240,14 @@ async def lifespan(app: FastAPI):
         print(f"[ZEUS] Iniciando Second Brain integrando {vault_path}")
         _watcher_task = asyncio.create_task(watch_vault(vault_path))
         _sync_worker_task = asyncio.create_task(sync_worker_loop())
-        if ENABLE_SECOND_BRAIN_SYNC_ENGINE:
-            print("[ZEUS] Iniciando Sync Engine (Sináptico→Obsidian, LongTerm→Notion, Insights→Linear)")
+        if ENABLE_SECOND_BRAIN_SYNC_ENGINE or ENABLE_OBSIDIAN_AUTO_SYNC:
+            print("[ZEUS] Iniciando Sync Engine: Sináptico→Obsidian")
             _sync_engine_tasks.append(asyncio.create_task(sync_synaptic_to_obsidian(memory_manager, interval=60.0)))
+        if ENABLE_SECOND_BRAIN_SYNC_ENGINE or ENABLE_NOTION_AUTO_SYNC:
+            print("[ZEUS] Iniciando Sync Engine: LongTerm→Notion")
             _sync_engine_tasks.append(asyncio.create_task(sync_longterm_to_notion(interval=300.0)))
+        if ENABLE_SECOND_BRAIN_SYNC_ENGINE or ENABLE_LINEAR_AUTO_SYNC:
+            print("[ZEUS] Iniciando Sync Engine: Insights→Linear")
             _sync_engine_tasks.append(asyncio.create_task(sync_insights_to_linear(memory_manager, interval=300.0)))
     
     yield
@@ -1128,6 +1135,11 @@ def _build_second_brain_status() -> dict:
     status = {
         "enabled": bool(ENABLE_SECOND_BRAIN),
         "sync_engine_enabled": bool(ENABLE_SECOND_BRAIN_SYNC_ENGINE),
+        "auto_sync": {
+            "obsidian": bool(ENABLE_OBSIDIAN_AUTO_SYNC or ENABLE_SECOND_BRAIN_SYNC_ENGINE),
+            "notion": bool(ENABLE_NOTION_AUTO_SYNC or ENABLE_SECOND_BRAIN_SYNC_ENGINE),
+            "linear": bool(ENABLE_LINEAR_AUTO_SYNC or ENABLE_SECOND_BRAIN_SYNC_ENGINE),
+        },
         "vault_path": vault_path,
         "vault_exists": os.path.isdir(vault_path),
         "db_path": db_path,
