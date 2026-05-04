@@ -12,6 +12,7 @@ import time
 import urllib.error
 import urllib.request
 import webbrowser
+from datetime import datetime
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT_DIR not in sys.path:
@@ -20,215 +21,448 @@ if ROOT_DIR not in sys.path:
 from zeus_core.response_text import pango_markup, speech_text
 
 import gi
+gi.require_version("Gdk", "4.0")
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+from gi.repository import Gdk, Gio, GLib, Gtk, Pango, Adw
 
-gi.require_version("Gdk", "3.0")
-gi.require_version("Gtk", "3.0")
-from gi.repository import Gdk, Gio, GLib, Gtk
-
+# Inicializar Libadwaita
+Adw.init()
 
 BACKEND = (sys.argv[1] if len(sys.argv) > 1 else os.getenv("ZEUS_BACKEND_URL", "http://127.0.0.1:8080")).rstrip("/")
 APP_ID = "local.zeus.CognitiveChat"
 
 
-class ZeusGtkChat(Gtk.Application):
+class ZeusGtkChat(Adw.Application):
     def __init__(self) -> None:
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE)
-        self.window: Gtk.ApplicationWindow | None = None
+        self.window: Adw.ApplicationWindow | None = None
+        self.toast_overlay: Adw.ToastOverlay | None = None
         self.messages_box: Gtk.Box | None = None
         self.scroller: Gtk.ScrolledWindow | None = None
         self.input: Gtk.Entry | None = None
         self.send_button: Gtk.Button | None = None
-        self.status_label: Gtk.Label | None = None
-        self.provider_label: Gtk.Label | None = None
-        self.metrics_label: Gtk.Label | None = None
-        self.voice_button: Gtk.ToggleButton | None = None
+        self.cancel_button: Gtk.Button | None = None
+        self.spinner: Gtk.Spinner | None = None
+        self.window_title: Adw.WindowTitle | None = None
+        self.status_page: Adw.StatusPage | None = None
+        self.banner: Adw.Banner | None = None
+        
         self._last_status: dict = {}
         self._voice_enabled = True
+        self._cancel_requested = False
+        self._is_generating = False
 
     def do_activate(self) -> None:
         if self.window is None:
             self.window = self._build_window()
+            self._apply_theme()
+            self._check_status()
         self.window.present()
-        self._check_status()
 
     def do_command_line(self, command_line) -> int:
         self.activate()
         return 0
 
-    def _build_window(self) -> Gtk.ApplicationWindow:
+    def _apply_theme(self) -> None:
+        style_manager = Adw.StyleManager.get_default()
+        theme = os.getenv("ZEUS_GTK_THEME", "dark").lower()
+        if theme == "dark":
+            style_manager.set_color_scheme(Adw.ColorScheme.PREFER_DARK)
+        elif theme == "light":
+            style_manager.set_color_scheme(Adw.ColorScheme.PREFER_LIGHT)
+        else:
+            style_manager.set_color_scheme(Adw.ColorScheme.DEFAULT)
+
+    def _build_window(self) -> Adw.ApplicationWindow:
         self._install_css()
 
-        window = Gtk.ApplicationWindow(application=self)
-        window.set_title("ZEUS Ops Chat")
-        window.set_default_size(520, 720)
-        window.set_size_request(360, 460)
-        window.get_style_context().add_class("zeus-root")
-        window.connect("key-press-event", self._on_key_press)
+        window = Adw.ApplicationWindow(application=self)
+        window.set_default_size(580, 780)
+        window.add_css_class("zeus-window")
+        
+        # Keyboard shortcuts
+        key_ctrl = Gtk.EventControllerKey.new()
+        key_ctrl.connect("key-pressed", self._on_key_press)
+        window.add_controller(key_ctrl)
 
-        root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        root.get_style_context().add_class("zeus-root")
-        window.add(root)
+        # Main overlay for Toasts
+        self.toast_overlay = Adw.ToastOverlay()
+        window.set_content(self.toast_overlay)
 
-        header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        header.get_style_context().add_class("zeus-header")
-        root.pack_start(header, False, False, 0)
+        # Main vertical box
+        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.toast_overlay.set_child(main_box)
 
-        title_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-        header.pack_start(title_box, True, True, 0)
+        # HeaderBar
+        header = Adw.HeaderBar()
+        main_box.append(header)
 
-        title = Gtk.Label(label="ZEUS Ops")
-        title.set_xalign(0)
-        title.get_style_context().add_class("zeus-title")
-        title_box.pack_start(title, False, False, 0)
+        self.window_title = Adw.WindowTitle(title="ZEUS Ops", subtitle="Inicializando...")
+        header.set_title_widget(self.window_title)
 
-        self.provider_label = Gtk.Label(label="Verificando backend...")
-        self.provider_label.set_xalign(0)
-        self.provider_label.get_style_context().add_class("zeus-subtitle")
-        title_box.pack_start(self.provider_label, False, False, 0)
-
-        self.metrics_label = Gtk.Label(label="latência -- ms · voz on")
-        self.metrics_label.set_xalign(0)
-        self.metrics_label.get_style_context().add_class("zeus-metrics")
-        title_box.pack_start(self.metrics_label, False, False, 0)
-
-        self.voice_button = Gtk.ToggleButton(label="Voz")
+        # Voice Toggle
+        self.voice_button = Gtk.ToggleButton()
+        self.voice_button.set_icon_name("audio-volume-high-symbolic")
         self.voice_button.set_active(True)
-        self.voice_button.get_style_context().add_class("zeus-tool-button")
+        self.voice_button.set_tooltip_text("Alternar Voz")
         self.voice_button.connect("toggled", self._toggle_voice)
-        header.pack_start(self.voice_button, False, False, 0)
+        header.pack_end(self.voice_button)
 
-        hud_button = Gtk.Button(label="HUD")
-        hud_button.get_style_context().add_class("zeus-tool-button")
-        hud_button.connect("clicked", self._open_hud)
-        header.pack_start(hud_button, False, False, 0)
+        # HUD Button
+        hud_button = Gtk.Button(icon_name="applications-internet-symbolic")
+        hud_button.set_tooltip_text("Abrir HUD Web")
+        hud_button.connect("clicked", lambda _: webbrowser.open(BACKEND))
+        header.pack_end(hud_button)
 
-        diag_button = Gtk.Button(label="Diag")
-        diag_button.get_style_context().add_class("zeus-tool-button")
-        diag_button.connect("clicked", self._copy_diagnostics)
-        header.pack_start(diag_button, False, False, 0)
+        # Diagnostic Button
+        diag_button = Gtk.Button(icon_name="dialog-information-symbolic")
+        diag_button.set_tooltip_text("Diagnóstico do ZEUS")
+        diag_button.connect("clicked", self._show_diagnostic)
+        header.pack_start(diag_button)
 
+        # Banner for Offline status
+        self.banner = Adw.Banner()
+        self.banner.set_title("Backend ZEUS offline. Verifique se o serviço está ativo.")
+        self.banner.set_button_label("Tentar novamente")
+        self.banner.connect("button-clicked", lambda _: self._check_status())
+        main_box.append(self.banner)
+
+        # Scroller
         self.scroller = Gtk.ScrolledWindow()
         self.scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        self.scroller.get_style_context().add_class("zeus-scroll")
-        root.pack_start(self.scroller, True, True, 0)
+        self.scroller.set_vexpand(True)
+        self.scroller.add_css_class("chat-scroll")
+        
+        # Clamp for centered reading
+        clamp = Adw.Clamp()
+        clamp.set_maximum_size(860)
+        clamp.set_tightening_threshold(600)
+        
+        self.scroller.set_child(clamp)
+        main_box.append(self.scroller)
 
-        self.messages_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        self.messages_box.set_margin_top(14)
-        self.messages_box.set_margin_bottom(14)
-        self.messages_box.set_margin_start(14)
-        self.messages_box.set_margin_end(14)
-        self.scroller.add(self.messages_box)
+        # Box for messages
+        self.messages_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        self.messages_box.set_margin_top(24)
+        self.messages_box.set_margin_bottom(24)
+        self.messages_box.set_margin_start(16)
+        self.messages_box.set_margin_end(16)
+        
+        # Empty State
+        self.status_page = Adw.StatusPage()
+        self.status_page.set_icon_name("system-run-symbolic")
+        self.status_page.set_title("ZEUS pronto")
+        self.status_page.set_description("Digite uma mensagem para iniciar.")
+        self.status_page.add_css_class("empty-state")
+        
+        overlay_box = Gtk.Overlay()
+        overlay_box.set_child(self.messages_box)
+        overlay_box.add_overlay(self.status_page)
+        clamp.set_child(overlay_box)
 
-        composer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        composer.get_style_context().add_class("zeus-composer")
-        root.pack_start(composer, False, False, 0)
+        # Composer area
+        composer_clamp = Adw.Clamp()
+        composer_clamp.set_maximum_size(860)
+        composer_clamp.set_tightening_threshold(600)
 
-        self.status_label = Gtk.Label(label="Pronto para operar")
-        self.status_label.set_xalign(0)
-        self.status_label.get_style_context().add_class("zeus-status")
-        composer.pack_start(self.status_label, False, False, 0)
+        composer_bg = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        composer_bg.add_css_class("composer-bg")
+        composer_bg.append(composer_clamp)
+        main_box.append(composer_bg)
 
-        input_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        composer.pack_start(input_row, False, False, 0)
+        composer = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        composer.add_css_class("composer")
+        composer.set_margin_start(16)
+        composer.set_margin_end(16)
+        composer.set_margin_top(16)
+        composer.set_margin_bottom(24)
+        composer_clamp.set_child(composer)
 
         self.input = Gtk.Entry()
-        self.input.set_placeholder_text("Peça uma ação, diagnóstico ou sincronização")
+        self.input.set_placeholder_text("Peça uma ação, diagnóstico ou sincronização...")
         self.input.connect("activate", self._send_message)
-        self.input.get_style_context().add_class("zeus-input")
-        input_row.pack_start(self.input, True, True, 0)
+        self.input.set_hexpand(True)
+        composer.append(self.input)
 
-        self.send_button = Gtk.Button(label="Run")
-        self.send_button.get_style_context().add_class("zeus-send")
+        self.spinner = Gtk.Spinner()
+        composer.append(self.spinner)
+
+        self.cancel_button = Gtk.Button(icon_name="media-playback-stop-symbolic")
+        self.cancel_button.set_tooltip_text("Cancelar geração (Esc)")
+        self.cancel_button.add_css_class("destructive-action")
+        self.cancel_button.set_visible(False)
+        self.cancel_button.connect("clicked", self._cancel_generation)
+        composer.append(self.cancel_button)
+
+        self.send_button = Gtk.Button(icon_name="mail-send-symbolic")
+        self.send_button.add_css_class("suggested-action")
+        self.send_button.set_tooltip_text("Enviar mensagem (Enter)")
         self.send_button.connect("clicked", self._send_message)
-        input_row.pack_start(self.send_button, False, False, 0)
+        composer.append(self.send_button)
 
-        self._add_message("Conectando ao núcleo ZEUS...", "assistant")
-        window.show_all()
+        print("[GTK] App started")
         return window
 
     def _install_css(self) -> None:
-        css = b"""
-        .zeus-root { background: #0f172a; color: #e5e7eb; }
-        .zeus-header { background: #111827; padding: 14px; border-bottom: 1px solid #334155; }
-        .zeus-title { color: #f8fafc; font-size: 19px; font-weight: 700; }
-        .zeus-subtitle { color: #9ca3af; font-size: 12px; }
-        .zeus-metrics { color: #22c55e; font-size: 11px; }
-        .zeus-scroll { background: #0f172a; border: 0; }
-        .zeus-composer { background: #111827; padding: 12px 14px 14px 14px; border-top: 1px solid #334155; }
-        .zeus-status { color: #9ca3af; font-size: 12px; }
-        .zeus-input { background: #020617; color: #f8fafc; border: 1px solid #475569; border-radius: 8px; padding: 10px 12px; }
-        .zeus-send { background: #22c55e; color: #04130a; border: 0; border-radius: 8px; padding: 10px 16px; font-weight: 700; }
-        .zeus-tool-button { background: #1f2937; color: #e5e7eb; border: 1px solid #475569; border-radius: 8px; padding: 7px 10px; }
-        .zeus-tool-button:checked { background: #14532d; color: #dcfce7; }
-        .zeus-message-user { background: #2563eb; color: white; border-radius: 8px; padding: 10px 12px; }
-        .zeus-message-assistant { background: #1e293b; color: #e5e7eb; border: 1px solid #334155; border-radius: 8px; padding: 10px 12px; }
+        css = """
+        .zeus-window { background-color: @window_bg_color; }
+        .composer-bg { background-color: @window_bg_color; border-top: 1px solid @borders; }
+        .empty-state { opacity: 0.7; }
+        .message-row { margin-bottom: 8px; }
+        .message-bubble { border-radius: 16px; padding: 12px 16px; line-height: 1.4; }
+        .message-bubble-user { background-color: @accent_bg_color; color: @accent_fg_color; border-bottom-right-radius: 4px; }
+        .message-bubble-assistant { background-color: @card_bg_color; border: 1px solid @borders; border-bottom-left-radius: 4px; }
+        .message-bubble-system { background-color: transparent; opacity: 0.7; font-size: 0.9em; }
+        .message-meta { opacity: 0.65; font-size: 0.75em; margin-top: 4px; }
+        .message-meta-user { color: @accent_fg_color; }
+        .code-card { background-color: @dark_2; border: 1px solid @borders; border-radius: 12px; margin-top: 8px; margin-bottom: 8px; }
+        .code-header { background-color: @dark_3; padding: 6px 12px; border-bottom: 1px solid @borders; font-size: 0.85em; opacity: 0.9; }
+        .code-content { padding: 12px; font-family: monospace; font-size: 0.95em; }
         """
         provider = Gtk.CssProvider()
-        provider.load_from_data(css)
-        Gtk.StyleContext.add_provider_for_screen(
-            window_screen(),
+        provider.load_from_string(css)
+        Gtk.StyleContext.add_provider_for_display(
+            Gdk.Display.get_default(),
             provider,
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
         )
 
-    def _on_key_press(self, widget, event) -> bool:
-        if event.keyval in (Gdk.KEY_l, Gdk.KEY_L) and (event.state & Gdk.ModifierType.CONTROL_MASK):
+    def _toast(self, message: str, timeout: int = 3) -> None:
+        if self.toast_overlay:
+            toast = Adw.Toast.new(message)
+            toast.set_timeout(timeout)
+            self.toast_overlay.add_toast(toast)
+        else:
+            print(f"[GTK][Toast fallback] {message}")
+
+    def _set_status(self, subtitle: str) -> None:
+        if self.window_title:
+            self.window_title.set_subtitle(subtitle)
+
+    def _show_diagnostic(self, *_args) -> None:
+        provider = self._last_status.get("llm", {}).get("provider", "desconhecido")
+        is_online = bool(self._last_status) and not self.banner.get_revealed()
+        msg = f"Backend: {'Online' if is_online else 'Offline'}\\nModo: leve\\nLLM: {provider}"
+        self._toast(msg, timeout=4)
+
+    def _on_key_press(self, controller, keyval, keycode, state) -> bool:
+        if keyval in (Gdk.KEY_l, Gdk.KEY_L) and (state & Gdk.ModifierType.CONTROL_MASK):
             self._clear_messages()
+            return True
+        if keyval == Gdk.KEY_Escape and self._is_generating:
+            self._cancel_generation()
             return True
         return False
 
     def _clear_messages(self) -> None:
         if self.messages_box is not None:
-            for child in self.messages_box.get_children():
-                self.messages_box.remove(child)
-            self._add_message("Chat limpo.", "assistant")
+            while self.messages_box.get_first_child() is not None:
+                self.messages_box.remove(self.messages_box.get_first_child())
+            self.status_page.set_visible(True)
+            self._add_message("system", "Chat limpo localmente.")
 
     def _toggle_voice(self, button: Gtk.ToggleButton) -> None:
         self._voice_enabled = button.get_active()
-        state = "on" if self._voice_enabled else "off"
-        if self.metrics_label is not None:
-            self.metrics_label.set_text(f"latência -- ms · voz {state}")
+        self._toast(f"Voz {'ativada' if self._voice_enabled else 'desativada'}")
 
-    def _add_message(self, text: str, role: str) -> None:
-        if self.messages_box is None:
-            return
+    def _copy_to_clipboard(self, text: str, label: str = "Copiado") -> None:
+        clipboard = Gdk.Display.get_default().get_clipboard()
+        clipboard.set(text)
+        self._toast(label)
 
-        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
-        message = Gtk.Label()
-        if role == "assistant":
-            message.set_markup(pango_markup(text) or GLib.markup_escape_text(text))
-        else:
-            message.set_text(text)
-        message.set_line_wrap(True)
-        message.set_selectable(True)
-        message.set_xalign(0)
-        message.set_max_width_chars(42)
-        message.get_style_context().add_class("zeus-message-user" if role == "user" else "zeus-message-assistant")
+    def _add_message(self, role: str, content: str) -> None:
+        if self.status_page and self.status_page.get_visible():
+            self.status_page.set_visible(False)
+
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        row.add_css_class("message-row")
+        
+        timestamp = datetime.now().strftime("%H:%M")
 
         if role == "user":
-            row.pack_start(Gtk.Label(), True, True, 0)
-            row.pack_start(message, False, False, 0)
-        else:
-            row.pack_start(message, False, False, 0)
-            row.pack_start(Gtk.Label(), True, True, 0)
+            row.set_halign(Gtk.Align.END)
+            bubble_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            
+            content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            content_box.add_css_class("message-bubble")
+            content_box.add_css_class("message-bubble-user")
+            
+            label = Gtk.Label(label=content)
+            label.set_wrap(True)
+            label.set_selectable(True)
+            label.set_halign(Gtk.Align.START)
+            content_box.append(label)
+            
+            meta = Gtk.Label(label=timestamp)
+            meta.add_css_class("message-meta")
+            meta.add_css_class("message-meta-user")
+            meta.set_halign(Gtk.Align.END)
+            content_box.append(meta)
+            
+            bubble_box.append(content_box)
+            
+            avatar = Adw.Avatar(text="U", size=36, show_initials=True)
+            
+            row.append(bubble_box)
+            row.append(avatar)
+            
+        elif role == "assistant":
+            row.set_halign(Gtk.Align.START)
+            
+            avatar = Adw.Avatar(text="Z", size=36, show_initials=True)
+            
+            bubble_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            bubble_box.set_hexpand(True)
+            
+            content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            content_box.add_css_class("message-bubble")
+            content_box.add_css_class("message-bubble-assistant")
+            
+            rendered_content = self._render_message_content(content)
+            content_box.append(rendered_content)
+            
+            actions_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            actions_box.set_margin_top(6)
+            
+            meta = Gtk.Label(label=f"ZEUS · {timestamp}")
+            meta.add_css_class("message-meta")
+            actions_box.append(meta)
+            
+            copy_btn = Gtk.Button(icon_name="edit-copy-symbolic")
+            copy_btn.add_css_class("flat")
+            copy_btn.add_css_class("circular")
+            copy_btn.set_tooltip_text("Copiar mensagem")
+            copy_btn.connect("clicked", lambda _, txt=content: self._copy_to_clipboard(txt, "Mensagem copiada"))
+            
+            spacer = Gtk.Label()
+            spacer.set_hexpand(True)
+            actions_box.append(spacer)
+            actions_box.append(copy_btn)
+            
+            content_box.append(actions_box)
+            bubble_box.append(content_box)
+            
+            row.append(avatar)
+            row.append(bubble_box)
+            
+        else: # system
+            row.set_halign(Gtk.Align.CENTER)
+            lbl = Gtk.Label(label=content)
+            lbl.add_css_class("message-bubble-system")
+            row.append(lbl)
 
-        self.messages_box.pack_start(row, False, False, 0)
-        self.messages_box.show_all()
-        GLib.idle_add(self._scroll_bottom)
+        revealer = Gtk.Revealer()
+        revealer.set_transition_type(Gtk.RevealerTransitionType.SLIDE_UP)
+        revealer.set_transition_duration(250)
+        revealer.set_child(row)
 
-    def _scroll_bottom(self) -> bool:
+        self.messages_box.append(revealer)
+        GLib.idle_add(lambda: revealer.set_reveal_child(True))
+        GLib.idle_add(self._scroll_to_bottom)
+
+    def _render_message_content(self, content: str) -> Gtk.Widget:
+        container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        
+        # Leve parser de markdown para blocos de código
+        parts = content.split("```")
+        for i, part in enumerate(parts):
+            if i % 2 == 1 and i < len(parts) - 1: # Bloco de código
+                lines = part.split("\\n", 1)
+                lang = lines[0].strip() if len(lines) > 1 else ""
+                code = lines[1].strip() if len(lines) > 1 else lines[0].strip()
+                container.append(self._create_code_block(code, lang))
+            else: # Texto normal
+                if not part.strip():
+                    continue
+                lbl = Gtk.Label()
+                # Aplica bold simples (naive) substituindo ** por tags <b>
+                parsed_text = part
+                if "**" in parsed_text:
+                    parsed_text = parsed_text.replace("**", "<b>", 1).replace("**", "</b>", 1)
+                
+                try:
+                    lbl.set_markup(parsed_text)
+                except Exception:
+                    lbl.set_text(part)
+                
+                lbl.set_wrap(True)
+                lbl.set_selectable(True)
+                lbl.set_halign(Gtk.Align.START)
+                container.append(lbl)
+                
+        return container
+
+    def _create_code_block(self, code: str, language: str = "") -> Gtk.Widget:
+        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        card.add_css_class("code-card")
+        
+        header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        header.add_css_class("code-header")
+        
+        lang_lbl = Gtk.Label(label=language or "code")
+        lang_lbl.add_css_class("dim-label")
+        header.append(lang_lbl)
+        
+        spacer = Gtk.Label()
+        spacer.set_hexpand(True)
+        header.append(spacer)
+        
+        copy_btn = Gtk.Button(icon_name="edit-copy-symbolic")
+        copy_btn.add_css_class("flat")
+        copy_btn.add_css_class("circular")
+        copy_btn.set_tooltip_text("Copiar código")
+        copy_btn.connect("clicked", lambda _, txt=code: self._copy_to_clipboard(txt, "Código copiado"))
+        header.append(copy_btn)
+        
+        card.append(header)
+        
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.NEVER)
+        
+        code_lbl = Gtk.Label(label=code)
+        code_lbl.set_halign(Gtk.Align.START)
+        code_lbl.set_selectable(True)
+        code_lbl.add_css_class("code-content")
+        scroll.set_child(code_lbl)
+        
+        card.append(scroll)
+        return card
+
+    def _scroll_to_bottom(self) -> bool:
         if self.scroller is not None:
-            adjustment = self.scroller.get_vadjustment()
-            adjustment.set_value(adjustment.get_upper() - adjustment.get_page_size())
+            adj = self.scroller.get_vadjustment()
+            if adj.get_upper() - adj.get_value() <= adj.get_page_size() + 150:
+                adj.set_value(adj.get_upper() - adj.get_page_size())
         return False
 
-    def _set_busy(self, busy: bool, status: str) -> None:
-        if self.status_label is not None:
-            self.status_label.set_text(status)
-        if self.send_button is not None:
-            self.send_button.set_sensitive(not busy)
-        if self.input is not None:
-            self.input.set_sensitive(not busy)
+    def _set_loading(self, loading: bool, status: str) -> None:
+        self._is_generating = loading
+        if self.spinner:
+            if loading:
+                self.spinner.start()
+            else:
+                self.spinner.stop()
+        
+        if self.send_button:
+            self.send_button.set_sensitive(not loading)
+            self.send_button.set_visible(not loading)
+            
+        if self.cancel_button:
+            self.cancel_button.set_visible(loading)
+            
+        if self.input:
+            self.input.set_sensitive(not loading)
+            if not loading:
+                self.input.grab_focus()
+                
+        self._set_status(status)
+
+    def _cancel_generation(self, *_args) -> None:
+        self._cancel_requested = True
+        self._set_loading(False, "Pronto")
+        self._toast("Geração cancelada")
+        print("[GTK] Generation canceled")
 
     def _check_status(self) -> None:
         def worker() -> None:
@@ -237,82 +471,77 @@ class ZeusGtkChat(Gtk.Application):
                 GLib.idle_add(self._apply_status, data)
             except Exception as exc:
                 GLib.idle_add(self._apply_status_error, str(exc))
-
         threading.Thread(target=worker, daemon=True).start()
 
     def _apply_status(self, data: dict) -> bool:
         self._last_status = data
-        llm = data.get("llm") or {}
-        provider = llm.get("provider") or "llm"
-        model = llm.get("model") or "modelo"
-        configured = "configurado" if llm.get("configured") else "sem config"
-        voice = data.get("voice") or {}
-        sb = data.get("second_brain") or {}
-        if self.provider_label is not None:
-            self.provider_label.set_text(f"Backend online: {provider} / {model} ({configured})")
-        if self.metrics_label is not None:
-            voice_state = "on" if voice.get("enabled", True) and self._voice_enabled else "off"
-            sb_state = "SB on" if sb.get("enabled") else "SB off"
-            self.metrics_label.set_text(f"{sb_state} · voz {voice_state}")
-        if self.status_label is not None:
-            self.status_label.set_text("Backend online")
+        if self.banner:
+            self.banner.set_revealed(False)
+        self._set_status("Pronto")
+        print("[GTK] Backend status: online")
         return False
 
     def _apply_status_error(self, error: str) -> bool:
-        if self.provider_label is not None:
-            self.provider_label.set_text("Backend offline")
-        if self.status_label is not None:
-            self.status_label.set_text("Erro de conexao")
-        self._add_message("Erro ao verificar backend: " + error, "assistant")
+        if self.banner:
+            self.banner.set_revealed(True)
+        self._set_status("Backend offline")
+        print(f"[GTK] Network error: {error}")
         return False
 
     def _send_message(self, *_args) -> None:
-        if self.input is None:
+        if self.input is None or self._is_generating:
             return
         text = self.input.get_text().strip()
         if not text:
             return
+            
         self.input.set_text("")
-        self._add_message(text, "user")
-        self._set_busy(True, "Processando...")
+        self._add_message("user", text)
+        self._set_loading(True, "Gerando resposta...")
+        self._cancel_requested = False
+        print("[GTK] Sending message")
 
-        def worker() -> None:
-            started = time.perf_counter()
-            payload = {
-                "message": text,
-                "source": "cinnamon_gtk_chat",
-                "client_id": "zeus_gtk_chat",
-            }
-            try:
-                data = self._post_json("/api/applet/chat", payload, timeout=120)
-                reply = data.get("reply") or data.get("error") or "Sem resposta."
-                speech_reply = data.get("speech_reply") or speech_text(str(reply))
-                latency_ms = data.get("latency_ms") or round((time.perf_counter() - started) * 1000)
-                GLib.idle_add(self._handle_reply, str(reply), int(latency_ms))
-                if self._voice_enabled:
-                    self._speak_async(str(speech_reply or reply))
-            except urllib.error.HTTPError as exc:
-                try:
-                    body = exc.read().decode("utf-8")
-                except Exception:
-                    body = str(exc)
-                GLib.idle_add(self._handle_error, body)
-            except Exception as exc:
-                GLib.idle_add(self._handle_error, str(exc))
+        threading.Thread(target=self._request_worker, args=(text,), daemon=True).start()
 
-        threading.Thread(target=worker, daemon=True).start()
+    def _request_worker(self, text: str) -> None:
+        started = time.perf_counter()
+        payload = {
+            "message": text,
+            "source": "cinnamon_gtk_chat",
+            "client_id": "zeus_gtk_chat",
+        }
+        try:
+            data = self._post_json("/api/applet/chat", payload, timeout=120)
+            if self._cancel_requested:
+                return
+            
+            reply = data.get("reply") or data.get("error") or "Sem resposta."
+            speech_reply = data.get("speech_reply") or speech_text(str(reply))
+            latency_ms = data.get("latency_ms") or round((time.perf_counter() - started) * 1000)
+            
+            GLib.idle_add(self._on_response, str(reply), int(latency_ms), str(speech_reply or reply))
+        except urllib.error.HTTPError as exc:
+            if self._cancel_requested: return
+            try: body = exc.read().decode("utf-8")
+            except Exception: body = str(exc)
+            GLib.idle_add(self._on_error, body)
+        except Exception as exc:
+            if self._cancel_requested: return
+            GLib.idle_add(self._on_error, str(exc))
 
-    def _handle_reply(self, reply: str, latency_ms: int = 0) -> bool:
-        self._add_message(reply, "assistant")
-        self._set_busy(False, "Backend online")
-        if self.metrics_label is not None:
-            voice_state = "on" if self._voice_enabled else "off"
-            self.metrics_label.set_text(f"latência {latency_ms} ms · voz {voice_state}")
+    def _on_response(self, reply: str, latency_ms: int, speech_reply: str) -> bool:
+        self._add_message("assistant", reply)
+        self._set_loading(False, "Pronto")
+        print("[GTK] Response received")
+        if self._voice_enabled:
+            self._speak_async(speech_reply)
         return False
 
-    def _handle_error(self, error: str) -> bool:
-        self._add_message("Erro: " + error, "assistant")
-        self._set_busy(False, "Erro no chat")
+    def _on_error(self, error: str) -> bool:
+        self._toast(f"Erro de rede: {error}")
+        self._set_loading(False, "Erro")
+        print(f"[GTK] Network error: {error}")
+        self.banner.set_revealed(True)
         return False
 
     def _speak_async(self, text: str) -> None:
@@ -320,20 +549,11 @@ class ZeusGtkChat(Gtk.Application):
             try:
                 data = self._post_json("/api/tts", {"text": text}, timeout=45)
                 audio = data.get("audio") or ""
-                if audio:
-                    GLib.idle_add(self._set_voice_status, "Reproduzindo voz...")
+                if audio and not self._cancel_requested:
                     self._play_audio(audio)
-                else:
-                    GLib.idle_add(self._set_voice_status, "TTS não retornou áudio.")
             except Exception as exc:
-                GLib.idle_add(self._set_voice_status, "voz indisponível: " + str(exc)[:80])
-
+                print(f"[GTK] TTS Error: {exc}")
         threading.Thread(target=worker, daemon=True).start()
-
-    def _set_voice_status(self, text: str) -> bool:
-        if self.status_label is not None:
-            self.status_label.set_text(text)
-        return False
 
     def _play_audio(self, audio_b64: str) -> None:
         raw = base64.b64decode(audio_b64)
@@ -342,7 +562,7 @@ class ZeusGtkChat(Gtk.Application):
             path = tmp.name
         player = _find_player()
         if not player:
-            GLib.idle_add(self._set_voice_status, "Instale ffplay ou mpv para tocar voz.")
+            GLib.idle_add(self._toast, "Instale ffplay ou mpv para tocar voz.")
             return
         if os.path.basename(player) == "ffplay":
             args = [player, "-nodisp", "-autoexit", "-loglevel", "quiet", path]
@@ -351,23 +571,6 @@ class ZeusGtkChat(Gtk.Application):
         else:
             args = [player, path]
         subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-
-    def _open_hud(self, *_args) -> None:
-        webbrowser.open(BACKEND)
-
-    def _copy_diagnostics(self, *_args) -> None:
-        payload = json.dumps(
-            {
-                "backend": BACKEND,
-                "status": self._last_status,
-            },
-            ensure_ascii=False,
-            indent=2,
-        )
-        clipboard = Gtk.Clipboard.get_default(window_screen().get_display())
-        clipboard.set_text(payload, -1)
-        if self.status_label is not None:
-            self.status_label.set_text("Diagnostico copiado")
 
     def _get_json(self, path: str, *, timeout: int) -> dict:
         with urllib.request.urlopen(BACKEND + path, timeout=timeout) as response:
@@ -383,21 +586,12 @@ class ZeusGtkChat(Gtk.Application):
         with urllib.request.urlopen(req, timeout=timeout) as response:
             return json.loads(response.read().decode("utf-8"))
 
-
-def window_screen():
-    screen = Gdk.Screen.get_default()
-    if screen is None:
-        raise RuntimeError("GTK screen unavailable")
-    return screen
-
-
 def _find_player() -> str | None:
     for name in ("ffplay", "mpv"):
         path = shutil_which(name)
         if path:
             return path
     return None
-
 
 def shutil_which(name: str) -> str | None:
     for folder in os.getenv("PATH", "").split(os.pathsep):
@@ -406,11 +600,9 @@ def shutil_which(name: str) -> str | None:
             return candidate
     return None
 
-
 def main() -> int:
     app = ZeusGtkChat()
     return app.run(sys.argv)
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

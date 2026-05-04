@@ -1,20 +1,20 @@
-# ZEUS Cognitive AI
+# ZEUS Cognitive OS
 
 ZEUS is a local-first cognitive operating layer that combines a FastAPI backend, Ollama/OpenAI-compatible LLM routing, realtime HUD telemetry, voice/vision tools, Rust-based file watching, a Linux Mint/Cinnamon panel applet, and an event-driven **Second Brain Orchestrator** connecting Obsidian, Notion, and Linear.
 
 The current default profile is **Ollama Cloud through the local Ollama daemon**, using `gemma4:31b-cloud` when the machine is authenticated with `ollama signin`.
 
-Current product direction: **the Cinnamon applet is the primary desktop interface**. The desktop chat is GTK and is launched from the Cinnamon applet.
+Current product direction: **the Cinnamon applet is the primary desktop interface**. The desktop chat is a native **GTK4 + Libadwaita** application launched from the Cinnamon applet.
 
 ## Current Status
 
-- Backend: FastAPI + Socket.IO + native WebSocket.
-- LLM: Ollama-first, with OpenAI/Gemini support available by environment variables.
-- Second Brain: Event-driven orchestration syncing local Obsidian notes to Notion and Linear via markdown tags (`#to-notion`, `#to-linear`).
-- UI: Web HUD in `public/index.html`, Cinnamon applet in `applets/cinnamon/zeus@local/`, and GTK chat in `bin/zeus-gtk-chat`.
-- Security: LAN access requires token when enabled; command execution uses allowlist, confirmation, and audit logging.
-- Observability: structured JSON logs, request correlation-id, and health metrics.
-- Tests: Python unit/contract tests plus Node tests for frontend behavior.
+- **Backend:** FastAPI + Socket.IO + native WebSocket.
+- **LLM:** Ollama-first, with OpenAI/Gemini support available by environment variables.
+- **Second Brain:** Event-driven orchestration syncing local Obsidian notes to Notion and Linear via markdown tags (`#to-notion`, `#to-linear`).
+- **UI:** Web HUD in `public/index.html`, Cinnamon applet in `applets/cinnamon/zeus@local/`, and a premium GTK4/Libadwaita chat in `bin/zeus-gtk-chat`.
+- **Security:** LAN access requires token when enabled; command execution uses allowlist, confirmation, and audit logging.
+- **Observability:** structured JSON logs, request correlation-id, and health metrics.
+- **Tests:** Python unit/contract tests plus Node tests for frontend behavior.
 
 ## Architecture
 
@@ -22,11 +22,13 @@ Current product direction: **the Cinnamon applet is the primary desktop interfac
 graph TD
     User[User] --> WebHUD[Web HUD]
     User --> Applet[Cinnamon Applet]
+    User --> GTKChat[GTK4/Libadwaita Chat]
     User --> Obsidian[Obsidian Vault]
 
     WebHUD --> API[FastAPI Backend]
     Applet --> API
-    Obsidian --> Watcher[File Watcher]
+    GTKChat --> API
+    Obsidian --> Watcher[Rust File Watcher]
 
     Watcher --> API
     API --> LLM[LLM Provider]
@@ -48,7 +50,7 @@ graph TD
 | `zeus_core/` | LLM routing, agents, memory, security guards, event bus, integrations (Notion, Linear), observability. |
 | `public/` | Web HUD and frontend tests. |
 | `applets/` | Linux desktop panel integrations, currently Cinnamon `zeus@local`. |
-| `bin/zeus-gtk-chat` | Lightweight GTK desktop chat launched by the applet. |
+| `bin/zeus-gtk-chat` | Premium native GTK4/Libadwaita desktop chat launched by the applet. |
 | `watcher_rs/` | Rust filesystem watcher. |
 | `core-rust/` | Rust memory/system components. |
 | `docs/` | Technical reports and execution plans. |
@@ -124,7 +126,9 @@ Backend health guard:
 ./bin/zeus ensure-server
 ```
 
-Linux Mint/Cinnamon applet:
+### Linux Desktop Components
+
+#### Cinnamon Applet:
 
 ```bash
 chmod +x bin/install-cinnamon-applet.sh
@@ -132,27 +136,26 @@ chmod +x bin/install-cinnamon-applet.sh
 cinnamon-settings applets
 ```
 
-Then enable **ZEUS Cognitive AI** in Cinnamon Applets. The applet talks to the local backend through:
-
-```text
-GET  http://127.0.0.1:8080/api/applet/status
-POST http://127.0.0.1:8080/api/applet/chat
-POST http://127.0.0.1:8080/api/applet/voice/start
-POST http://127.0.0.1:8080/api/applet/vision/analyze
-```
-
+Then enable **ZEUS Cognitive AI** in Cinnamon Applets. The applet talks to the local backend through HTTP endpoints.
 The applet shows backend/LLM status in the Cinnamon panel. Click behavior:
-
 - backend online: opens the external GTK chat window from `bin/zeus-gtk-chat`;
 - backend offline: runs `./bin/zeus ensure-server`.
 
-GTK chat dependency on Debian/Ubuntu/Linux Mint:
+#### Native GTK4 Chat:
+The desktop client is now built with **GTK4 and Libadwaita** for a native GNOME experience, featuring animations, Markdown code block parsing, toast notifications, and dark mode.
+
+Dependencies for Debian/Ubuntu/Linux Mint:
 
 ```bash
-sudo apt install python3-gi gir1.2-gtk-3.0
+sudo apt install python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 libadwaita-1-0
 ```
 
-The applet intentionally avoids Cinnamon popup widgets because some Cinnamon/GJS versions reject popup menu parameters and unload the applet. If Cinnamon does not reload the applet after installation, run:
+The application respects the dark mode preference automatically but can be overridden:
+```bash
+ZEUS_GTK_THEME=dark ./bin/zeus-gtk-chat
+```
+
+If Cinnamon does not reload the applet after installation, run:
 
 ```bash
 gdbus call --session --dest org.Cinnamon --object-path /org/Cinnamon --method org.Cinnamon.ReloadXlet zeus@local APPLET
@@ -237,6 +240,6 @@ git push origin main
 ## Documentation
 
 - `docs/ZEUS_SECOND_BRAIN_ARCHITECTURE.md`
-- `docs/RELATORIO_SISTEMA_2026-05-02.md`
+- `docs/RELATORIO_COMPLETO_SISTEMA_2026-05-03.md`
 - `docs/PLANO_EXECUCAO_ZEUS_2026-05-02.md`
-- `docs/ANALISE_SISTEMA_DETALHADA.md`
+- `docs/PLANO_APPLET_GTK_2026-05-03.md`
