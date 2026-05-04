@@ -1,13 +1,15 @@
 import unittest
+from unittest.mock import patch
 
 import os
 import sys
+import time
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from zeus_core.core_system import _extract_message_content
 from zeus_core import core_system
-from zeus_core.health_status import build_watcher_status
+from zeus_core.health_status import build_external_watcher_status, build_watcher_status
 from pattern_engine import PatternEngine
 import web_gui
 
@@ -70,6 +72,31 @@ class BackendRegressionTests(unittest.TestCase):
 
     def test_watcher_status_reports_offline_without_process(self):
         status = build_watcher_status(None, None, None)
+        self.assertEqual(status["status"], "offline")
+        self.assertIsNone(status["pid"])
+
+    def test_external_watcher_status_detects_process(self):
+        class Proc:
+            info = {
+                "pid": 1234,
+                "cmdline": ["/repo/watcher_rs/target/release/watcher_rs"],
+                "create_time": time.time() - 5,
+            }
+
+        with patch("zeus_core.health_status.psutil.process_iter", return_value=[Proc()]):
+            with patch("zeus_core.health_status._watcher_port_open", return_value=True):
+                status = build_external_watcher_status("/repo", port=8081)
+
+        self.assertEqual(status["status"], "online")
+        self.assertEqual(status["pid"], 1234)
+        self.assertEqual(status["mode"], "external")
+        self.assertTrue(status["port_open"])
+
+    def test_external_watcher_status_reports_offline_when_absent(self):
+        with patch("zeus_core.health_status.psutil.process_iter", return_value=[]):
+            with patch("zeus_core.health_status._watcher_port_open", return_value=False):
+                status = build_external_watcher_status("/repo", port=8081)
+
         self.assertEqual(status["status"], "offline")
         self.assertIsNone(status["pid"])
 

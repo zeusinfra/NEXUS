@@ -48,7 +48,7 @@ from zeus_core.events.sync_worker import sync_worker_loop
 from zeus_core.events.sync_engine import sync_synaptic_to_obsidian, sync_longterm_to_notion, sync_insights_to_linear
 from zeus_core.cognitive.context_engine import build_current_context
 from zeus_core.memory.sqlite_memory import get_connection as get_second_brain_connection
-from zeus_core.health_status import build_runtime_health, build_watcher_status
+from zeus_core.health_status import build_external_watcher_status, build_runtime_health, build_watcher_status
 from zeus_core.observability import correlation_id_middleware, get_logger, get_metrics_snapshot, log_event, setup_logging
 from zeus_core.security_guard import (
     extract_bearer_token,
@@ -1549,9 +1549,18 @@ def _build_api_status_payload() -> dict:
     }
 
 def _build_api_health_payload() -> dict:
+    watcher_status = build_watcher_status(
+        watcher_runner.process,
+        watcher_runner.started_at,
+        watcher_runner.last_event_at,
+    )
+    if watcher_status["status"] == "offline":
+        watcher_port = int(os.getenv("ZEUS_WATCHER_PORT", "8081"))
+        watcher_status = build_external_watcher_status(PROJECT_ROOT, port=watcher_port)
+
     health = build_runtime_health(
         llm=get_llm_status(),
-        watcher=build_watcher_status(watcher_runner.process, watcher_runner.started_at, watcher_runner.last_event_at),
+        watcher=watcher_status,
         enable_voice=ENABLE_VOICE,
         enable_voice_sensing=ENABLE_VOICE_SENSING,
         allow_lan=ALLOW_LAN,
