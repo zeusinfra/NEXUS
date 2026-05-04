@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from zeus_core.cognitive.classifier import decide_action
+from zeus_core.cognitive.context_engine import _area_from_tags
 from zeus_core.integrations.obsidian import extract_internal_links, extract_tags, read_note
 
 
@@ -58,6 +59,11 @@ class SecondBrainTests(unittest.TestCase):
 
         self.assertIn("ZEUS_ENABLE_SECOND_BRAIN=0", env_example)
         self.assertIn("ZEUS_ENABLE_SECOND_BRAIN_SYNC_ENGINE=0", env_example)
+
+    def test_context_area_mapping_links_information_to_domain(self):
+        self.assertEqual(_area_from_tags('["#bug", "#infra"]'), "tarefa/operação")
+        self.assertEqual(_area_from_tags('["#to-notion"]'), "documentação")
+        self.assertEqual(_area_from_tags('["#zeus-memory"]'), "memória")
 
 
 if __name__ == "__main__":

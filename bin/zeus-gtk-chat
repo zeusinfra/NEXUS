@@ -3,8 +3,12 @@ from __future__ import annotations
 
 import json
 import os
+import base64
+import subprocess
 import sys
+import tempfile
 import threading
+import time
 import urllib.error
 import urllib.request
 import webbrowser
@@ -30,7 +34,10 @@ class ZeusGtkChat(Gtk.Application):
         self.send_button: Gtk.Button | None = None
         self.status_label: Gtk.Label | None = None
         self.provider_label: Gtk.Label | None = None
+        self.metrics_label: Gtk.Label | None = None
+        self.voice_button: Gtk.ToggleButton | None = None
         self._last_status: dict = {}
+        self._voice_enabled = True
 
     def do_activate(self) -> None:
         if self.window is None:
@@ -46,8 +53,8 @@ class ZeusGtkChat(Gtk.Application):
         self._install_css()
 
         window = Gtk.ApplicationWindow(application=self)
-        window.set_title("ZEUS Chat")
-        window.set_default_size(460, 660)
+        window.set_title("ZEUS Ops Chat")
+        window.set_default_size(520, 720)
         window.set_size_request(360, 460)
         window.get_style_context().add_class("zeus-root")
         window.connect("key-press-event", self._on_key_press)
@@ -63,7 +70,7 @@ class ZeusGtkChat(Gtk.Application):
         title_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         header.pack_start(title_box, True, True, 0)
 
-        title = Gtk.Label(label="ZEUS")
+        title = Gtk.Label(label="ZEUS Ops")
         title.set_xalign(0)
         title.get_style_context().add_class("zeus-title")
         title_box.pack_start(title, False, False, 0)
@@ -72,6 +79,17 @@ class ZeusGtkChat(Gtk.Application):
         self.provider_label.set_xalign(0)
         self.provider_label.get_style_context().add_class("zeus-subtitle")
         title_box.pack_start(self.provider_label, False, False, 0)
+
+        self.metrics_label = Gtk.Label(label="latência -- ms · voz on")
+        self.metrics_label.set_xalign(0)
+        self.metrics_label.get_style_context().add_class("zeus-metrics")
+        title_box.pack_start(self.metrics_label, False, False, 0)
+
+        self.voice_button = Gtk.ToggleButton(label="Voz")
+        self.voice_button.set_active(True)
+        self.voice_button.get_style_context().add_class("zeus-tool-button")
+        self.voice_button.connect("toggled", self._toggle_voice)
+        header.pack_start(self.voice_button, False, False, 0)
 
         hud_button = Gtk.Button(label="HUD")
         hud_button.get_style_context().add_class("zeus-tool-button")
@@ -99,7 +117,7 @@ class ZeusGtkChat(Gtk.Application):
         composer.get_style_context().add_class("zeus-composer")
         root.pack_start(composer, False, False, 0)
 
-        self.status_label = Gtk.Label(label="Pronto")
+        self.status_label = Gtk.Label(label="Pronto para operar")
         self.status_label.set_xalign(0)
         self.status_label.get_style_context().add_class("zeus-status")
         composer.pack_start(self.status_label, False, False, 0)
@@ -108,12 +126,12 @@ class ZeusGtkChat(Gtk.Application):
         composer.pack_start(input_row, False, False, 0)
 
         self.input = Gtk.Entry()
-        self.input.set_placeholder_text("Mensagem para o ZEUS")
+        self.input.set_placeholder_text("Peça uma ação, diagnóstico ou sincronização")
         self.input.connect("activate", self._send_message)
         self.input.get_style_context().add_class("zeus-input")
         input_row.pack_start(self.input, True, True, 0)
 
-        self.send_button = Gtk.Button(label="Enviar")
+        self.send_button = Gtk.Button(label="Run")
         self.send_button.get_style_context().add_class("zeus-send")
         self.send_button.connect("clicked", self._send_message)
         input_row.pack_start(self.send_button, False, False, 0)
@@ -124,18 +142,20 @@ class ZeusGtkChat(Gtk.Application):
 
     def _install_css(self) -> None:
         css = b"""
-        .zeus-root { background: #0b1220; color: #e5e7eb; }
-        .zeus-header { background: #111827; padding: 14px; border-bottom: 1px solid #243244; }
-        .zeus-title { color: #f8fafc; font-size: 18px; font-weight: 700; }
-        .zeus-subtitle { color: #94a3b8; font-size: 12px; }
-        .zeus-scroll { background: #0b1220; border: 0; }
-        .zeus-composer { background: #111827; padding: 12px 14px 14px 14px; border-top: 1px solid #243244; }
-        .zeus-status { color: #94a3b8; font-size: 12px; }
-        .zeus-input { background: #0b1220; color: #f8fafc; border: 1px solid #334155; border-radius: 18px; padding: 9px 12px; }
-        .zeus-send { background: #22c55e; color: #04130a; border: 0; border-radius: 18px; padding: 9px 14px; font-weight: 700; }
-        .zeus-tool-button { background: #1f2937; color: #e5e7eb; border: 1px solid #334155; border-radius: 8px; padding: 6px 10px; }
-        .zeus-message-user { background: #2563eb; color: white; border-radius: 14px; padding: 10px 12px; }
-        .zeus-message-assistant { background: #1f2937; color: #e5e7eb; border-radius: 14px; padding: 10px 12px; }
+        .zeus-root { background: #0f172a; color: #e5e7eb; }
+        .zeus-header { background: #111827; padding: 14px; border-bottom: 1px solid #334155; }
+        .zeus-title { color: #f8fafc; font-size: 19px; font-weight: 700; }
+        .zeus-subtitle { color: #9ca3af; font-size: 12px; }
+        .zeus-metrics { color: #22c55e; font-size: 11px; }
+        .zeus-scroll { background: #0f172a; border: 0; }
+        .zeus-composer { background: #111827; padding: 12px 14px 14px 14px; border-top: 1px solid #334155; }
+        .zeus-status { color: #9ca3af; font-size: 12px; }
+        .zeus-input { background: #020617; color: #f8fafc; border: 1px solid #475569; border-radius: 8px; padding: 10px 12px; }
+        .zeus-send { background: #22c55e; color: #04130a; border: 0; border-radius: 8px; padding: 10px 16px; font-weight: 700; }
+        .zeus-tool-button { background: #1f2937; color: #e5e7eb; border: 1px solid #475569; border-radius: 8px; padding: 7px 10px; }
+        .zeus-tool-button:checked { background: #14532d; color: #dcfce7; }
+        .zeus-message-user { background: #2563eb; color: white; border-radius: 8px; padding: 10px 12px; }
+        .zeus-message-assistant { background: #1e293b; color: #e5e7eb; border: 1px solid #334155; border-radius: 8px; padding: 10px 12px; }
         """
         provider = Gtk.CssProvider()
         provider.load_from_data(css)
@@ -156,6 +176,12 @@ class ZeusGtkChat(Gtk.Application):
             for child in self.messages_box.get_children():
                 self.messages_box.remove(child)
             self._add_message("Chat limpo.", "assistant")
+
+    def _toggle_voice(self, button: Gtk.ToggleButton) -> None:
+        self._voice_enabled = button.get_active()
+        state = "on" if self._voice_enabled else "off"
+        if self.metrics_label is not None:
+            self.metrics_label.set_text(f"latência -- ms · voz {state}")
 
     def _add_message(self, text: str, role: str) -> None:
         if self.messages_box is None:
@@ -210,8 +236,14 @@ class ZeusGtkChat(Gtk.Application):
         provider = llm.get("provider") or "llm"
         model = llm.get("model") or "modelo"
         configured = "configurado" if llm.get("configured") else "sem config"
+        voice = data.get("voice") or {}
+        sb = data.get("second_brain") or {}
         if self.provider_label is not None:
             self.provider_label.set_text(f"Backend online: {provider} / {model} ({configured})")
+        if self.metrics_label is not None:
+            voice_state = "on" if voice.get("enabled", True) and self._voice_enabled else "off"
+            sb_state = "SB on" if sb.get("enabled") else "SB off"
+            self.metrics_label.set_text(f"{sb_state} · voz {voice_state}")
         if self.status_label is not None:
             self.status_label.set_text("Backend online")
         return False
@@ -232,9 +264,10 @@ class ZeusGtkChat(Gtk.Application):
             return
         self.input.set_text("")
         self._add_message(text, "user")
-        self._set_busy(True, "ZEUS pensando...")
+        self._set_busy(True, "Processando...")
 
         def worker() -> None:
+            started = time.perf_counter()
             payload = {
                 "message": text,
                 "source": "cinnamon_gtk_chat",
@@ -243,7 +276,10 @@ class ZeusGtkChat(Gtk.Application):
             try:
                 data = self._post_json("/api/applet/chat", payload, timeout=120)
                 reply = data.get("reply") or data.get("error") or "Sem resposta."
-                GLib.idle_add(self._handle_reply, str(reply))
+                latency_ms = data.get("latency_ms") or round((time.perf_counter() - started) * 1000)
+                GLib.idle_add(self._handle_reply, str(reply), int(latency_ms))
+                if self._voice_enabled:
+                    self._speak_async(str(reply))
             except urllib.error.HTTPError as exc:
                 try:
                     body = exc.read().decode("utf-8")
@@ -255,15 +291,50 @@ class ZeusGtkChat(Gtk.Application):
 
         threading.Thread(target=worker, daemon=True).start()
 
-    def _handle_reply(self, reply: str) -> bool:
+    def _handle_reply(self, reply: str, latency_ms: int = 0) -> bool:
         self._add_message(reply, "assistant")
         self._set_busy(False, "Backend online")
+        if self.metrics_label is not None:
+            voice_state = "on" if self._voice_enabled else "off"
+            self.metrics_label.set_text(f"latência {latency_ms} ms · voz {voice_state}")
         return False
 
     def _handle_error(self, error: str) -> bool:
         self._add_message("Erro: " + error, "assistant")
         self._set_busy(False, "Erro no chat")
         return False
+
+    def _speak_async(self, text: str) -> None:
+        def worker() -> None:
+            try:
+                data = self._post_json("/api/tts", {"text": text}, timeout=45)
+                audio = data.get("audio") or ""
+                if audio:
+                    self._play_audio(audio)
+            except Exception as exc:
+                GLib.idle_add(self._set_voice_status, "voz indisponível: " + str(exc)[:80])
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _set_voice_status(self, text: str) -> bool:
+        if self.status_label is not None:
+            self.status_label.set_text(text)
+        return False
+
+    def _play_audio(self, audio_b64: str) -> None:
+        raw = base64.b64decode(audio_b64)
+        with tempfile.NamedTemporaryFile(prefix="zeus-tts-", suffix=".mp3", delete=False) as tmp:
+            tmp.write(raw)
+            path = tmp.name
+        player = _find_player()
+        if not player:
+            GLib.idle_add(self._set_voice_status, "Instale ffplay ou mpv para tocar voz.")
+            return
+        if os.path.basename(player) == "ffplay":
+            args = [player, "-nodisp", "-autoexit", "-loglevel", "quiet", path]
+        else:
+            args = [player, path]
+        subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     def _open_hud(self, *_args) -> None:
         webbrowser.open(BACKEND)
@@ -302,6 +373,22 @@ def window_screen():
     if screen is None:
         raise RuntimeError("GTK screen unavailable")
     return screen
+
+
+def _find_player() -> str | None:
+    for name in ("ffplay", "mpv"):
+        path = shutil_which(name)
+        if path:
+            return path
+    return None
+
+
+def shutil_which(name: str) -> str | None:
+    for folder in os.getenv("PATH", "").split(os.pathsep):
+        candidate = os.path.join(folder, name)
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return candidate
+    return None
 
 
 def main() -> int:

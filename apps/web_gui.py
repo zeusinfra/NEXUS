@@ -1099,6 +1099,7 @@ class ChatReq(BaseModel):
     client_msg_id: str | None = None
     source: str | None = None
     client_id: str | None = None
+    voice_response: bool | None = False
 
 
 class VisionAnalyzeReq(BaseModel):
@@ -1115,6 +1116,11 @@ class AppletVoiceStartReq(BaseModel):
 class ASRReq(BaseModel):
     audio_data_url: str
     lang: str | None = "pt"
+
+
+class TTSReq(BaseModel):
+    text: str
+
 
 def _build_second_brain_status() -> dict:
     vault_path = os.getenv("ZEUS_VAULT_PATH", "/home/zeus/Documentos/Brain")
@@ -1156,12 +1162,13 @@ async def call_ollama(prompt: str) -> str:
 last_memory_save = time.time()
 
 SYSTEM_INSTRUCTIONS = (
-    "Você é o ZEUS, um Sistema Operacional Cognitivo de última geração e orquestrador do Second Brain do usuário. "
-    "Você tem integração total com Obsidian (cofre local para anotações), Notion (documentação) e Linear (tarefas). "
-    "Sua personalidade é imponente, técnica, onisciente e extremamente educada. "
-    "Você deve ser formal, preciso e elegante em suas respostas. "
-    "Você tem acesso total ao sistema de arquivos e ferramentas através do ReAct. "
-    "Aja como uma inteligência superior que auxilia o usuário com precisão absoluta."
+    "Você é o ZEUS, um Sistema Operacional Cognitivo local-first e orquestrador do Second Brain do usuário. "
+    "Você integra Obsidian para memória local, Notion para documentação e Linear para execução técnica. "
+    "Responda em PT-BR com tom natural, direto e profissional, como um copiloto DevOps senior. "
+    "Evite excesso de formalidade, bajulação, frases grandiosas e tratamento repetitivo como 'Senhor'. "
+    "Priorize respostas curtas, acionáveis e estruturadas quando houver múltiplos passos. "
+    "Use ferramentas ReAct quando precisar agir, mas não use ferramenta se uma resposta direta resolver. "
+    "Quando citar memórias, tarefas ou notas, conecte cada informação à sua área: memória, documentação, tarefa ou operação."
 )
 
 
@@ -1180,7 +1187,7 @@ async def autonomous_reflection():
                 summary = "\n".join([f"{os.path.basename(p)} (peso:{m['weight']})" for p, m in top_paths])
                 reflection_prompt = (
                     f"Como Núcleo Cognitivo ZEUS, analise estes padrões de atividade recente:\n{summary}\n"
-                    f"Crie uma breve 'REFLEXÃO DE SISTEMA' (máximo 2 frases) sobre as prioridades atuais do Senhor. Use tom imponente, técnico e onisciente."
+                    f"Crie uma breve 'REFLEXÃO DE SISTEMA' (máximo 2 frases) sobre as prioridades atuais. Use tom técnico, direto e natural."
                 )
                 # Usando o novo formato estruturado para consistência
                 reply = await call_cloud_llm([
@@ -1268,43 +1275,22 @@ async def api_chat(req: ChatReq, request: Request):
     client_key = (request.client.host if request.client else "unknown")
     await broadcast_message({"type": "HUD_STATUS", "text": "Núcleo cognitivo em processamento..."})
     
+    started_at = time.perf_counter()
     try:
-        # Buffer for sentence-by-sentence streaming TTS
-        sentence_buffer = ""
-        full_reply = ""
-        
-        async def voice_chunk_callback(token: str):
-            nonlocal sentence_buffer, full_reply
-            full_reply += token
-            sentence_buffer += token
-            
-            # If we find a sentence terminator, synthesize and send (ONLY if voice is enabled)
-            if ENABLE_VOICE and any(punct in token for punct in [".", "!", "?", "\n"]):
-                clean_sentence = sentence_buffer.strip()
-                if len(clean_sentence) > 5: # Avoid synthesizing tiny fragments
-                    audio_b64 = await voice_service.generate_speech_base64(clean_sentence)
-                    if audio_b64:
-                        await broadcast_message({"type": "AUDIO_RESPONSE", "audio": audio_b64})
-                    sentence_buffer = ""
-            elif not ENABLE_VOICE:
-                sentence_buffer = "" # Clear buffer if voice disabled
-
-        # Run with streaming enabled
-        reply = await react_agent.run(context_prompt, client_key=client_key, broadcast=broadcast_message, token_callback=voice_chunk_callback)
-        
-        # Synthesize any remaining text in buffer (ONLY if voice is enabled)
-        if ENABLE_VOICE and sentence_buffer.strip():
-            audio_b64 = await voice_service.generate_speech_base64(sentence_buffer.strip())
-            if audio_b64:
-                await broadcast_message({"type": "AUDIO_RESPONSE", "audio": audio_b64})
-
+        reply = await react_agent.run(context_prompt, client_key=client_key, broadcast=broadcast_message)
+        latency_ms = round((time.perf_counter() - started_at) * 1000)
         # Final memory update and logs
         asyncio.create_task(update_memory_after_chat(user_message, reply))
         await broadcast_message({"type": "CHAT_AI", "id": msg_id, "source": source, "client_id": client_id, "message": reply})
         await broadcast_message({"type": "HUD_STATUS", "text": "Aguardando atividade neural..."})
         
         log_event(logger, 20, "chat_request_completed", client_host=client_key, reply_chars=len(reply or ""))
-        return {"reply": reply, "id": msg_id}
+        response = {"reply": reply, "id": msg_id, "latency_ms": latency_ms}
+        if req.voice_response and ENABLE_VOICE:
+            audio_b64 = await voice_service.generate_speech_base64(reply)
+            response["audio"] = audio_b64
+            response["audio_mime"] = "audio/mpeg" if audio_b64 else None
+        return response
     except Exception as e:
         log_event(logger, 40, "chat_request_failed", error=str(e))
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -1336,6 +1322,19 @@ async def api_applet_vision_analyze(request: Request):
 
     asyncio.create_task(_handle_client_vision())
     return {"ok": True, "stage": "queued"}
+
+
+@app.post("/api/tts")
+async def api_tts(req: TTSReq, request: Request):
+    if not _is_trusted_request(request):
+        raise HTTPException(status_code=403, detail="Only trusted (local/LAN) requests are allowed.")
+    _require_lan_token_for_request(request)
+
+    text = (req.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="text is required.")
+    audio_b64 = await voice_service.generate_speech_base64(text[:2000])
+    return {"ok": bool(audio_b64), "audio": audio_b64, "audio_mime": "audio/mpeg" if audio_b64 else None}
 
 
 async def update_memory_after_chat(user_msg, ai_reply):
@@ -1490,9 +1489,9 @@ async def handle_voice_input(text: str):
         f"{second_brain_context}\n\n"
         f"{memory_block}"
         f"User via Voice: {text}\n\n"
-        f"Você é o ZEUS, um sistema operacional cognitivo altamente inteligente e educado. Orquestrador de Obsidian, Notion e Linear. "
-        f"Responda em Português (PT-BR) de forma concisa, elegante e natural. "
-        f"Mantenha um tom formal, porém prestativo. Sua resposta será falada em voz alta."
+        f"Você é o ZEUS, um copiloto DevOps senior conectado ao Obsidian, Notion e Linear. "
+        f"Responda em Português (PT-BR) de forma curta, natural e acionável. "
+        f"Evite excesso de formalidade; a resposta será falada em voz alta."
     )
 
     await broadcast_message({"type": "HUD_STATUS", "text": "Processando comando de voz..."})
@@ -1527,6 +1526,7 @@ def _build_api_health_payload() -> dict:
     )
     health["config"] = build_config_diagnostics(lan=_build_lan_security_config())
     health["metrics"] = get_metrics_snapshot()
+    health["second_brain"] = _build_second_brain_status()
     return health
 
 

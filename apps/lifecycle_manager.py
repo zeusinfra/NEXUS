@@ -13,15 +13,15 @@ class LifecycleManager:
     async def boot_greeting(self):
         try:
             await asyncio.sleep(3)
-            prompt = "O sistema ZEUS acaba de ser iniciado. Crie uma mensagem falada muito curta de boas-vindas (máximo 1 frase), chamando o usuário de 'Senhor'. Seja imponente, técnico e direto."
+            prompt = "O sistema ZEUS acaba de ser iniciado. Crie uma mensagem falada muito curta de boas-vindas (máximo 1 frase). Seja técnico, direto e natural."
             reply = await self.g['call_ollama'](prompt)
             if reply and reply.strip():
                 await self.g['speak'](reply)
             else:
-                await self.g['speak']("Olá, Senhor. O sistema ZEUS está online.")
+                await self.g['speak']("ZEUS online. Pronto para operar.")
         except Exception as e:
             print(f"Erro na saudação inicial: {e}")
-            await self.g['speak']("Olá, Senhor. O sistema ZEUS está online.")
+            await self.g['speak']("ZEUS online. Pronto para operar.")
 
     async def web_sensing_loop(self):
         while True:

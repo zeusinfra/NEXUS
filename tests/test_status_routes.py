@@ -29,7 +29,11 @@ class StatusRoutesTests(unittest.IsolatedAsyncioTestCase):
                 is_trusted_request=lambda request: trusted,
                 require_lan_token_for_request=require_token,
                 build_api_status=lambda: {"cpu": 1.0, "mood": "CALM"},
-                build_api_health=lambda: {"llm": {"provider": "test"}, "config": {"warnings": []}},
+                build_api_health=lambda: {
+                    "llm": {"provider": "test"},
+                    "config": {"warnings": []},
+                    "second_brain": {"enabled": True, "sync_engine_enabled": False},
+                },
                 llm_service=LLMService(
                     get_status=lambda: {"provider": "test", "configured": True},
                     call_llm=lambda messages: "ZEUS LLM OK",
@@ -57,6 +61,8 @@ class StatusRoutesTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result["online"])
         self.assertEqual(result["llm"]["provider"], "test")
         self.assertEqual(result["config"]["warnings"], [])
+        self.assertTrue(result["second_brain"]["enabled"])
+        self.assertFalse(result["second_brain"]["sync_engine_enabled"])
         self.assertEqual(calls["token"], 1)
 
     async def test_llm_status_route_returns_sanitized_status(self):

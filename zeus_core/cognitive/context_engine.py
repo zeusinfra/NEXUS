@@ -1,5 +1,9 @@
 from zeus_core.integrations.linear import get_active_issues
-from zeus_core.memory.sqlite_memory import get_connection
+from zeus_core.memory.sqlite_memory import get_connection, get_sync_status
+import time
+
+_ISSUES_CACHE = {"ts": 0.0, "items": []}
+_ISSUES_CACHE_TTL_SECONDS = 90.0
 
 def _get_recent_notes(limit: int = 3) -> list:
     conn = get_connection()
@@ -21,28 +25,55 @@ def _get_recent_notes(limit: int = 3) -> list:
         })
     return notes
 
+
+def _get_cached_issues() -> list[dict]:
+    now = time.time()
+    if now - float(_ISSUES_CACHE["ts"]) < _ISSUES_CACHE_TTL_SECONDS:
+        return list(_ISSUES_CACHE["items"])
+    issues = get_active_issues()
+    _ISSUES_CACHE["ts"] = now
+    _ISSUES_CACHE["items"] = list(issues or [])
+    return list(_ISSUES_CACHE["items"])
+
+
+def _area_from_tags(tags: str | None) -> str:
+    t = (tags or "").lower()
+    if "to-linear" in t or "bug" in t or "infra" in t or "performance" in t:
+        return "tarefa/operação"
+    if "to-notion" in t or "project" in t or "docs" in t:
+        return "documentação"
+    if "zeus" in t or "memory" in t:
+        return "memória"
+    return "memória local"
+
 def build_current_context() -> str:
     """
     Constrói um resumo do contexto atual do usuário para injetar no LLM do agente ZEUS.
     """
-    context_lines = ["Contexto atual:"]
+    context_lines = ["Contexto operacional atual:"]
     
-    # 1. Busca issues ativas no Linear
-    issues = get_active_issues()
+    sync_status = get_sync_status()
+    context_lines.append(
+        f"- Sincronização: pendentes={sync_status.get('pending', 0)}, processados={sync_status.get('processed', 0)}, erros={sync_status.get('error', 0)}."
+    )
+
+    # 1. Busca issues ativas no Linear com cache curto para reduzir latência
+    issues = _get_cached_issues()
     if issues:
-        context_lines.append("- O usuário está trabalhando nas seguintes issues:")
+        context_lines.append("- Tarefas Linear ativas:")
         for issue in issues:
             title = issue.get('title', 'Sem título')
             state = issue.get('state', {}).get('name', 'N/A')
-            context_lines.append(f"  * [{issue.get('identifier')}] {title} (Status: {state})")
+            context_lines.append(f"  * [tarefa] [{issue.get('identifier')}] {title} (status: {state})")
     else:
-        context_lines.append("- Nenhuma issue ativa no Linear no momento.")
+        context_lines.append("- Tarefas Linear: nenhuma issue ativa carregada.")
         
     # 2. Busca notas recentes do Obsidian
     recent_notes = _get_recent_notes()
     if recent_notes:
-        context_lines.append("- Últimas anotações capturadas do Obsidian:")
+        context_lines.append("- Memórias/Notas Obsidian recentes:")
         for note in recent_notes:
-            context_lines.append(f"  * {note['path']} (Tags: {note['tags']})")
+            area = _area_from_tags(note.get("tags"))
+            context_lines.append(f"  * [{area}] {note['path']} (tags: {note['tags']})")
             
     return "\n".join(context_lines)

@@ -275,7 +275,7 @@ class VoiceSensing:
                     if self._loop:
                         if self.broadcast:
                             asyncio.run_coroutine_threadsafe(self.broadcast({"type": "CHAT_USER", "message": text}), self._loop)
-                        asyncio.run_coroutine_threadsafe(self.speak("Sim, Senhor?"), self._loop)
+                        asyncio.run_coroutine_threadsafe(self.speak("Pode falar."), self._loop)
                     return
 
                 # Se consumiu um comando no modo armado, desarma.

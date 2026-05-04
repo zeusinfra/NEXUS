@@ -63,6 +63,7 @@ def create_status_router(deps: StatusRouteDeps) -> APIRouter:
             },
             "voice": health.get("voice", {}),
             "vision": health.get("vision", {}),
+            "second_brain": health.get("second_brain", {}),
             "security": health.get("security", {}),
             "config": {
                 "env": config.get("env"),
