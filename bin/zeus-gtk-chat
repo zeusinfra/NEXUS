@@ -13,6 +13,12 @@ import urllib.error
 import urllib.request
 import webbrowser
 
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
+from zeus_core.response_text import pango_markup, speech_text
+
 import gi
 
 gi.require_version("Gdk", "3.0")
@@ -188,7 +194,11 @@ class ZeusGtkChat(Gtk.Application):
             return
 
         row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
-        message = Gtk.Label(label=text)
+        message = Gtk.Label()
+        if role == "assistant":
+            message.set_markup(pango_markup(text) or GLib.markup_escape_text(text))
+        else:
+            message.set_text(text)
         message.set_line_wrap(True)
         message.set_selectable(True)
         message.set_xalign(0)
@@ -276,10 +286,11 @@ class ZeusGtkChat(Gtk.Application):
             try:
                 data = self._post_json("/api/applet/chat", payload, timeout=120)
                 reply = data.get("reply") or data.get("error") or "Sem resposta."
+                speech_reply = data.get("speech_reply") or speech_text(str(reply))
                 latency_ms = data.get("latency_ms") or round((time.perf_counter() - started) * 1000)
                 GLib.idle_add(self._handle_reply, str(reply), int(latency_ms))
                 if self._voice_enabled:
-                    self._speak_async(str(reply))
+                    self._speak_async(str(speech_reply or reply))
             except urllib.error.HTTPError as exc:
                 try:
                     body = exc.read().decode("utf-8")

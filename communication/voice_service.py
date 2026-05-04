@@ -2,6 +2,8 @@ import os
 import asyncio
 import base64
 
+from zeus_core.response_text import speech_text
+
 try:
     import edge_tts
 except ImportError:
@@ -26,6 +28,9 @@ class VoiceService:
             return ""
 
         try:
+            text = speech_text(text)
+            if not text:
+                return ""
             temp_file = os.path.join(self.output_dir, "response.mp3")
             communicate = edge_tts.Communicate(text, VOICE, rate="+5%", pitch="+0Hz")
             await communicate.save(temp_file)

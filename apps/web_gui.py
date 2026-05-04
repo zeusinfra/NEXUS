@@ -41,6 +41,7 @@ from zeus_core.config_guard import LanSecurityConfig, build_config_diagnostics, 
 from zeus_core.event_pipeline import OverflowEventQueue, RustWatcherRunner
 from zeus_core.llm_service import LLMService
 from zeus_core.memory_manager import MemoryManager
+from zeus_core.response_text import display_text, speech_text
 from zeus_core.events.watcher import watch_vault
 from zeus_core.events.sync_worker import sync_worker_loop
 from zeus_core.events.sync_engine import sync_synaptic_to_obsidian, sync_longterm_to_notion, sync_insights_to_linear
@@ -305,25 +306,28 @@ async def speak(text, target: str = "all"):
     """Toca TTS local (Edge-TTS + ffplay) via VoiceSensing quando habilitado."""
     if not text or not text.strip():
         return
+    spoken_text = speech_text(text)
+    display_reply = display_text(text)
     try:
         if not ENABLE_VOICE:
             # Em modo somente texto, apenas loga
-            print(f"[ZEUS VOICE ALERT] {text}")
+            print(f"[ZEUS VOICE ALERT] {display_reply or text}")
             return
 
         # Envia o comando de voz para a Bolha/Web via Socket.io
         await broadcast_message({
             "type": "voice_play",
-            "text": text,
+            "text": spoken_text or text,
+            "raw_text": text,
             "voice": "pt-BR-AntonioNeural",
             "target": target,
         })
 
         # Mantém a fala no servidor quando habilitado
-        await voice_module.speak(text)
+        await voice_module.speak(spoken_text or text)
     except Exception as e:
         print(f"[ZEUS] Falha ao falar (fallback para log): {e}")
-        print(f"[ZEUS VOICE ALERT] {text}")
+        print(f"[ZEUS VOICE ALERT] {display_reply or text}")
 
 async def cleanup_voice_temp_files():
     pass
@@ -1179,6 +1183,7 @@ SYSTEM_INSTRUCTIONS = (
     "Responda em PT-BR com tom natural, direto e profissional, como um copiloto DevOps senior. "
     "Evite excesso de formalidade, bajulação, frases grandiosas e tratamento repetitivo como 'Senhor'. "
     "Priorize respostas curtas, acionáveis e estruturadas quando houver múltiplos passos. "
+    "Evite símbolos de Markdown quando a resposta for simples; prefira texto limpo e frases naturais. "
     "Use ferramentas ReAct quando precisar agir, mas não use ferramenta se uma resposta direta resolver. "
     "Quando citar memórias, tarefas ou notas, conecte cada informação à sua área: memória, documentação, tarefa ou operação."
 )
@@ -1290,16 +1295,32 @@ async def api_chat(req: ChatReq, request: Request):
     started_at = time.perf_counter()
     try:
         reply = await react_agent.run(context_prompt, client_key=client_key, broadcast=broadcast_message)
+        display_reply = display_text(reply)
+        voice_reply = speech_text(reply)
         latency_ms = round((time.perf_counter() - started_at) * 1000)
         # Final memory update and logs
         asyncio.create_task(update_memory_after_chat(user_message, reply))
-        await broadcast_message({"type": "CHAT_AI", "id": msg_id, "source": source, "client_id": client_id, "message": reply})
+        await broadcast_message({
+            "type": "CHAT_AI",
+            "id": msg_id,
+            "source": source,
+            "client_id": client_id,
+            "message": display_reply or reply,
+            "raw_message": reply,
+            "speech_message": voice_reply,
+        })
         await broadcast_message({"type": "HUD_STATUS", "text": "Aguardando atividade neural..."})
         
         log_event(logger, 20, "chat_request_completed", client_host=client_key, reply_chars=len(reply or ""))
-        response = {"reply": reply, "id": msg_id, "latency_ms": latency_ms}
+        response = {
+            "reply": display_reply or reply,
+            "raw_reply": reply,
+            "speech_reply": voice_reply,
+            "id": msg_id,
+            "latency_ms": latency_ms,
+        }
         if req.voice_response and ENABLE_VOICE:
-            audio_b64 = await voice_service.generate_speech_base64(reply)
+            audio_b64 = await voice_service.generate_speech_base64(voice_reply or reply)
             response["audio"] = audio_b64
             response["audio_mime"] = "audio/mpeg" if audio_b64 else None
         return response
@@ -1503,14 +1524,14 @@ async def handle_voice_input(text: str):
         f"User via Voice: {text}\n\n"
         f"Você é o ZEUS, um copiloto DevOps senior conectado ao Obsidian, Notion e Linear. "
         f"Responda em Português (PT-BR) de forma curta, natural e acionável. "
-        f"Evite excesso de formalidade; a resposta será falada em voz alta."
+        f"Evite excesso de formalidade, Markdown e símbolos visuais; a resposta será falada em voz alta."
     )
 
     await broadcast_message({"type": "HUD_STATUS", "text": "Processando comando de voz..."})
     reply = await react_agent.run(context_prompt, client_key="voice", broadcast=broadcast_message)
     await broadcast_message({"type": "HUD_STATUS", "text": "Aguardando atividade neural..."})
     
-    await voice_module.speak(reply)
+    await voice_module.speak(speech_text(reply) or reply)
 
 def _build_api_status_payload() -> dict:
     cpu_per_core = psutil.cpu_percent(percpu=True)
@@ -1561,12 +1582,20 @@ async def _handle_client_text(text: str):
     context_prompt = await get_combined_context_prompt(text)
     await broadcast_message({"type": "HUD_STATUS", "text": "Núcleo cognitivo processando..."})
     reply = await react_agent.run(context_prompt, client_key="local_client", broadcast=broadcast_message)
-    await broadcast_message({"type": "CHAT_AI", "message": reply, "source": "local_client"})
+    display_reply = display_text(reply)
+    voice_reply = speech_text(reply)
+    await broadcast_message({
+        "type": "CHAT_AI",
+        "message": display_reply or reply,
+        "raw_message": reply,
+        "speech_message": voice_reply,
+        "source": "local_client",
+    })
     await broadcast_message({"type": "HUD_STATUS", "text": "Aguardando atividade neural..."})
 
     if ENABLE_VOICE:
         try:
-            audio_b64 = await voice_service.generate_speech_base64(reply)
+            audio_b64 = await voice_service.generate_speech_base64(voice_reply or reply)
             if audio_b64:
                 await broadcast_message({"type": "AUDIO_RESPONSE", "payload": {"audio": audio_b64}})
         except Exception as e:
@@ -1586,12 +1615,20 @@ async def _handle_client_vision():
             prompt = "O que você vê na minha tela? Destaque os pontos principais de forma concisa e útil."
             result = await asyncio.to_thread(analyze_image_with_llm, cap["path"], question=prompt)
             reply = result.get("answer", "Não consegui analisar a tela.")
+            display_reply = display_text(reply)
+            voice_reply = speech_text(reply)
 
-            await broadcast_message({"type": "CHAT_AI", "message": f"👁️ {reply}", "source": "local_client"})
+            await broadcast_message({
+                "type": "CHAT_AI",
+                "message": f"Visão: {display_reply or reply}",
+                "raw_message": reply,
+                "speech_message": voice_reply,
+                "source": "local_client",
+            })
             await broadcast_message({"type": "HUD_STATUS", "text": "Aguardando atividade neural..."})
 
             if ENABLE_VOICE:
-                audio_b64 = await voice_service.generate_speech_base64(reply)
+                audio_b64 = await voice_service.generate_speech_base64(voice_reply or reply)
                 if audio_b64:
                     await broadcast_message({"type": "AUDIO_RESPONSE", "payload": {"audio": audio_b64}})
     except Exception as e:

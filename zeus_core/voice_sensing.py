@@ -12,6 +12,7 @@ import shutil
 import re
 import unicodedata
 from faster_whisper import WhisperModel
+from zeus_core.response_text import speech_text
 
 def _suppress_alsa_errors():
     """Suprime mensagens de erro ALSA/JACK que poluem o terminal."""
@@ -302,6 +303,9 @@ class VoiceSensing:
         """Sintetiza e toca o áudio, travando o microfone enquanto fala."""
         if not text or not text.strip():
             return
+        spoken_text = speech_text(text)
+        if not spoken_text:
+            return
         
         try:
             print(f"[ZEUS] {text}")
@@ -311,14 +315,14 @@ class VoiceSensing:
         if self.broadcast:
             await self.broadcast({"type": "CHAT_AI", "message": text})
             await self._send_status("Sintetizando voz...")
-            await self._send_voice_state("speaking", text_preview=text[:80])
+            await self._send_voice_state("speaking", text_preview=spoken_text[:80])
             
         self.is_speaking = True
         try:
             tmp_path = None
             try:
                 VOICE = "pt-BR-AntonioNeural"
-                communicate = edge_tts.Communicate(text, VOICE, rate="+5%", pitch="-2Hz")
+                communicate = edge_tts.Communicate(spoken_text, VOICE, rate="+5%", pitch="-2Hz")
 
                 with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False, prefix="zeus_tts_") as tmp:
                     tmp_path = tmp.name
@@ -369,7 +373,7 @@ class VoiceSensing:
                     "-w",
                     "-l",
                     "pt",
-                    text,
+                    spoken_text,
                     stdout=subprocess.DEVNULL,
                     stderr=asyncio.subprocess.PIPE,
                 )
