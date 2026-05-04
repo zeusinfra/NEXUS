@@ -7,6 +7,8 @@ from unittest.mock import patch
 
 from zeus_core.cognitive.classifier import decide_action
 from zeus_core.cognitive.context_engine import _area_from_tags
+from zeus_core.events.sync_engine import _format_operational_status_for_notion
+from zeus_core.integrations import notion
 from zeus_core.integrations.obsidian import extract_internal_links, extract_tags, read_note
 
 
@@ -66,6 +68,34 @@ class SecondBrainTests(unittest.TestCase):
         self.assertEqual(_area_from_tags('["#bug", "#infra"]'), "tarefa/operação")
         self.assertEqual(_area_from_tags('["#to-notion"]'), "documentação")
         self.assertEqual(_area_from_tags('["#zeus-memory"]'), "memória")
+
+    def test_operational_status_page_formats_sync_data(self):
+        content = _format_operational_status_for_notion({
+            "total_events": 3,
+            "pending": 1,
+            "processed": 2,
+            "error": 0,
+            "total_sync_ops": 8,
+            "last_sync_op": "2026-05-04 10:00:00",
+        })
+
+        self.assertIn("ZEUS — Estado Operacional", content)
+        self.assertIn("Eventos totais: 3", content)
+        self.assertIn("Operações de sync registradas: 8", content)
+
+    def test_notion_page_properties_follow_database_schema(self):
+        schema = {
+            "Title": {"type": "title"},
+            "Tags": {"type": "multi_select"},
+            "Notes": {"type": "rich_text"},
+        }
+
+        with patch.object(notion, "_get_database_properties", return_value=schema):
+            properties = notion._build_page_properties("ZEUS", ["#memory"], "memory.md")
+
+        self.assertIn("Title", properties)
+        self.assertIn("Tags", properties)
+        self.assertNotIn("Source Path", properties)
 
 
 if __name__ == "__main__":

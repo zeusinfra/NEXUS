@@ -11,6 +11,7 @@ NOTION_ENABLED = os.getenv("ZEUS_ENABLE_NOTION", "false").lower() in {"1", "true
 NOTION_VERSION = "2022-06-28"
 
 BASE_URL = "https://api.notion.com/v1"
+_DATABASE_PROPERTIES_CACHE = None
 
 def _get_headers():
     return {
@@ -18,6 +19,61 @@ def _get_headers():
         "Content-Type": "application/json",
         "Notion-Version": NOTION_VERSION
     }
+
+
+def _get_database_properties() -> dict:
+    global _DATABASE_PROPERTIES_CACHE
+    if _DATABASE_PROPERTIES_CACHE is not None:
+        return _DATABASE_PROPERTIES_CACHE
+    if not NOTION_ENABLED or not NOTION_TOKEN or not NOTION_DATABASE_ID:
+        _DATABASE_PROPERTIES_CACHE = {}
+        return _DATABASE_PROPERTIES_CACHE
+    try:
+        response = requests.get(f"{BASE_URL}/databases/{NOTION_DATABASE_ID}", headers=_get_headers(), timeout=10)
+        response.raise_for_status()
+        _DATABASE_PROPERTIES_CACHE = response.json().get("properties", {}) or {}
+    except Exception as e:
+        print(f"[Notion] Erro ao ler schema do database: {e}")
+        _DATABASE_PROPERTIES_CACHE = {}
+    return _DATABASE_PROPERTIES_CACHE
+
+
+def _title_property_name() -> str:
+    props = _get_database_properties()
+    for name, spec in props.items():
+        if (spec or {}).get("type") == "title":
+            return name
+    return "Name"
+
+
+def _build_page_properties(title: str, tags: list[str], source_path: str) -> dict:
+    props = _get_database_properties()
+    title_prop = _title_property_name()
+    page_props = {
+        title_prop: {
+            "title": [
+                {
+                    "text": {"content": title[:2000]}
+                }
+            ]
+        }
+    }
+
+    if props.get("Source Path", {}).get("type") == "rich_text":
+        page_props["Source Path"] = {
+            "rich_text": [
+                {
+                    "text": {"content": (source_path or "")[:2000]}
+                }
+            ]
+        }
+
+    if props.get("Tags", {}).get("type") == "multi_select":
+        page_props["Tags"] = {
+            "multi_select": [{"name": t.replace('#', '')[:100]} for t in tags if t]
+        }
+
+    return page_props
 
 def _markdown_to_blocks(content: str) -> list:
     """Conversor simplificado de MD para Notion Blocks. Em prod, usar 'notion-blockify' ou similar."""
@@ -53,30 +109,9 @@ def create_notion_page(title: str, content: str, tags: list[str], source_path: s
 
     url = f"{BASE_URL}/pages"
     
-    # Formata as tags para multiselect
-    multi_select_tags = [{"name": t.replace('#', '')} for t in tags if t]
-    
     payload = {
         "parent": {"database_id": NOTION_DATABASE_ID},
-        "properties": {
-            "Name": {
-                "title": [
-                    {
-                        "text": {"content": title}
-                    }
-                ]
-            },
-            "Source Path": {
-                "rich_text": [
-                    {
-                        "text": {"content": source_path}
-                    }
-                ]
-            },
-            "Tags": {
-                "multi_select": multi_select_tags
-            }
-        },
+        "properties": _build_page_properties(title, tags, source_path),
         "children": _markdown_to_blocks(content)
     }
 
@@ -128,9 +163,10 @@ def upsert_notion_page(title: str, content: str, tags: list[str], source_path: s
 
     # 1. Busca página existente pelo título no database
     search_url = f"{BASE_URL}/databases/{NOTION_DATABASE_ID}/query"
+    title_prop = _title_property_name()
     search_payload = {
         "filter": {
-            "property": "Name",
+            "property": title_prop,
             "title": {
                 "equals": title
             }

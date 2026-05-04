@@ -15,7 +15,7 @@ from datetime import datetime
 from zeus_core.integrations.obsidian import write_sync_note, update_daily_log
 from zeus_core.integrations.notion import upsert_notion_page
 from zeus_core.integrations.linear import create_insight_issue
-from zeus_core.memory.sqlite_memory import log_sync_event, was_already_synced
+from zeus_core.memory.sqlite_memory import get_sync_status, log_sync_event, was_already_synced
 from zeus_core.long_term_memory import load_memory as load_long_term_memory
 
 
@@ -91,42 +91,47 @@ async def sync_longterm_to_notion(interval: float = 300.0):
         try:
             memory = load_long_term_memory()
             
-            # Only sync if there's meaningful content
+            # Sync profile when long-term memory exists; otherwise publish an operational status page
+            # so the Notion workspace receives visible ZEUS data immediately.
             has_content = any(
                 isinstance(memory.get(section), dict) and memory[section]
                 for section in ["identity", "preferences", "projects", "relationships", "wishes", "notes"]
             )
-            
-            if not has_content:
-                await asyncio.sleep(interval)
-                continue
 
-            content = _format_memory_for_notion(memory)
-            tags = ["zeus-memory", "auto-sync", "cognitive-profile"]
+            if has_content:
+                title = "ZEUS — Perfil Cognitivo"
+                content = _format_memory_for_notion(memory)
+                tags = ["zeus-memory", "auto-sync", "cognitive-profile"]
+                source_path = "long_term_memory.json"
+            else:
+                title = "ZEUS — Estado Operacional"
+                content = _format_operational_status_for_notion(get_sync_status())
+                tags = ["zeus-memory", "auto-sync", "operational-status"]
+                source_path = "zeus_events.db"
 
             result = await asyncio.to_thread(
                 upsert_notion_page,
-                title="ZEUS — Perfil Cognitivo",
+                title=title,
                 content=content,
                 tags=tags,
-                source_path="long_term_memory.json"
+                source_path=source_path
             )
 
             if "id" in result:
                 log_sync_event(
-                    source="long_term_memory",
+                    source="long_term_memory" if has_content else "operational_status",
                     target="notion",
-                    source_path="memory/long_term.json",
+                    source_path=source_path,
                     target_id=result["id"],
                     status="success"
                 )
                 action = result.get("action", "synced")
-                print(f"[SyncEngine] Perfil Cognitivo {action} no Notion (ID: {result['id']})")
+                print(f"[SyncEngine] {title} {action} no Notion (ID: {result['id']})")
             elif "error" in result and result["error"] not in ("Disabled", "Not configured"):
                 log_sync_event(
-                    source="long_term_memory",
+                    source="long_term_memory" if has_content else "operational_status",
                     target="notion",
-                    source_path="memory/long_term.json",
+                    source_path=source_path,
                     status="error",
                     error_message=str(result["error"])
                 )
@@ -282,3 +287,26 @@ def _format_memory_for_notion(memory: dict) -> str:
         lines.append("")
 
     return "\n".join(lines)
+
+
+def _format_operational_status_for_notion(sync_status: dict) -> str:
+    """Formats a minimal operational status page for Notion when long-term memory is empty."""
+    generated_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    return "\n".join([
+        "# ZEUS — Estado Operacional",
+        "",
+        f"> Última sincronização: {generated_at}",
+        "",
+        "## Second Brain",
+        "",
+        f"- Eventos totais: {sync_status.get('total_events', 0)}",
+        f"- Eventos pendentes: {sync_status.get('pending', 0)}",
+        f"- Eventos processados: {sync_status.get('processed', 0)}",
+        f"- Eventos com erro: {sync_status.get('error', 0)}",
+        f"- Operações de sync registradas: {sync_status.get('total_sync_ops', 0)}",
+        f"- Última operação de sync: {sync_status.get('last_sync_op') or 'N/A'}",
+        "",
+        "## Observação",
+        "",
+        "A memória longa ainda não possui perfil cognitivo persistido. Esta página confirma que o ZEUS já está conectado ao Notion e pronto para sincronizar dados conforme a memória for sendo construída.",
+    ])
