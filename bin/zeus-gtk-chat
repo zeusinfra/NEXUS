@@ -310,7 +310,10 @@ class ZeusGtkChat(Gtk.Application):
                 data = self._post_json("/api/tts", {"text": text}, timeout=45)
                 audio = data.get("audio") or ""
                 if audio:
+                    GLib.idle_add(self._set_voice_status, "Reproduzindo voz...")
                     self._play_audio(audio)
+                else:
+                    GLib.idle_add(self._set_voice_status, "TTS não retornou áudio.")
             except Exception as exc:
                 GLib.idle_add(self._set_voice_status, "voz indisponível: " + str(exc)[:80])
 
@@ -332,9 +335,11 @@ class ZeusGtkChat(Gtk.Application):
             return
         if os.path.basename(player) == "ffplay":
             args = [player, "-nodisp", "-autoexit", "-loglevel", "quiet", path]
+        elif os.path.basename(player) == "mpv":
+            args = [player, "--no-terminal", path]
         else:
             args = [player, path]
-        subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
 
     def _open_hud(self, *_args) -> None:
         webbrowser.open(BACKEND)
