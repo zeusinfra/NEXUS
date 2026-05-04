@@ -93,6 +93,7 @@ ENABLE_AUTONOMOUS_TASKS = _env_flag("ZEUS_ENABLE_AUTONOMOUS_TASKS", "0")
 ENABLE_BOOT_GREETING = _env_flag("ZEUS_ENABLE_BOOT_GREETING", "0")
 ENABLE_RESOURCE_MONITOR = _env_flag("ZEUS_ENABLE_RESOURCE_MONITOR", "0")
 ENABLE_SECOND_BRAIN = _env_flag("ZEUS_ENABLE_SECOND_BRAIN", "0")
+ENABLE_SECOND_BRAIN_SYNC_ENGINE = _env_flag("ZEUS_ENABLE_SECOND_BRAIN_SYNC_ENGINE", "0")
 ENABLE_OPEN_FILE = _env_flag("ZEUS_ENABLE_OPEN_FILE", "0")
 LAN_AUTH_ENABLED = _env_flag("ZEUS_LAN_AUTH", "1" if ALLOW_LAN else "0")
 LAN_TOKEN = os.getenv("ZEUS_LAN_TOKEN", "").strip()
@@ -236,11 +237,11 @@ async def lifespan(app: FastAPI):
         print(f"[ZEUS] Iniciando Second Brain integrando {vault_path}")
         _watcher_task = asyncio.create_task(watch_vault(vault_path))
         _sync_worker_task = asyncio.create_task(sync_worker_loop())
-        # Real-Time Memory Sync Workers
-        print("[ZEUS] Iniciando Sync Engine (Sináptico→Obsidian, LongTerm→Notion, Insights→Linear)")
-        _sync_engine_tasks.append(asyncio.create_task(sync_synaptic_to_obsidian(memory_manager, interval=60.0)))
-        _sync_engine_tasks.append(asyncio.create_task(sync_longterm_to_notion(interval=300.0)))
-        _sync_engine_tasks.append(asyncio.create_task(sync_insights_to_linear(memory_manager, interval=300.0)))
+        if ENABLE_SECOND_BRAIN_SYNC_ENGINE:
+            print("[ZEUS] Iniciando Sync Engine (Sináptico→Obsidian, LongTerm→Notion, Insights→Linear)")
+            _sync_engine_tasks.append(asyncio.create_task(sync_synaptic_to_obsidian(memory_manager, interval=60.0)))
+            _sync_engine_tasks.append(asyncio.create_task(sync_longterm_to_notion(interval=300.0)))
+            _sync_engine_tasks.append(asyncio.create_task(sync_insights_to_linear(memory_manager, interval=300.0)))
     
     yield
     # Salvar Memória ao fechar
@@ -1120,6 +1121,7 @@ def _build_second_brain_status() -> dict:
     db_path = os.getenv("ZEUS_DB_PATH", "./zeus_events.db")
     status = {
         "enabled": bool(ENABLE_SECOND_BRAIN),
+        "sync_engine_enabled": bool(ENABLE_SECOND_BRAIN_SYNC_ENGINE),
         "vault_path": vault_path,
         "vault_exists": os.path.isdir(vault_path),
         "db_path": db_path,

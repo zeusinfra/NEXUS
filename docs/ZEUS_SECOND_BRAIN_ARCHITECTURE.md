@@ -19,6 +19,7 @@ As seguintes variáveis devem ser preenchidas no seu `.env` para habilitar o flu
 ZEUS_VAULT_PATH=/home/zeus/Documentos/Brain
 ZEUS_DB_PATH=./zeus_events.db
 ZEUS_ENABLE_SECOND_BRAIN=1
+ZEUS_ENABLE_SECOND_BRAIN_SYNC_ENGINE=0
 
 # Notion
 NOTION_TOKEN=secret_xxx

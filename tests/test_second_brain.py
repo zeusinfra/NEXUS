@@ -53,6 +53,12 @@ class SecondBrainTests(unittest.TestCase):
         importlib.reload(notion)
         importlib.reload(linear)
 
+    def test_env_example_keeps_sync_engine_opt_in(self):
+        env_example = Path(".env.example").read_text(encoding="utf-8")
+
+        self.assertIn("ZEUS_ENABLE_SECOND_BRAIN=0", env_example)
+        self.assertIn("ZEUS_ENABLE_SECOND_BRAIN_SYNC_ENGINE=0", env_example)
+
 
 if __name__ == "__main__":
     unittest.main()
