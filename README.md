@@ -6,15 +6,15 @@ The current default profile is **Ollama Cloud through the local Ollama daemon**,
 
 Current product direction: **the Cinnamon applet is the primary desktop interface**. The desktop chat is a native **GTK4 + Libadwaita** application launched from the Cinnamon applet.
 
-## Current Status
+## Current Status (2026-05-05)
 
-- **Backend:** FastAPI + Socket.IO + native WebSocket.
-- **LLM:** Ollama-first, with OpenAI/Gemini support available by environment variables.
-- **Second Brain:** Event-driven orchestration syncing local Obsidian notes to Notion and Linear via markdown tags (`#to-notion`, `#to-linear`).
-- **UI:** Web HUD in `public/index.html`, Cinnamon applet in `applets/cinnamon/zeus@local/`, and a premium GTK4/Libadwaita chat in `bin/zeus-gtk-chat`.
-- **Security:** LAN access requires token when enabled; command execution uses allowlist, confirmation, and audit logging.
-- **Observability:** structured JSON logs, request correlation-id, and health metrics.
-- **Tests:** Python unit/contract tests plus Node tests for frontend behavior.
+- **Backend:** FastAPI + Socket.IO (v3.0 Production-grade Core).
+- **LLM:** Multi-provider (Gemini 3 Flash, Ollama, OpenAI) with event-driven context.
+- **Cognitive Persona:** Detailed "Systems Architect" with long-term memory.
+- **Second Brain:** Bi-directional sync (Synaptic Mirror + Obsidian → Notion/Linear).
+- **UI:** Web HUD (glassmorphism), Cinnamon applet, and native GTK4 chat.
+- **Security:** LAN isolation, command confirmation, and credential masking.
+- **Observability:** Structured logs, correlation-id, and health diagnostics.
 
 ## Architecture
 
@@ -239,6 +239,7 @@ git push origin main
 
 ## Documentation
 
+- `docs/RELATORIO_COMPLETO_SISTEMA_2026-05-05.md` (Latest)
 - `docs/ZEUS_SECOND_BRAIN_ARCHITECTURE.md`
 - `docs/RELATORIO_COMPLETO_SISTEMA_2026-05-03.md`
 - `docs/PLANO_EXECUCAO_ZEUS_2026-05-02.md`

@@ -1,17 +1,20 @@
 # ZEUS Second Brain Architecture
 
 ## Visão Geral
-Esta arquitetura transforma o ZEUS de um simples assistente reativo para um "Segundo Cérebro" orquestrador, seguindo o pipeline:
-1. **Pensar:** Obsidian (Arquivos Markdown locais)
-2. **Orquestrar:** ZEUS (Event Bus via SQLite)
-3. **Organizar:** Notion (Documentação em nuvem estruturada)
-4. **Executar:** Linear (Issues, Bugs, Roadmap técnico)
+Esta arquitetura transforma o ZEUS de um assistente reativo em um "Segundo Cérebro" bi-direcional:
+1. **Percepção:** Filesystem Mirror (Reflete a estrutura do SO no Obsidian).
+2. **Pensar:** Obsidian (Arquivos Markdown locais como interface de pensamento).
+3. **Orquestrar:** ZEUS (Sync Engine e Event Pipeline via SQLite).
+4. **Organizar:** Notion (Documentação estruturada e Dashboards operacionais).
+5. **Executar:** Linear (Issues técnicas e Roadmap de engenharia).
 
 ## Fluxo Orientado a Eventos
-1. O `watcher.py` (via `os.stat`) detecta novas notas ou alterações no `ZEUS_VAULT_PATH`.
-2. O `event_bus.py` aplica *debounce*, calcula o SHA-256 e, se houver mudança real, salva no banco `zeus_events.db`.
-3. O `sync_worker.py` lê os eventos pendentes assincronamente e os delega ao `classifier.py`.
-4. O classificador lê as tags da nota (`#to-notion`, `#to-linear`, `#bug`) e engatilha as integrações `notion.py` e `linear.py`.
+1. O **Watcher Rust** (`watcher_rs`) monitora alterações no sistema e no `ZEUS_VAULT_PATH`.
+2. O **Sync Engine** (`sync_engine.py`) orquestra trabalhadores independentes:
+   - **Synaptic → Obsidian:** Exporta o mapa neural e logs diários para o vault.
+   - **Long-Term → Notion:** Sincroniza o perfil cognitivo e estado operacional.
+   - **Insights → Linear:** Transforma anomalias e tags em issues técnicas.
+3. O **Sync Worker** (`sync_worker.py`) processa a fila de eventos do `zeus_events.db` para roteamento inteligente.
 
 ## Variáveis de Ambiente
 As seguintes variáveis devem ser preenchidas no seu `.env` para habilitar o fluxo completo:
