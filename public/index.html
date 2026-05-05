@@ -17,7 +17,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=JetBrains+Mono:wght@300;400;700&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-:root{--c:#00e5ff;--c2:#0099cc;--c3:#79ffd2;--bg:#0a0e1a;--bg2:#09111d;--card:rgba(8,18,32,0.78);--border:rgba(0,229,255,0.12);--text:#e0f0ff;--muted:#5a7a9a;--font:'Rajdhani',sans-serif;--mono:'JetBrains Mono',monospace;--hud:'Orbitron',sans-serif}
+:root{--c:#00e5ff;--c2:#0099cc;--c3:#79ffd2;--bg:#050810;--bg2:#0a1220;--card:rgba(10,20,35,0.65);--border:rgba(0,229,255,0.22);--text:#e0f0ff;--muted:#7090b0;--font:'Rajdhani',sans-serif;--mono:'JetBrains Mono',monospace;--hud:'Orbitron',sans-serif}
 body{background:radial-gradient(circle at 50% 45%, rgba(0,229,255,.08), transparent 24%),radial-gradient(circle at 18% 18%, rgba(121,255,210,.08), transparent 20%),linear-gradient(180deg, var(--bg2), var(--bg));color:var(--text);font-family:var(--font);min-height:100vh;min-height:100dvh;overflow:hidden}
 
 .app{display:grid;grid-template-columns:minmax(240px,280px) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);height:100vh;min-height:100dvh;padding:12px;gap:12px;transition:grid-template-columns .45s ease}
@@ -63,6 +63,7 @@ body{background:radial-gradient(circle at 50% 45%, rgba(0,229,255,.08), transpar
 .stat-bar{height:6px;background:rgba(0,0,0,0.3);border-radius:3px;overflow:hidden;border:1px solid rgba(0,229,255,0.05);position:relative}
 .stat-fill{height:100%;background:linear-gradient(90deg, var(--c2), var(--c));box-shadow:0 0 12px var(--c);transition:width .8s cubic-bezier(0.16, 1, 0.3, 1);border-radius:3px;position:relative}
 .stat-fill::after{content:"";position:absolute;inset:0;background-image:linear-gradient(90deg, transparent 0%, transparent 70%, rgba(0,0,0,0.4) 71%, rgba(0,0,0,0.4) 100%);background-size:4px 100%;z-index:2}
+.sparkline{width:100%;height:30px;margin-top:8px;opacity:.6}
 .stat-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:16px}
 .stat-box{text-align:center;padding:12px 8px;border:1px solid rgba(0,229,255,0.1);border-radius:10px;background:rgba(0,0,0,0.25);transition:border-color .3s}
 .stat-box:hover{border-color:rgba(0,229,255,0.3)}
@@ -274,8 +275,8 @@ body{background:radial-gradient(circle at 50% 45%, rgba(0,229,255,.08), transpar
     <div class="card">
       <div class="card-h"><h3>⬡ Visão do Sistema</h3><div class="actions"><button class="act-btn">↻</button></div></div>
       <div class="card-body">
-        <div class="stat-row"><div class="stat-label"><span>Uso de CPU</span><span id="cpu-v">0%</span></div><div class="stat-bar"><div class="stat-fill" id="cpu-b" style="width:0%"></div></div></div>
-        <div class="stat-row"><div class="stat-label"><span>Uso de Memória</span><span id="ram-v">0%</span></div><div class="stat-bar"><div class="stat-fill" id="ram-b" style="width:0%"></div></div></div>
+        <div class="stat-row"><div class="stat-label"><span>Uso de CPU</span><span id="cpu-v">0%</span></div><div class="stat-bar"><div class="stat-fill" id="cpu-b" style="width:0%"></div></div><canvas id="cpu-sparkline" class="sparkline"></canvas></div>
+        <div class="stat-row"><div class="stat-label"><span>Uso de Memória</span><span id="ram-v">0%</span></div><div class="stat-bar"><div class="stat-fill" id="ram-b" style="width:0%"></div></div><canvas id="ram-sparkline" class="sparkline"></canvas></div>
         <div class="stat-grid">
           <div class="stat-box"><div class="val" id="sg-cpu">0%</div><div class="lbl">CPU</div></div>
           <div class="stat-box"><div class="val" id="sg-mem">0%</div><div class="lbl">Recall</div></div>
@@ -542,7 +543,7 @@ const plexusGroup = new THREE.Group();
 window.plexusGroup = plexusGroup;
 scene.add(plexusGroup);
 
-const NODE_COUNT = 1000;
+const NODE_COUNT = 1800;
 const CLUSTER_COUNT = 8;
 const CLUSTER_COLORS = [0x00e5ff, 0x8c3cff, 0x00ffaa, 0xff5050, 0xffd700, 0xff00d4, 0x2e6bff, 0xff7a18];
 const CLUSTER_NAMES = ["Core", "Logic", "Senses", "Synapse", "Archive", "Pulse", "Network", "Dynamics"];
@@ -1670,6 +1671,51 @@ function updateMetrics(cpu, ram) {
     if(ramB) ramB.style.width = `${ram}%`;
     
     if(cpu > 10) pulseOrb(0.01);
+    
+    // Update Sparklines
+    if(!window.cpuSpark) window.cpuSpark = new Sparkline('cpu-sparkline', '#00e5ff');
+    if(!window.ramSpark) window.ramSpark = new Sparkline('ram-sparkline', '#79ffd2');
+    window.cpuSpark.add(cpu);
+    window.ramSpark.add(ram);
+}
+
+class Sparkline {
+    constructor(id, color) {
+        this.canvas = document.getElementById(id);
+        if(!this.canvas) return;
+        this.ctx = this.canvas.getContext('2d');
+        this.color = color;
+        this.data = [];
+        this.maxPoints = 40;
+    }
+    add(val) {
+        if(!this.canvas) return;
+        this.data.push(val);
+        if(this.data.length > this.maxPoints) this.data.shift();
+        this.draw();
+    }
+    draw() {
+        const {ctx, canvas, data, color} = this;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if(data.length < 2) return;
+        ctx.beginPath();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.lineJoin = 'round';
+        const step = canvas.width / (this.maxPoints - 1);
+        data.forEach((v, i) => {
+            const x = i * step;
+            const y = canvas.height - (v / 100 * canvas.height);
+            if(i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+        // Fill
+        ctx.lineTo((data.length-1)*step, canvas.height);
+        ctx.lineTo(0, canvas.height);
+        ctx.fillStyle = color + '22';
+        ctx.fill();
+    }
 }
 
 </script>

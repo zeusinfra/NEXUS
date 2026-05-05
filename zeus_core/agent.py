@@ -320,6 +320,26 @@ Uso:
 - quebrar objetivo complexo em subtarefas;
 - gerar plano de execução.
 
+14. obsidian_mirror_filesystem
+args:
+{
+  "path": ".",
+  "max_depth": 3
+}
+
+Uso:
+- espelhar a estrutura de diretórios e arquivos do SO no Obsidian;
+- criar um mapa navegável do sistema com links e pesos sinápticos.
+
+15. system_diagnostics
+args:
+{}
+
+Uso:
+- obter relatório completo de saúde do sistema;
+- verificar uso de CPU, RAM, Disco e latência de rede;
+- diagnosticar lentidão ou problemas de infraestrutura.
+
 ====================================================================
 REGRAS DE USO DAS FERRAMENTAS
 ====================================================================
@@ -460,6 +480,9 @@ Para navegador/web:
 
 Para nota local/conhecimento bruto:
 - use obsidian_read_note ou obsidian_write_insight.
+
+Para espelhamento de arquivos no Obsidian:
+- use obsidian_mirror_filesystem.
 
 Para organização online:
 - use notion_search ou notion_create_page.

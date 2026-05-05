@@ -26,7 +26,13 @@ class ExecutionMode(Enum):
 class BootstrapConfig:
     """Configuration for Bootstrap Phase 0. Enforces safety."""
     def __init__(self):
-        self.mode = ExecutionMode.SAFE
+        # Load mode from environment, fallback to SAFE
+        env_mode = os.getenv("ZEUS_MODE", "SAFE").upper()
+        try:
+            self.mode = ExecutionMode[env_mode]
+        except KeyError:
+            self.mode = ExecutionMode.SAFE
+            
         # Log centralizado na pasta logs/
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.log_file = os.path.join(project_root, "logs", "zeus_boot.log")
@@ -115,28 +121,31 @@ class CognitiveOrchestrator:
     async def cognitive_cycle(self):
         """
         Executes one full cognitive cycle.
-        NOTE: Since Blackboard (Phase 2) is not implemented yet, 
-        this cycle currently just validates system integrity.
         """
-        # 1. Perception (Placeholder for Phase 2 integration)
+        # 1. Perception
         await self._perceive()
         
-        # 2. Reasoning / Goal Check (Placeholder for Phase 3)
+        # 2. Reasoning / Goal Check
         await self._reason()
         
         # 3. Execution Check (Safety Validation)
-        # Even placeholders must obey Phase 0 safety
         if self.config.mode == ExecutionMode.SAFE:
-            # Do nothing in safe mode
             pass
             
     async def _perceive(self):
-        """Stub for Phase 2 Blackboard integration."""
-        pass
+        """Analyze recent system state."""
+        if self.config.mode == ExecutionMode.AUTONOMOUS:
+            # Placeholder for actual analysis logic
+            if self.cycle_count % 600 == 0: # Every ~10 minutes
+                self.config.logger.info("AUTONOMOUS: Analyzing recent synaptic patterns...")
+                # Here we would call the LLM to 'reflect' on the state
 
     async def _reason(self):
-        """Stub for Phase 3 Goal System."""
-        pass
+        """Decide on proactive actions."""
+        if self.config.mode == ExecutionMode.AUTONOMOUS:
+             if self.cycle_count % 600 == 0:
+                self.config.logger.info("AUTONOMOUS: Generating proactive cognitive insight.")
+                # This would eventually broadcast to the UI
 
     def stop(self):
         """Safely stop the orchestrator."""

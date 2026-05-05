@@ -23,6 +23,8 @@ from zeus_core.browser_control import browser_control
 from zeus_core.integrations.linear import create_linear_issue, get_active_issues
 from zeus_core.integrations.notion import create_notion_page, search_notion
 from zeus_core.integrations.obsidian import read_note, write_obsidian_insight
+from zeus_core.integrations.filesystem_mirror import FilesystemMirror
+from zeus_core.diagnostics import get_system_diagnostics
 
 
 def _project_root() -> Path:
@@ -320,6 +322,26 @@ def obsidian_write_insight(parameters: dict) -> dict:
     return {"path": path, "written": True}
 
 
+def obsidian_mirror_filesystem(parameters: dict) -> dict:
+    from apps.web_gui import memory_manager
+    path = str((parameters or {}).get("path") or ".").strip()
+    max_depth = int((parameters or {}).get("max_depth") or 3)
+    
+    # Resolvendo o caminho. Se for ".", usa o root do projeto.
+    # Se for absoluto, verifica se existe.
+    root = _project_root()
+    target = Path(path).expanduser()
+    if not target.is_absolute():
+        target = (root / target).resolve()
+    
+    if not target.exists():
+        raise ToolError(f"Caminho não encontrado: {target}")
+
+    mirror = FilesystemMirror(memory_manager=memory_manager)
+    result = mirror.mirror_path(str(target), max_depth=max_depth)
+    return {"status": "success", "message": result}
+
+
 def notion_create_page(parameters: dict) -> dict:
     title = str((parameters or {}).get("title") or "ZEUS Note").strip()
     content = str((parameters or {}).get("content") or "").strip()
@@ -360,8 +382,10 @@ def get_actions() -> Dict[str, Any]:
         "browser_control": browser_control,
         "obsidian_read_note": obsidian_read_note,
         "obsidian_write_insight": obsidian_write_insight,
+        "obsidian_mirror_filesystem": obsidian_mirror_filesystem,
         "notion_create_page": notion_create_page,
         "notion_search": notion_search,
         "linear_create_issue": linear_create_issue,
         "linear_current_context": linear_current_context,
+        "system_diagnostics": lambda params: get_system_diagnostics(),
     }

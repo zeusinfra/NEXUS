@@ -16,6 +16,14 @@ IGNORED_RUNTIME_DIRS = {
     ".obsidian",
     ".pytest_cache",
     ".ruff_cache",
+    "proc",
+    "sys",
+    "dev",
+    "run",
+    "tmp",
+    "mnt",
+    "media",
+    "lost+found",
 }
 
 IGNORED_RUNTIME_EXTENSIONS = {

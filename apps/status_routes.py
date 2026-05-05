@@ -67,6 +67,8 @@ def create_status_router(deps: StatusRouteDeps) -> APIRouter:
             "security": health.get("security", {}),
             "config": {
                 "env": config.get("env"),
+                "mode": config.get("mode"),
+                "auto_evolve": bool(config.get("auto_evolve")),
                 "hosted_ollama_api": bool(config.get("hosted_ollama_api")),
                 "warnings": config.get("warnings", []),
             },

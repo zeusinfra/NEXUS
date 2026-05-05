@@ -1,0 +1,24 @@
+{
+  "identity": {},
+  "preferences": {},
+  "projects": {
+    "OS_Mirror": {
+      "description": {
+        "value": "Sistema de espelhamento entre arquivos reais e Obsidian",
+        "updated": "2026-05-05"
+      },
+      "status": {
+        "value": "Under analysis",
+        "updated": "2026-05-05"
+      }
+    }
+  },
+  "relationships": {},
+  "wishes": {},
+  "notes": {
+    "technical_patterns": {
+      "value": "User is seeking feedback on their specific implementation pattern for OS_Mirror.",
+      "updated": "2026-05-05"
+    }
+  }
+}

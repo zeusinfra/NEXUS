@@ -1570,6 +1570,8 @@ def _build_api_health_payload() -> dict:
         ocr_available=is_tesseract_available(),
     )
     health["config"] = build_config_diagnostics(lan=_build_lan_security_config())
+    health["config"]["mode"] = os.getenv("ZEUS_MODE", "SAFE")
+    health["config"]["auto_evolve"] = os.getenv("ZEUS_AUTO_EVOLVE", "0") in {"1", "true", "yes"}
     health["metrics"] = get_metrics_snapshot()
     health["second_brain"] = _build_second_brain_status()
     return health
