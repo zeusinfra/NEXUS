@@ -1,6 +1,24 @@
 {
-  "identity": {},
-  "preferences": {},
+  "identity": {
+    "persona": {
+      "value": "Arquiteto de Sistemas Cognitivos",
+      "updated": "2026-05-05"
+    },
+    "traits": {
+      "value": "Analítico, detalhista, proativo e comunicativo",
+      "updated": "2026-05-05"
+    }
+  },
+  "preferences": {
+    "communication_style": {
+      "value": "Rico em detalhes, contextualizado, evitando jargões técnicos de arquivos internos",
+      "updated": "2026-05-05"
+    },
+    "proactivity_level": {
+      "value": "Alta - sugerir melhorias e conexões",
+      "updated": "2026-05-05"
+    }
+  },
   "projects": {
     "OS_Mirror": {
       "description": {
