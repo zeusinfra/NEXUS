@@ -6,15 +6,16 @@ The current default profile is **Ollama Cloud through the local Ollama daemon**,
 
 Current product direction: **the Cinnamon applet is the primary desktop interface**. The desktop chat is a native **GTK4 + Libadwaita** application launched from the Cinnamon applet.
 
-## Current Status (2026-05-05)
+## Current Status (2026-05-06)
 
-- **Backend:** FastAPI + Socket.IO (v3.0 Production-grade Core).
-- **LLM:** Multi-provider (Gemini 3 Flash, Ollama, OpenAI) with event-driven context.
-- **Cognitive Persona:** Detailed "Systems Architect" with long-term memory.
-- **Second Brain:** Bi-directional sync (Synaptic Mirror + Obsidian → Notion/Linear).
-- **UI:** Web HUD (glassmorphism), Cinnamon applet, and native GTK4 chat.
-- **Security:** LAN isolation, command confirmation, and credential masking.
-- **Observability:** Structured logs, correlation-id, and health diagnostics.
+- **Backend:** FastAPI + Socket.IO (v3.1 Cognitive Maturity Core).
+- **Cognitive Loop:** Finalized with **Priority Orchestrator**, **Predictive Engine**, and **Privacy Guard** (Cognitive Shielding).
+- **LLM:** Multi-provider with proactive foresight and habit anomaly detection.
+- **Cognitive Persona:** Advanced "Systems Architect" with adaptive executive control.
+- **Second Brain:** Bi-directional synaptic sync with Obsidian, Notion, and Linear.
+- **UI:** Web HUD with **Adaptive UI (Cognitive Dimming)**, Cinnamon applet, and native GTK4 chat with real-time cognitive signals.
+- **Security:** Deep perception sanitization (Cognitive Shield), LAN isolation, and command confirmation.
+- **Observability:** Real-time attention telemetry and health diagnostics.
 
 ## Architecture
 
@@ -239,8 +240,5 @@ git push origin main
 
 ## Documentation
 
-- `docs/RELATORIO_COMPLETO_SISTEMA_2026-05-05.md` (Latest)
+- `docs/RELATORIO_COMPLETO_SISTEMA_2026-05-06.md` (Latest: Cognitive Maturity & Adaptive UI)
 - `docs/ZEUS_SECOND_BRAIN_ARCHITECTURE.md`
-- `docs/RELATORIO_COMPLETO_SISTEMA_2026-05-03.md`
-- `docs/PLANO_EXECUCAO_ZEUS_2026-05-02.md`
-- `docs/PLANO_APPLET_GTK_2026-05-03.md`

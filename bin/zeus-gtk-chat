@@ -130,6 +130,12 @@ class ZeusGtkChat(Adw.Application):
         diag_button.connect("clicked", self._show_diagnostic)
         header.pack_start(diag_button)
 
+        # Privacy Shield Icon
+        self.privacy_icon = Gtk.Image.new_from_icon_name("security-high-symbolic")
+        self.privacy_icon.set_tooltip_text("Cognitive Shield Ativo")
+        self.privacy_icon.add_css_class("dim-label")
+        header.pack_start(self.privacy_icon)
+
         # Banner for Offline status
         self.banner = Adw.Banner()
         self.banner.set_title("Backend ZEUS offline. Verifique se o serviço está ativo.")
@@ -494,8 +500,34 @@ class ZeusGtkChat(Adw.Application):
         self._last_status = data
         if self.banner:
             self.banner.set_revealed(False)
-        self._set_status("Pronto")
-        print("[GTK] Backend status: online")
+        
+        # 🧠 Integration: Cognitive Telemetry in GTK
+        cog = data.get("cognitive", {})
+        att_state = cog.get("attention", "idle").upper()
+        
+        # Tradução amigável para o GTK
+        att_map = {
+            "IDLE": "Pronto",
+            "DEEP_FOCUS": "Foco Profundo",
+            "DEVELOPMENT": "Desenvolvimento",
+            "MINING": "Mineração de Dados",
+            "SECURITY": "Proteção Ativa"
+        }
+        status_text = att_map.get(att_state, att_state.capitalize())
+        self._set_status(status_text)
+        
+        # Privacy Icon
+        if self.privacy_icon:
+            if cog.get("privacy_shield") == "active":
+                self.privacy_icon.set_from_icon_name("security-high-symbolic")
+                self.privacy_icon.remove_css_class("dim-label")
+                self.privacy_icon.add_css_class("success")
+            else:
+                self.privacy_icon.set_from_icon_name("security-low-symbolic")
+                self.privacy_icon.add_css_class("dim-label")
+                self.privacy_icon.remove_css_class("success")
+
+        print(f"[GTK] Backend status: online (Attention: {att_state})")
         return False
 
     def _apply_status_error(self, error: str) -> bool:

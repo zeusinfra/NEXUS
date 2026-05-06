@@ -8,6 +8,9 @@ from zeus_core.core_system import call_cloud_llm, call_cloud_llm_stream
 from zeus_core.executor import PlanExecutor
 from zeus_core.tools import ToolError
 from zeus_core.actions import get_actions
+from zeus_core.security.privacy_guard import PrivacyGuard
+
+privacy_guard = PrivacyGuard()
 
 
 BroadcastFn = Callable[[dict], Awaitable[None]]
@@ -600,9 +603,21 @@ Se não precisar agir, responda normalmente em PT-BR.
 """.strip()
 
     async def _call_llm(self, messages: list) -> str:
-        return await asyncio.to_thread(call_cloud_llm, messages)
+        # Privacy Sanitization
+        sanitized_messages = []
+        for m in messages:
+            content = m.get("content", "")
+            sanitized_messages.append({**m, "content": privacy_guard.sanitize(content)})
+        
+        return await asyncio.to_thread(call_cloud_llm, sanitized_messages)
 
     async def _call_llm_stream(self, messages: list):
+        # Privacy Sanitization
+        sanitized_messages = []
+        for m in messages:
+            content = m.get("content", "")
+            sanitized_messages.append({**m, "content": privacy_guard.sanitize(content)})
+
         # O Gemini generator precisa ser consumido no thread que o criou ou de forma segura
         # Como o call_cloud_llm_stream é um generator síncrono no core_system, usamos to_thread
         def safe_next(i):
@@ -612,7 +627,7 @@ Se não precisar agir, responda normalmente em PT-BR.
                 return None, True
 
         loop = asyncio.get_running_loop()
-        it = call_cloud_llm_stream(messages)
+        it = call_cloud_llm_stream(sanitized_messages)
         
         while True:
             # Em Python 3.11+, StopIteration não pode ser levantado em um Future (run_in_executor)

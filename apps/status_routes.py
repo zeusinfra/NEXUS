@@ -48,10 +48,17 @@ def create_status_router(deps: StatusRouteDeps) -> APIRouter:
     @router.get("/api/applet/status")
     async def get_api_applet_status(request: Request):
         require_access(request)
+        from zeus_core.cognitive.cognitive_state import cognitive_state_manager
+        from zeus_core.cognitive.goal_engine import GoalEngine
+        
+        # Add cognitive state
+        state = cognitive_state_manager.state
+        
         health = deps.build_api_health()
         llm = health.get("llm", {})
         metrics = health.get("metrics", {})
         config = health.get("config", {})
+
         return {
             "ok": True,
             "online": True,
@@ -60,6 +67,12 @@ def create_status_router(deps: StatusRouteDeps) -> APIRouter:
                 "model": llm.get("model"),
                 "configured": bool(llm.get("configured")),
                 "base_url": llm.get("base_url"),
+            },
+            "cognitive": {
+                "attention": state.attention.get("state", "idle"),
+                "focus_score": state.attention.get("focus_score", 0.0),
+                "active_goals": state.active_goals_list,
+                "privacy_shield": state.privacy_status.get("shield")
             },
             "voice": health.get("voice", {}),
             "vision": health.get("vision", {}),

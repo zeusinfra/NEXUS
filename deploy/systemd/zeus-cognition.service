@@ -1,0 +1,14 @@
+[Unit]
+Description=ZEUS Cognitive Loop Service
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/zeus/Documentos/ZEUS_SYSTEM
+ExecStart=/home/zeus/Documentos/ZEUS_SYSTEM/.venv/bin/python -m zeus_core.cognitive.cognition_service
+Restart=on-failure
+RestartSec=5
+EnvironmentFile=/home/zeus/Documentos/ZEUS_SYSTEM/.env
+
+[Install]
+WantedBy=default.target

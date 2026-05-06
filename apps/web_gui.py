@@ -20,6 +20,13 @@ from urllib.parse import urlparse
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 from apps.realtime_hub import RealtimeDeps, RealtimeHub
 from apps.status_routes import StatusRouteDeps, create_status_router
+from apps.routes.cognition_routes import CognitionRouteDeps, create_cognition_router
+from apps.routes.privacy_routes import PrivacyRouteDeps, create_privacy_router
+from zeus_core.cognitive import CognitionService
+from zeus_core.cognitive.cognitive_state import cognitive_state_manager
+from zeus_core.cognitive.goal_engine import GoalEngine
+from zeus_core.cognitive.user_profile_engine import record_interaction
+from zeus_core.security.privacy_guard import PrivacyGuard
 from apps.lifecycle_manager import LifecycleManager
 from pattern_engine import PatternEngine
 from apps.zeus_evolution import ZeusBrain
@@ -100,6 +107,7 @@ ENABLE_OBSIDIAN_AUTO_SYNC = _env_flag("ZEUS_ENABLE_OBSIDIAN_AUTO_SYNC", "0")
 ENABLE_NOTION_AUTO_SYNC = _env_flag("ZEUS_ENABLE_NOTION_AUTO_SYNC", "0")
 ENABLE_LINEAR_AUTO_SYNC = _env_flag("ZEUS_ENABLE_LINEAR_AUTO_SYNC", "0")
 ENABLE_OPEN_FILE = _env_flag("ZEUS_ENABLE_OPEN_FILE", "0")
+ENABLE_COGNITIVE_LOOP = _env_flag("ZEUS_COGNITIVE_LOOP_ENABLED", "0")
 LAN_AUTH_ENABLED = _env_flag("ZEUS_LAN_AUTH", "1" if ALLOW_LAN else "0")
 LAN_TOKEN = os.getenv("ZEUS_LAN_TOKEN", "").strip()
 
@@ -182,6 +190,9 @@ long_term_memory = load_long_memory()
 resource_control = ResourceControl(brain.blackboard, {}) # Integrando controle de recursos
 
 lifecycle_manager = LifecycleManager(globals())
+cognition_service = CognitionService()
+privacy_guard = PrivacyGuard()
+goal_engine = GoalEngine()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -251,7 +262,12 @@ async def lifespan(app: FastAPI):
         if ENABLE_SECOND_BRAIN_SYNC_ENGINE or ENABLE_LINEAR_AUTO_SYNC:
             print("[ZEUS] Iniciando Sync Engine: Insights→Linear")
             _sync_engine_tasks.append(asyncio.create_task(sync_insights_to_linear(memory_manager, interval=300.0)))
-    
+
+    # Cognitive Loop
+    if ENABLE_COGNITIVE_LOOP:
+        print("[ZEUS] Iniciando Cognitive Loop autônomo")
+        await cognition_service.start()
+
     yield
     # Salvar Memória ao fechar
     save_memory()
@@ -274,6 +290,12 @@ async def lifespan(app: FastAPI):
             _sync_worker_task.cancel()
         for task in _sync_engine_tasks:
             task.cancel()
+    except Exception:
+        pass
+    # Stop cognitive loop
+    try:
+        if cognition_service.is_running:
+            await cognition_service.stop()
     except Exception:
         pass
 
@@ -1065,6 +1087,24 @@ async def metrics_loop():
             }
         }
         await broadcast_message(msg)
+
+        # 🧠 Pillar Integration: Cognitive Telemetry
+        try:
+            state = cognitive_state_manager.state
+            # Using a limit of 3 for the HUD to keep it clean
+            active_goals = goal_engine.get_active_goals(limit=3)
+            
+            cog_update = {
+                "type": "COGNITIVE_UPDATE",
+                "payload": {
+                    "attention": state.attention,
+                    "active_goals": state.active_goals_list,
+                    "privacy": state.privacy_status
+                }
+            }
+            await broadcast_message(cog_update)
+        except Exception as ce:
+            logger.error(f"Failed to broadcast cognitive telemetry: {ce}")
         await broadcast_message({
             "type": "SYSTEM_EVENT",
             "project": "OS_CORE",
@@ -1290,6 +1330,7 @@ async def api_chat(req: ChatReq, request: Request):
     client_id = (req.client_id or "").strip()[:64] or None
     
     await broadcast_message({"type": "CHAT_USER", "id": msg_id, "source": source, "client_id": client_id, "message": user_message})
+    asyncio.create_task(asyncio.to_thread(record_interaction, "chat", user_message, source))
     
     context_prompt = await get_combined_context_prompt(user_message)
     client_key = (request.client.host if request.client else "unknown")
@@ -1585,6 +1626,18 @@ app.include_router(create_status_router(StatusRouteDeps(
     llm_service=llm_service,
 )))
 
+app.include_router(create_cognition_router(CognitionRouteDeps(
+    is_trusted_request=_is_trusted_request,
+    require_lan_token_for_request=_require_lan_token_for_request,
+    cognition_service=cognition_service,
+)))
+
+app.include_router(create_privacy_router(PrivacyRouteDeps(
+    is_trusted_request=_is_trusted_request,
+    require_lan_token_for_request=_require_lan_token_for_request,
+    privacy_guard=privacy_guard,
+)))
+
 
 async def _handle_arm_voice_duration(duration: int):
     if voice_module:
@@ -1593,6 +1646,7 @@ async def _handle_arm_voice_duration(duration: int):
 
 async def _handle_client_text(text: str):
     await broadcast_message({"type": "CHAT_USER", "message": text, "source": "local_client"})
+    asyncio.create_task(asyncio.to_thread(record_interaction, "chat", text, "local_client"))
     context_prompt = await get_combined_context_prompt(text)
     await broadcast_message({"type": "HUD_STATUS", "text": "Núcleo cognitivo processando..."})
     reply = await react_agent.run(context_prompt, client_key="local_client", broadcast=broadcast_message)

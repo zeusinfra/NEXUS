@@ -3,7 +3,11 @@ import requests
 import json
 from dotenv import load_dotenv
 
+from zeus_core.security.privacy_guard import PrivacyGuard
+
 load_dotenv()
+
+privacy_guard = PrivacyGuard()
 
 NOTION_TOKEN = os.getenv("NOTION_TOKEN")
 NOTION_DATABASE_ID = os.getenv("NOTION_DATABASE_ID")
@@ -109,10 +113,18 @@ def create_notion_page(title: str, content: str, tags: list[str], source_path: s
 
     url = f"{BASE_URL}/pages"
     
+    # Privacy Check
+    validation = privacy_guard.validate_export(f"{title}\n{content}", "notion")
+    if not validation.allowed:
+        print(f"[Notion] Exportação bloqueada por privacidade: {validation.reason}")
+        return {"error": "Privacy Block", "reason": validation.reason}
+    
+    final_content = validation.sanitized_content if validation.action == "sanitized" else content
+    
     payload = {
         "parent": {"database_id": NOTION_DATABASE_ID},
         "properties": _build_page_properties(title, tags, source_path),
-        "children": _markdown_to_blocks(content)
+        "children": _markdown_to_blocks(final_content)
     }
 
     try:

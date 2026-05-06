@@ -2,7 +2,11 @@ import os
 import requests
 from dotenv import load_dotenv
 
+from zeus_core.security.privacy_guard import PrivacyGuard
+
 load_dotenv()
+
+privacy_guard = PrivacyGuard()
 
 LINEAR_API_KEY = os.getenv("LINEAR_API_KEY")
 LINEAR_TEAM_ID = os.getenv("LINEAR_TEAM_ID")
@@ -35,6 +39,14 @@ def create_linear_issue(title: str, description: str, labels: list[str], priorit
     # Adiciona link do Obsidian no final da descrição
     full_description = f"{description}\n\n---\n*Origem: {source_path}*"
 
+    # Privacy Check
+    validation = privacy_guard.validate_export(f"{title}\n{full_description}", "linear")
+    if not validation.allowed:
+        print(f"[Linear] Exportação bloqueada por privacidade: {validation.reason}")
+        return {"error": "Privacy Block", "reason": validation.reason}
+    
+    final_desc = validation.sanitized_content if validation.action == "sanitized" else full_description
+
     mutation = """
     mutation IssueCreate($teamId: String!, $title: String!, $description: String, $priority: Int) {
       issueCreate(input: {
@@ -56,7 +68,7 @@ def create_linear_issue(title: str, description: str, labels: list[str], priorit
     variables = {
         "teamId": LINEAR_TEAM_ID,
         "title": title,
-        "description": full_description,
+        "description": final_desc,
         "priority": _map_priority(priority)
     }
     

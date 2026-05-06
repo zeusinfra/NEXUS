@@ -253,6 +253,22 @@ body{background:radial-gradient(circle at 50% 45%, rgba(0,229,255,.08), transpar
   .stat-label,.load-lbl{font-size:.68rem}
   .uptime-val{font-size:1.15rem}
 }
+  .stat-fill.attention-deep{background:linear-gradient(90deg, #8c3cff, #5a189a);box-shadow:0 0 15px #8c3cff}
+  .stat-fill.attention-dev{background:linear-gradient(90deg, #00e5ff, #0099cc);box-shadow:0 0 15px #00e5ff}
+  .stat-fill.attention-mining{background:linear-gradient(90deg, #00ffaa, #009966);box-shadow:0 0 15px #00ffaa}
+  
+  .goal-item{display:flex;align-items:center;gap:10px;padding:8px;border-bottom:1px solid rgba(255,255,255,0.05);font-family:var(--mono);font-size:.65rem}
+  .goal-item .dot{width:6px;height:6px;border-radius:50%;background:var(--c3)}
+  .goal-item .title{flex:1;color:var(--text)}
+  .goal-item .meta{color:var(--muted);font-size:.55rem}
+
+  .insight-box{margin-top:10px;padding:10px;border-radius:12px;background:rgba(255,200,87,0.08);border:1px solid rgba(255,200,87,0.15);animation:fadeIn .5s ease}
+  .insight-box .lbl{font-family:var(--hud);font-size:.55rem;color:#ffc857;letter-spacing:1px;text-transform:uppercase}
+  .insight-box .txt{margin-top:4px;font-size:.72rem;color:rgba(224,240,255,0.9)}
+
+  .shield-active{color:var(--c3);text-shadow:0 0 10px var(--c3)}
+  .shield-masked{color:#ffc857;animation:pulse-shield 2s infinite}
+  @keyframes pulse-shield{0%,100%{opacity:1}50%{opacity:.5}}
 </style>
 </head>
 <body>
@@ -295,7 +311,7 @@ body{background:radial-gradient(circle at 50% 45%, rgba(0,229,255,.08), transpar
           <div class="health-chip warn" id="h-memory"><div class="lbl">Memória</div><div class="val">--</div></div>
           <div class="health-chip warn" id="h-watcher"><div class="lbl">Watcher</div><div class="val">--</div></div>
           <div class="health-chip warn" id="h-voice"><div class="lbl">Voz/ASR</div><div class="val">--</div></div>
-          <div class="health-chip warn" id="h-security"><div class="lbl">Segurança</div><div class="val">--</div></div>
+          <div class="health-chip ok" id="h-privacy"><div class="lbl">Shield</div><div class="val">ativo</div></div>
         </div>
         <div class="state-rail" id="state-rail">
           <div class="state-dot active" data-state="idle">Idle</div>
@@ -316,6 +332,20 @@ body{background:radial-gradient(circle at 50% 45%, rgba(0,229,255,.08), transpar
       </div>
     </div>
 
+
+    <div class="card">
+      <div class="card-h"><h3>✦ Núcleo de Inteligência</h3><span id="cog-cycle-timer" style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">--</span></div>
+      <div class="card-body">
+        <div class="stat-row">
+          <div class="stat-label"><span>Estado de Atenção</span><span id="attention-label">IDLE</span></div>
+          <div class="stat-bar"><div class="stat-bar-inner" style="background:rgba(0,0,0,0.2);width:100%;height:100%;border-radius:3px"><div class="stat-fill" id="attention-bar" style="width:20%"></div></div></div>
+        </div>
+        <div class="goal-list" id="goal-orchestrator-list">
+          <div class="goal-item"><div class="dot"></div><div class="title">Aguardando metas...</div></div>
+        </div>
+        <div id="predictive-insight-container"></div>
+      </div>
+    </div>
 
     <div class="card">
       <div class="card-h"><h3>⊙ Tempo e Estado</h3><span style="font-family:var(--mono);font-size:.6rem;color:var(--muted)" id="up-sm">00:00:00</span></div>
@@ -871,7 +901,7 @@ const OS_FAMILY_VISUALS={
   media:{color:[1,0.52,0.44],entropy:0.28},
   system:{color:[0.62,0.88,0.72],entropy:0.2},
 };
-let rSp=0,pAmt=0,cpuL=0,mouseX=0,mouseY=0,tgtX=0,tgtY=0,baseRotY=0,sysSent=[0,1,0.8],orbEnergy=.18,orbDriftX=0,orbDriftY=0,focusBias=0,chatEnergy=0,sidebarsHidden=false;
+let rSp=0,pAmt=0,cpuL=0,mouseX=0,mouseY=0,tgtX=0,tgtY=0,baseRotY=0,sysSent=[0,1,0.8],orbEnergy=.18,orbDriftX=0,orbDriftY=0,focusBias=0,chatEnergy=0,sidebarsHidden=false,hiddenByFocus=false;
 const MOOD_COLORS = {
   IDLE: new THREE.Color(0x00e5ff),
   CODING: new THREE.Color(0x8c3cff),
@@ -972,10 +1002,11 @@ function syncSidebarButton(){
   toggleSidebarsBtn.textContent=sidebarsHidden?'Expandir':'Painéis';
 }
 
-function toggleSidebars(force){
+function toggleSidebars(force, byFocus=false){
   sidebarsHidden=typeof force==='boolean'?force:!sidebarsHidden;
+  hiddenByFocus = byFocus && sidebarsHidden;
   appEl.classList.toggle('sidebars-hidden',sidebarsHidden);
-  localStorage.setItem('ZEUS_SIDEBARS_HIDDEN',sidebarsHidden?'1':'0');
+  if(!byFocus) localStorage.setItem('ZEUS_SIDEBARS_HIDDEN',sidebarsHidden?'1':'0');
   syncSidebarButton();
   pulseOrb(sidebarsHidden ? .24 : .18,sidebarsHidden ? .05 : -.03,0);
   setCoreStatus(sidebarsHidden?'Focus mode enabled.':'Side panels restored.');
@@ -1118,8 +1149,18 @@ function animate() {
   // === COMBO A: ORGANISMO VIVO ===
 
   // Determine dominant cluster from behavioral state
-  const BEHAVIOR_CLUSTER = { IDLE: 0, CODING: 1, THINKING: 2, SURGE: 3, ADAPTIVE: 4 };
-  const dominantIdx = BEHAVIOR_CLUSTER[visualBehavior] || 0;
+  const BEHAVIOR_CLUSTER = { 
+    IDLE: 0, 
+    CODING: 1, 
+    THINKING: 2, 
+    SURGE: 3, 
+    ADAPTIVE: 4,
+    DEEP_FOCUS: 1,  // Maps to Logic/Coding cluster
+    DEVELOPMENT: 1,
+    MINING: 4,      // Maps to Synapse/Archive cluster
+    SECURITY: 3     // Maps to Surge cluster
+  };
+  const dominantIdx = BEHAVIOR_CLUSTER[visualBehavior.toUpperCase()] || 0;
   const activeIdx = closestCluster >= 0 ? closestCluster : dominantIdx;
 
   // Update cluster hover states
@@ -1164,9 +1205,16 @@ function animate() {
 
   // Core sprite follows dominant color
   if (window.coreSprite) {
-    coreSprite.scale.setScalar(2.0 + orbEnergy * 2.5 + Math.sin(t * 1.5) * 0.2);
+    const isFocus = (visualBehavior === 'deep_focus' || visualBehavior === 'DEEP_FOCUS');
+    const pulseSpeed = isFocus ? 3.0 : 1.5;
+    coreSprite.scale.setScalar(2.0 + orbEnergy * 2.5 + Math.sin(t * pulseSpeed) * (isFocus ? 0.5 : 0.2));
     coreSprite.material.opacity = 0.15 + orbEnergy * 0.35;
     coreSprite.material.color.lerp(currentMoodColor, 0.03);
+    
+    // Extra rotation for focus
+    if(isFocus && window.singularityGroup) {
+        singularityGroup.rotation.y += 0.015;
+    }
   }
 
   // (5) PONTES NEURAIS — Bridges appear on active clusters, no pulsing
@@ -1382,6 +1430,92 @@ function enqueueEvent(message){
   }
   incomingEvents.push(message);
 }
+function handleCognitiveUpdate(data) {
+    if(!data) return;
+    
+    // Update Attention
+    const att = data.attention || {};
+    const label = document.getElementById('attention-label');
+    const bar = document.getElementById('attention-bar');
+    if(label) label.textContent = (att.state || 'IDLE').toUpperCase();
+    if(bar) {
+        const score = att.focus_score || 0;
+        bar.style.width = `${score * 100}%`;
+        bar.className = 'stat-fill';
+        
+        // Adaptive UI: Handle Cognitive Dimming
+        const isDeepFocus = (att.state === 'deep_focus');
+        if (isDeepFocus && !sidebarsHidden) {
+            toggleSidebars(true, true);
+        } else if (!isDeepFocus && sidebarsHidden && hiddenByFocus) {
+            toggleSidebars(false, false);
+        }
+
+        visualBehavior = att.state || 'IDLE';
+        
+        if(att.state === 'deep_focus') {
+            bar.classList.add('attention-deep');
+            targetMoodColor.copy(MOOD_COLORS.CODING);
+        } else if(att.state === 'development') {
+            bar.classList.add('attention-dev');
+            targetMoodColor.copy(MOOD_COLORS.IDLE);
+        } else if(att.state === 'mining') {
+            bar.classList.add('attention-mining');
+            targetMoodColor.copy(MOOD_COLORS.ADAPTIVE);
+        }
+    }
+
+    // Update Goals
+    const goals = data.active_goals || [];
+    const list = document.getElementById('goal-orchestrator-list');
+    if(list) {
+        if(goals.length === 0) {
+            list.innerHTML = '<div class="goal-item"><div class="dot" style="opacity:0.3"></div><div class="title" style="opacity:0.5">Nenhuma meta ativa</div></div>';
+        } else {
+            list.innerHTML = goals.slice(0, 3).map(g => `
+                <div class="goal-item">
+                    <div class="dot"></div>
+                    <div class="title">${g.title}</div>
+                    <div class="meta">${g.type}</div>
+                </div>
+            `).join('');
+        }
+    }
+
+    // Update Privacy
+    const priv = data.privacy || {};
+    const hPriv = document.getElementById('h-privacy');
+    if(hPriv) {
+        const val = hPriv.querySelector('.val');
+        if(priv.masked_count > 0) {
+            val.textContent = 'SHIELDED';
+            val.className = 'val shield-masked';
+            hPriv.className = 'health-chip warn';
+        } else {
+            val.textContent = 'SECURE';
+            val.className = 'val shield-active';
+            hPriv.className = 'health-chip ok';
+        }
+    }
+}
+
+function updatePredictiveInsights(suggestions) {
+    const container = document.getElementById('predictive-insight-container');
+    if(!container) return;
+    if(!suggestions || suggestions.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+    const s = suggestions[0];
+    const title = typeof s === 'string' ? s : (s.title || 'Novo Insight');
+    container.innerHTML = `
+        <div class="insight-box">
+            <div class="lbl">Foresight Suggestion</div>
+            <div class="txt">${title}</div>
+        </div>
+    `;
+}
+
 function handleRealtimeEvent(d){
   reactToSignal(d.type,d);
   if(d.type==='METRICS'){
@@ -1417,6 +1551,12 @@ function handleRealtimeEvent(d){
       const top=d.os_context.top_processes[0];
       document.getElementById('system-note-body').textContent=`Agora o foco do SO esta em ${top.name} com CPU ${top.cpu}% e memoria ${top.memory}%.`;
     }
+  }else if(d.type==='COGNITIVE_UPDATE'){
+    handleCognitiveUpdate(d.payload);
+  }else if(d.type==='PROACTIVE_SENSING'){
+    applyVisualSignal({project:'WEB_SENSING',behavior:'THINKING',entropy:0.55});
+    addLog(d.log || {title:'Foresight',detail:d.detail || 'Sugestão preditiva gerada.'},'l');
+    if(d.suggestions) updatePredictiveInsights(d.suggestions);
   }else if(d.type==='SYNAPSE_FIRE'){
     setCoreStatus(`Pulso ${d.intensity||'medium'} em ${(d.node||'rede').split('/').pop()}.`);
   }else if(d.type==='FILE_EVENT'){

@@ -1,0 +1,15 @@
+[Unit]
+Description=ZEUS Cognitive OS - Headless Backend
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/zeus/Documentos/ZEUS_SYSTEM
+ExecStart=/home/zeus/Documentos/ZEUS_SYSTEM/.venv/bin/python -m apps.web_gui --headless
+Restart=always
+RestartSec=10
+StandardOutput=append:/home/zeus/Documentos/ZEUS_SYSTEM/logs/systemd_out.log
+StandardError=append:/home/zeus/Documentos/ZEUS_SYSTEM/logs/systemd_err.log
+
+[Install]
+WantedBy=default.target
