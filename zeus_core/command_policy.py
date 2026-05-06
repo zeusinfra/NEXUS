@@ -47,6 +47,14 @@ RISKY_PACKAGE_SUBCOMMANDS = {
 
 logger = get_logger("zeus.command_policy")
 
+try:
+    from zeus_policy import CommandPolicyRust
+    RUST_POLICY_AVAILABLE = True
+    _RUST_POLICY = CommandPolicyRust()
+except ImportError:
+    RUST_POLICY_AVAILABLE = False
+    _RUST_POLICY = None
+
 
 @dataclass(frozen=True)
 class CommandDecision:
@@ -101,6 +109,14 @@ def _requires_confirmation_for_args(exe: str, args: list[str]) -> bool:
 def validate_command(command: str, tokens: list[str], *, confirmed: bool = False) -> CommandDecision:
     if not tokens:
         raise ToolError("Comando inválido.")
+
+    if _RUST_POLICY:
+        ok, reason = _RUST_POLICY.validate_command(command, tokens, confirmed)
+        if not ok:
+            raise ToolError(reason)
+        # Se passou no Rust, fazemos o de-para para CommandDecision do Python
+        decision = classify_command(tokens)
+        return decision
 
     decision = classify_command(tokens)
     allowlist = _configured_allowlist()

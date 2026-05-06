@@ -78,23 +78,48 @@ def _extract_message_content(data):
 
     return None
 
+try:
+    from zeus_state import BlackboardRust
+    RUST_STATE_AVAILABLE = True
+except ImportError:
+    RUST_STATE_AVAILABLE = False
+
 class Blackboard:
     """Estado global compartilhado entre os agentes."""
 
     def __init__(self):
-        self.state = {
-            "current_goal": None,
-            "plan": None,
-            "execution_result": None,
-            "metrics": None,
-            "status": "IDLE",
-            "context_fragment": "",
-        }
+        if RUST_STATE_AVAILABLE:
+            self.rust_blackboard = BlackboardRust()
+            # Inicializar chaves padrão
+            self.update("current_goal", None)
+            self.update("plan", None)
+            self.update("execution_result", None)
+            self.update("metrics", None)
+            self.update("status", "IDLE")
+            self.update("context_fragment", "")
+        else:
+            self.rust_blackboard = None
+            self.state = {
+                "current_goal": None,
+                "plan": None,
+                "execution_result": None,
+                "metrics": None,
+                "status": "IDLE",
+                "context_fragment": "",
+            }
 
     def update(self, key, value):
-        self.state[key] = value
+        if self.rust_blackboard:
+            self.rust_blackboard.set(key, json.dumps(value))
+        else:
+            self.state[key] = value
 
     def get(self, key):
+        if self.rust_blackboard:
+            json_val = self.rust_blackboard.get(key)
+            if json_val:
+                return json.loads(json_val)
+            return None
         return self.state.get(key)
 
 class CloudAgent:
@@ -553,3 +578,35 @@ class CriticAgent(CloudAgent):
         blackboard.update("status", status)
         blackboard.update("metrics", metric)
         return metric
+class ObserverAgent(CloudAgent):
+    """Agente de Vigilância: Analisa o contexto visual do sistema."""
+
+    def __init__(self, core_path):
+        self.core_path = core_path
+
+    def observe_screen(self, blackboard, question="O que está acontecendo na tela agora?"):
+        try:
+            from zeus_core.vision import capture_screen, analyze_image_with_llm
+            
+            # 1. Captura a tela
+            shot = capture_screen()
+            path = shot.get("path")
+            
+            if not path:
+                return "Erro ao capturar tela."
+
+            # 2. Analisa com LLM Vision
+            analysis = analyze_image_with_llm(path, question=question)
+            answer = analysis.get("answer", "Sem resposta da visão.")
+            
+            # 3. Atualiza Blackboard
+            visual_context = {
+                "last_observation": answer,
+                "timestamp": datetime.datetime.now().isoformat(),
+                "screen_path": path
+            }
+            blackboard.update("visual_context", visual_context)
+            
+            return answer
+        except Exception as e:
+            return f"Erro na visão contextual: {e}"

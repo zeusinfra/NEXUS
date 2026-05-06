@@ -71,6 +71,13 @@ class CognitiveLoop:
         self.orchestrator = PriorityOrchestrator(db_path=db_path)
         self.predictive = PredictiveEngine(db_path=db_path)
         self.privacy = PrivacyGuard(db_path=db_path)
+        from zeus_core.cognitive.self_healing import SelfHealingEngine
+        self.self_healing = SelfHealingEngine(db_path=db_path)
+        
+        # New Observer Agent
+        from zeus_core.core_system import ObserverAgent
+        self.observer = ObserverAgent(core_path=os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        self._cycle_count = 0
 
         # Track daily reflection
         self._last_daily_date: str | None = None
@@ -317,6 +324,27 @@ class CognitiveLoop:
             perception["temporal"] = {}
             perception["user_session"] = {"active": False}
 
+        # Visual Context (Pillar 1)
+        # Capture screen every 10 cycles (approx 5 mins at 30s interval) or if user is active
+        self._cycle_count += 1
+        if self._cycle_count % 10 == 0 or perception.get("user_session", {}).get("active"):
+             try:
+                 # Fazemos a observação em uma thread separada para não travar o loop
+                 visual_desc = self.observer.observe_screen(self.goal_engine.blackboard, question="Descreva brevemente as janelas ativas e o que o usuário parece estar fazendo.")
+                 perception["visual_context"] = visual_desc
+             except Exception as e:
+                 logger.error(f"Vision error in loop: {e}")
+
+        # Silent Mode / Deep Work Detection (Phase 4)
+        active = perception.get("user_session", {}).get("active", False)
+        # Se o usuário está ativo por mais de 10 min com janelas de 'dev', entramos em Deep Work
+        is_dev_window = any(x in str(perception.get("visual_context", "")).lower() for x in ["code", "terminal", "nvim", "cursor"])
+        if active and is_dev_window:
+            perception["cognitive_mode"] = "deep_work"
+            logger.info("Deep Work detected. Activating Cognitive Firewall.")
+        else:
+            perception["cognitive_mode"] = "nominal"
+
         # Build summary
         sys = perception.get("system", {})
         summary_parts = []
@@ -421,6 +449,12 @@ class CognitiveLoop:
             else:
                 analysis["summary"] = "Estado nominal"
 
+        # Self-Healing Analysis (Pillar 3)
+        issues = self.self_healing.scan_for_issues()
+        if issues:
+            analysis["anomalies"].append({"type": "system_errors", "count": len(issues)})
+            analysis["importance_score"] += 20
+            
         return analysis
 
     def _generate_goals(self, analysis: dict, perception: dict | None = None) -> int:

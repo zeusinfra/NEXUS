@@ -62,6 +62,7 @@ def create_status_router(deps: StatusRouteDeps) -> APIRouter:
         return {
             "ok": True,
             "online": True,
+            "api_status": deps.build_api_status(),
             "llm": {
                 "provider": llm.get("provider"),
                 "model": llm.get("model"),

@@ -7,6 +7,13 @@ Esta arquitetura transforma o ZEUS de um assistente reativo em um "Segundo Cére
 3. **Orquestrar:** ZEUS (Sync Engine e Event Pipeline via SQLite).
 4. **Organizar:** Notion (Documentação estruturada e Dashboards operacionais).
 5. **Executar:** Linear (Issues técnicas e Roadmap de engenharia).
+6. **Observar:** Cyber-Premium Dashboard (GTK4/Web HUD com telemetria em tempo real).
+
+## Observabilidade e Telemetria
+O ecossistema agora inclui uma camada de **Observabilidade Ativa**:
+- **Sidebar de Telemetria:** Integrada nativamente no Chat GTK4, fornece insights sobre o estado do hardware e o foco cognitivo atual.
+- **Thought Bar:** Uma interface de "consciência exposta" que mostra as etapas lógicas que o ZEUS está percorrendo durante a orquestração de tarefas complexas.
+- **Synaptic Log:** Visibilidade total dos eventos de sincronização entre as pontas do Second Brain diretamente no Web HUD.
 
 ## Fluxo Orientado a Eventos
 1. O **Watcher Rust** (`watcher_rs`) monitora alterações no sistema e no `ZEUS_VAULT_PATH`.

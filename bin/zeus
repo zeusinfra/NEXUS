@@ -175,6 +175,10 @@ case "$1" in
         echo "📜  Monitorando logs do ZEUS..."
         tail -f zeus_server.log
         ;;
+    tui|console|ops)
+        echo "📟  Iniciando Console de Operações (TUI)..."
+        "$ROOT_DIR/bin/zeus-tui"
+        ;;
     setup-aliases)
         echo "🔧  Configurando aliases globais em ~/.bashrc..."
         grep -q "alias zeus-server" ~/.bashrc || echo "alias zeus-server='cd $ROOT_DIR && ./bin/zeus web > zeus_server.log 2>&1 & sleep 1 && tail -f zeus_server.log'" >> ~/.bashrc
@@ -190,6 +194,7 @@ case "$1" in
         echo "  ./zeus web           → Iniciar Servidor (Browser)"
         echo "  ./zeus ensure-server → Garantir backend headless online"
         echo "  ./zeus logs          → Ver logs em tempo real"
+        echo "  ./zeus tui           → Iniciar Console de Operações (TUI)"
         echo "  ./zeus setup-aliases → Instalar aliases zeus-server/zeus-chat"
         echo "  ./zeus v4            → Core v4 (loop contínuo)"
         echo "  ./zeus evolve        → Motor de Evolução"

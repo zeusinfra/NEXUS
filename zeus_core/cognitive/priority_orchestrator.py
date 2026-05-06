@@ -15,6 +15,12 @@ from zeus_core.observability import get_logger, log_event
 
 logger = get_logger("zeus.cognitive.orchestrator")
 
+try:
+    from zeus_cognitive import CognitiveEngineRust
+    RUST_COGNITIVE_AVAILABLE = True
+except ImportError:
+    RUST_COGNITIVE_AVAILABLE = False
+
 @dataclass
 class OrchestrationResult:
     selected_goals: List[dict]
@@ -27,6 +33,11 @@ class PriorityOrchestrator:
     def __init__(self, db_path: str | None = None) -> None:
         self.db_path = db_path
         self.max_active_goals_default = 3
+        
+        if RUST_COGNITIVE_AVAILABLE:
+            self.rust_engine = CognitiveEngineRust()
+        else:
+            self.rust_engine = None
 
     def orchestrate(self, goals: List[dict], context: dict) -> OrchestrationResult:
         """
@@ -34,6 +45,24 @@ class PriorityOrchestrator:
         """
         if not goals:
             return OrchestrationResult([], [], "Nenhuma meta pendente.")
+
+        if self.rust_engine:
+            try:
+                # O Rust espera JSON
+                goals_json = json.dumps(goals)
+                context_json = json.dumps(context)
+                max_active = context.get("attention", {}).get("max_active_goals", self.max_active_goals_default)
+                
+                res_json = self.rust_engine.orchestrate(goals_json, context_json, max_active)
+                res_dict = json.loads(res_json)
+                
+                return OrchestrationResult(
+                    selected_goals=res_dict["selected"],
+                    deferred_goals=res_dict["deferred"],
+                    rationale=res_dict["rationale"] + " (Rust Engine)"
+                )
+            except Exception as e:
+                logger.error(f"Erro no orquestrador Rust: {e}. Usando fallback Python.")
 
         # 1. Determine capacity
         capacity = self._determine_capacity(context)

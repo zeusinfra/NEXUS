@@ -6,16 +6,14 @@ The current default profile is **Ollama Cloud through the local Ollama daemon**,
 
 Current product direction: **the Cinnamon applet is the primary desktop interface**. The desktop chat is a native **GTK4 + Libadwaita** application launched from the Cinnamon applet.
 
-## Current Status (2026-05-06)
+## Current Status (2026-05-06) - Cyber-Premium Evolution
 
-- **Backend:** FastAPI + Socket.IO (v3.1 Cognitive Maturity Core).
-- **Cognitive Loop:** Finalized with **Priority Orchestrator**, **Predictive Engine**, and **Privacy Guard** (Cognitive Shielding).
-- **LLM:** Multi-provider with proactive foresight and habit anomaly detection.
-- **Cognitive Persona:** Advanced "Systems Architect" with adaptive executive control.
-- **Second Brain:** Bi-directional synaptic sync with Obsidian, Notion, and Linear.
-- **UI:** Web HUD with **Adaptive UI (Cognitive Dimming)**, Cinnamon applet, and native GTK4 chat with real-time cognitive signals.
-- **Security:** Deep perception sanitization (Cognitive Shield), LAN isolation, and command confirmation.
-- **Observability:** Real-time attention telemetry and health diagnostics.
+- **UI/UX:** Nova interface **Cyber-Premium Dashboard** (GTK4/Libadwaita) com Sidebar de Telemetria (CPU/RAM/Contexto), Glassmorphism e alta densidade de informação.
+- **Consciência Exposta:** Implementação da **Thought Bar** no chat, exibindo o fluxo de pensamentos do núcleo cognitivo em tempo real.
+- **Persona 2.0:** Diálogo refinado em **PT-BR**, detalhista e sofisticado, atuando como um parceiro DevOps sênior e menos robótico.
+- **Backend:** FastAPI + Socket.IO (v4.5 Hybrid Core) com novos endpoints de telemetria integrados.
+- **Core Engine (Rust):** Arquitetura híbrida com 8 módulos nativos em Rust (`state`, `policy`, `security`, `memory`, etc.) operacionais.
+- **Cognitive Loop:** Sistema de **Deep Focus** automático que ajusta a interface e a segurança baseado na atividade do usuário.
 
 ## Architecture
 
@@ -53,7 +51,10 @@ graph TD
 | `applets/` | Linux desktop panel integrations, currently Cinnamon `zeus@local`. |
 | `bin/zeus-gtk-chat` | Premium native GTK4/Libadwaita desktop chat launched by the applet. |
 | `watcher_rs/` | Rust filesystem watcher. |
-| `core-rust/` | Rust memory/system components. |
+| `core-rust/` | **Hybrid Core Workspace**: 8 crates Rust para estado compartilhado, políticas, segurança, sensores e lógica cognitiva. |
+| `zeus_core/vision.py` | Módulo de captura de tela, OCR e análise visual via LLM. |
+| `zeus_core/cognitive/self_healing.py` | Motor de monitoramento de logs e reparo automático. |
+| `bin/zeus-summon` | Script para invocação global via atalhos de teclado (Super+Z). |
 | `docs/` | Technical reports and execution plans. |
 | `tests/` | Python regression, security, policy, route, and observability tests. |
 

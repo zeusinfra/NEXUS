@@ -70,6 +70,9 @@ class ZeusGtkChat(Adw.Application):
             
             if self._autostart_mode:
                 GLib.timeout_add(1500, self._trigger_autostart_greeting)
+            
+            # Contextual Placeholder Timer
+            GLib.timeout_add_seconds(15, self._update_contextual_placeholder)
                 
         self.window.present()
 
@@ -87,7 +90,7 @@ class ZeusGtkChat(Adw.Application):
         self._install_css()
 
         window = Adw.ApplicationWindow(application=self)
-        window.set_default_size(580, 780)
+        window.set_default_size(1100, 760)
         window.add_css_class("zeus-window")
         
         # Keyboard shortcuts
@@ -100,12 +103,43 @@ class ZeusGtkChat(Adw.Application):
         window.set_content(self.toast_overlay)
 
         # Main vertical box
-        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        self.toast_overlay.set_child(main_box)
+        self.main_container = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        self.toast_overlay.set_child(self.main_container)
 
-        # HeaderBar
+        # SIDEBAR (Telemetria Profissional)
+        self.sidebar = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=15)
+        self.sidebar.add_css_class("sidebar-panel")
+        self.sidebar.set_size_request(200, -1)
+        self.sidebar.set_margin_start(10)
+        self.sidebar.set_margin_end(10)
+        self.sidebar.set_margin_top(10)
+        self.sidebar.set_margin_bottom(10)
+        
+        # Sidebar Widgets
+        side_title = Gtk.Label(label="SYSTEM INSIGHT")
+        side_title.add_css_class("sidebar-title")
+        self.sidebar.append(side_title)
+        
+        self.cpu_bar = Adw.ExpanderRow(title="CPU LOAD", subtitle="0%")
+        self.sidebar.append(self.cpu_bar)
+        
+        self.ram_bar = Adw.ExpanderRow(title="RAM USAGE", subtitle="0%")
+        self.sidebar.append(self.ram_bar)
+        
+        self.context_label = Gtk.Label(label="FOCO: IDLE")
+        self.context_label.add_css_class("dim-label")
+        self.sidebar.append(self.context_label)
+
+        self.main_container.append(self.sidebar)
+
+        # RIGHT PANEL (Chat Area)
+        self.chat_area = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.chat_area.set_hexpand(True)
+        self.main_container.append(self.chat_area)
+
+        # HeaderBar (Attached to Chat Area)
         header = Adw.HeaderBar()
-        main_box.append(header)
+        self.chat_area.append(header)
 
         self.window_title = Adw.WindowTitle(title="ZEUS Ops", subtitle="Inicializando...")
         header.set_title_widget(self.window_title)
@@ -141,21 +175,21 @@ class ZeusGtkChat(Adw.Application):
         self.banner.set_title("Backend ZEUS offline. Verifique se o serviço está ativo.")
         self.banner.set_button_label("Tentar novamente")
         self.banner.connect("button-clicked", lambda _: self._check_status())
-        main_box.append(self.banner)
+        self.chat_area.append(self.banner)
 
         # Scroller
         self.scroller = Gtk.ScrolledWindow()
         self.scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         self.scroller.set_vexpand(True)
         self.scroller.add_css_class("chat-scroll")
-        
+        self.chat_area.append(self.scroller)
+
         # Clamp for centered reading
         clamp = Adw.Clamp()
-        clamp.set_maximum_size(860)
-        clamp.set_tightening_threshold(600)
+        clamp.set_maximum_size(960)
+        clamp.set_tightening_threshold(700)
         
         self.scroller.set_child(clamp)
-        main_box.append(self.scroller)
 
         # Box for messages
         self.messages_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
@@ -178,13 +212,23 @@ class ZeusGtkChat(Adw.Application):
 
         # Composer area
         composer_clamp = Adw.Clamp()
-        composer_clamp.set_maximum_size(860)
-        composer_clamp.set_tightening_threshold(600)
+        composer_clamp.set_maximum_size(960)
+        composer_clamp.set_tightening_threshold(700)
 
         composer_bg = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         composer_bg.add_css_class("composer-bg")
         composer_bg.append(composer_clamp)
-        main_box.append(composer_bg)
+        self.chat_area.append(composer_bg)
+
+        # Thought Bar
+        self.thought_bar = Gtk.Label(label="SISTEMA NOMINAL | AGUARDANDO INPUT...")
+        self.thought_bar.add_css_class("thought-bar")
+        self.thought_bar.set_halign(Gtk.Align.START)
+        self.thought_bar.set_margin_start(16)
+        self.thought_bar.set_margin_end(16)
+        self.thought_bar.set_margin_top(6)
+        self.thought_bar.set_margin_bottom(10)
+        self.chat_area.append(self.thought_bar)
 
         composer = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         composer.add_css_class("composer")
@@ -219,21 +263,125 @@ class ZeusGtkChat(Adw.Application):
         print("[GTK] App started")
         return window
 
+    def _update_contextual_placeholder(self) -> bool:
+        if not self._last_status or self._is_generating:
+            return True
+            
+        cog = self._last_status.get("cognitive", {})
+        mode = cog.get("mode", "nominal")
+        context = str(self._last_status.get("perception", {}).get("visual_context", ""))
+        
+        placeholder = "Peça uma ação ou diagnóstico..."
+        if "deep_work" in mode:
+            placeholder = "Modo Deep Work ativo. Como posso acelerar seu código?"
+        elif "terminal" in context.lower():
+            placeholder = "Vi que está no terminal. Precisa de ajuda com algum comando?"
+        elif "code" in context.lower() or "cursor" in context.lower():
+            placeholder = "Analisando seu código... Deseja um refactor ou teste?"
+        
+        if self.input:
+            self.input.set_placeholder_text(placeholder)
+        return True
+
     def _install_css(self) -> None:
         css = """
-        .zeus-window { background-color: @window_bg_color; }
-        .composer-bg { background-color: @window_bg_color; border-top: 1px solid @borders; }
-        .empty-state { opacity: 0.7; }
-        .message-row { margin-bottom: 8px; }
-        .message-bubble { border-radius: 16px; padding: 12px 16px; line-height: 1.4; }
-        .message-bubble-user { background-color: @accent_bg_color; color: @accent_fg_color; border-bottom-right-radius: 4px; }
-        .message-bubble-assistant { background-color: @card_bg_color; border: 1px solid @borders; border-bottom-left-radius: 4px; }
-        .message-bubble-system { background-color: transparent; opacity: 0.7; font-size: 0.9em; }
-        .message-meta { opacity: 0.65; font-size: 0.75em; margin-top: 4px; }
-        .message-meta-user { color: @accent_fg_color; }
-        .code-card { background-color: @dark_2; border: 1px solid @borders; border-radius: 12px; margin-top: 8px; margin-bottom: 8px; }
-        .code-header { background-color: @dark_3; padding: 6px 12px; border-bottom: 1px solid @borders; font-size: 0.85em; opacity: 0.9; }
-        .code-content { padding: 12px; font-family: monospace; font-size: 0.95em; }
+        @define-color window_bg_color #0a0a0c;
+        @define-color sidebar_bg #0f0f12;
+        @define-color accent_color #00ff88;
+        @define-color text_primary #e0e0e0;
+        @define-color text_secondary #a0a0a0;
+        @define-color border_glow rgba(0, 255, 136, 0.2);
+
+        * { 
+            font-family: 'Inter', 'Segoe UI', 'Roboto', sans-serif;
+            transition: all 200ms ease;
+        }
+
+        .zeus-window { 
+            background-color: @window_bg_color;
+        }
+
+        .sidebar-panel {
+            background-color: @sidebar_bg;
+            border-right: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 20px;
+        }
+
+        .sidebar-title {
+            font-weight: 800;
+            font-size: 0.7rem;
+            letter-spacing: 2px;
+            color: @accent_color;
+            margin-bottom: 10px;
+            opacity: 0.8;
+        }
+
+        headerbar {
+            background-color: transparent;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            padding: 10px;
+        }
+
+        .composer-bg { 
+            background-color: rgba(15, 15, 18, 0.8);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .message-bubble { 
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 14px 18px; 
+            line-height: 1.6; 
+            margin: 8px 0;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .message-bubble-user { 
+            background: linear-gradient(135deg, #1a1a20 0%, #16161c 100%);
+            border-right: 3px solid @accent_color;
+            margin-left: 60px;
+            color: @text_primary;
+        }
+        
+        .message-bubble-assistant { 
+            background: linear-gradient(135deg, #0f0f12 0%, #0a0a0c 100%);
+            border-left: 3px solid #008f5d;
+            margin-right: 60px;
+            color: @text_primary;
+        }
+
+        .thought-bar {
+            font-size: 0.75rem;
+            color: @text_secondary;
+            padding: 8px 16px;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        entry {
+            background-color: #16161c;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 12px;
+            color: @text_primary;
+        }
+
+        entry:focus {
+            border-color: @accent_color;
+            box-shadow: 0 0 8px @border_glow;
+        }
+
+        button.suggested-action {
+            background: @accent_color;
+            color: #000;
+            font-weight: bold;
+            border-radius: 8px;
+        }
+
+        button.suggested-action:hover {
+            background: #00cc6e;
+            box-shadow: 0 0 12px @border_glow;
+        }
         """
         provider = Gtk.CssProvider()
         provider.load_from_string(css)
@@ -311,7 +459,7 @@ class ZeusGtkChat(Adw.Application):
             content_box.add_css_class("message-bubble")
             content_box.add_css_class("message-bubble-user")
             
-            label = Gtk.Label(label=content)
+            label = Gtk.Label(label=f"» {content}")
             label.set_wrap(True)
             label.set_selectable(True)
             label.set_halign(Gtk.Align.START)
@@ -400,7 +548,7 @@ class ZeusGtkChat(Adw.Application):
                     continue
                 lbl = Gtk.Label()
                 # Aplica bold simples (naive) substituindo ** por tags <b>
-                parsed_text = part
+                parsed_text = f"» {part}" if i == 0 else part
                 if "**" in parsed_text:
                     parsed_text = parsed_text.replace("**", "<b>", 1).replace("**", "</b>", 1)
                 
@@ -501,10 +649,24 @@ class ZeusGtkChat(Adw.Application):
         if self.banner:
             self.banner.set_revealed(False)
         
-        # 🧠 Integration: Cognitive Telemetry in GTK
+        # 🧠 Sidebar Telemetry
+        api_status = data.get("api_status", {})
+        cpu = api_status.get("cpu", 0)
+        ram = api_status.get("ram", 0)
+        
+        if hasattr(self, 'cpu_bar'):
+            self.cpu_bar.set_subtitle(f"{cpu}%")
+        if hasattr(self, 'ram_bar'):
+            self.ram_bar.set_subtitle(f"{ram}%")
+            
         cog = data.get("cognitive", {})
         att_state = cog.get("attention", "idle").upper()
         
+        # Sidebar Focus Label
+        if hasattr(self, 'context_label'):
+            focus = f"FOCO: {att_state}"
+            self.context_label.set_label(focus)
+            
         # Tradução amigável para o GTK
         att_map = {
             "IDLE": "Pronto",
@@ -526,6 +688,17 @@ class ZeusGtkChat(Adw.Application):
                 self.privacy_icon.set_from_icon_name("security-low-symbolic")
                 self.privacy_icon.add_css_class("dim-label")
                 self.privacy_icon.remove_css_class("success")
+
+        # Update Thought Bar (Phase 1)
+        events = data.get("perception", {}).get("recent_events", [])
+        if events:
+            last_event = events[0]
+            thought = f"OBSERVANDO: {last_event.get('event_type')} | {last_event.get('status')}"
+            self.thought_bar.set_label(thought.upper())
+        elif data.get("cognitive", {}).get("attention") == "active":
+            self.thought_bar.set_label("PROCESSANDO INFORMAÇÃO NEURAL...")
+        else:
+            self.thought_bar.set_label("SISTEMA NOMINAL | AGUARDANDO COMANDO")
 
         print(f"[GTK] Backend status: online (Attention: {att_state})")
         return False

@@ -1,0 +1,21 @@
+#!/usr/bin/env python3
+import sys
+import requests
+import os
+
+OLLAMA_URL = os.getenv("ZEUS_API_URL", "http://localhost:5000/api/message")
+
+def summon():
+    """Manda um sinal para o ZEUS acordar e focar na janela ativa."""
+    payload = {
+        "text": "/summon",
+        "context": "global_hotkey"
+    }
+    try:
+        requests.post(OLLAMA_URL, json=payload, timeout=2)
+        print("ZEUS Summoned!")
+    except Exception as e:
+        print(f"Erro ao chamar o ZEUS: {e}")
+
+if __name__ == "__main__":
+    summon()

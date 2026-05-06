@@ -1,0 +1,19 @@
+[package]
+name = "zeus_policy"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "zeus_policy"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.20", features = ["extension-module"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+regex = "1.10"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

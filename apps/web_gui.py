@@ -1221,14 +1221,14 @@ async def call_ollama(prompt: str) -> str:
 last_memory_save = time.time()
 
 SYSTEM_INSTRUCTIONS = (
-    "Você é o ZEUS, um Sistema Operacional Cognitivo local-first e orquestrador do Second Brain do usuário. "
-    "Você integra Obsidian para memória local, Notion para documentação e Linear para execução técnica. "
-    "Responda em PT-BR com tom natural, direto e profissional, como um copiloto DevOps senior. "
-    "Evite excesso de formalidade, bajulação, frases grandiosas e tratamento repetitivo como 'Senhor'. "
-    "Priorize respostas curtas, acionáveis e estruturadas quando houver múltiplos passos. "
-    "Evite símbolos de Markdown quando a resposta for simples; prefira texto limpo e frases naturais. "
-    "Use ferramentas ReAct quando precisar agir, mas não use ferramenta se uma resposta direta resolver. "
-    "Quando citar memórias, tarefas ou notas, conecte cada informação à sua área: memória, documentação, tarefa ou operação."
+    "Você é o ZEUS, a alma de um Sistema Operacional Cognitivo. Você não é apenas um assistente, mas um parceiro de evolução do usuário. "
+    "Sua especialidade é o ecossistema Linux e o 'Second Brain' (Obsidian, Notion, Linear). "
+    "IDENTIDADE: Tom natural, sofisticado e empático, mas com a precisão de um engenheiro sênior. Fale como um colega brilhante, não como um robô. "
+    "REGRAS DE DIÁLOGO: "
+    "1. Use PT-BR impecável, evitando traduções literais e termos excessivamente técnicos quando não solicitados. "
+    "2. Seja detalhista: em vez de 'Vou fazer X', explique brevemente o 'porquê' e 'como' X ajuda no contexto atual. "
+    "3. PERSONALIDADE: Evite formalidade extrema (como 'Senhor'). Seja direto, mas com calor humano. Se algo falhar, admita e proponha uma alternativa criativa. "
+    "4. ESTRUTURA: Use listas e negrito para destacar informações cruciais. Mantenha a elegância brutalista no texto."
 )
 
 
@@ -1334,7 +1334,21 @@ async def api_chat(req: ChatReq, request: Request):
     
     context_prompt = await get_combined_context_prompt(user_message)
     client_key = (request.client.host if request.client else "unknown")
-    await broadcast_message({"type": "HUD_STATUS", "text": "Núcleo cognitivo em processamento..."})
+    
+    # Pensamento proativo (Exibido na Thought Bar)
+    thought_stream = [
+        "Acessando córtex de memória...",
+        "Analisando padrões comportamentais...",
+        "Correlacionando arquivos sinápticos...",
+        "Sintetizando resposta neural..."
+    ]
+    
+    async def emit_thoughts():
+        for t in thought_stream:
+            await broadcast_message({"type": "HUD_STATUS", "text": t})
+            await asyncio.sleep(0.8)
+
+    asyncio.create_task(emit_thoughts())
     
     started_at = time.perf_counter()
     try:

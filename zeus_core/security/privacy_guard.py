@@ -62,6 +62,12 @@ SENSITIVE_PATHS = [
 # Privacy Guard Logic
 # ------------------------------------------------------------------
 
+try:
+    from zeus_security import PrivacyEngineRust
+    RUST_SECURITY_AVAILABLE = True
+except ImportError:
+    RUST_SECURITY_AVAILABLE = False
+
 class PrivacyGuard:
     """The central engine for privacy protection."""
 
@@ -70,11 +76,22 @@ class PrivacyGuard:
         # Global privacy mode: 'balanced' | 'strict' | 'local_only'
         self.mode = os.getenv("ZEUS_PRIVACY_MODE", "balanced").lower()
         self.session_masked_count = 0
+        
+        if RUST_SECURITY_AVAILABLE:
+            self.rust_engine = PrivacyEngineRust()
+            logger.info("🦀 ZEUS: Privacy Guard operando com motor Rust otimizado.")
+        else:
+            self.rust_engine = None
+            logger.warning("🐍 ZEUS: Privacy Guard operando em modo Python (fallback).")
 
     def classify_content(self, content: str) -> PrivacyLevel:
         """Analyze content and return its highest privacy level."""
         if not content:
             return PrivacyLevel.PUBLIC
+
+        if self.rust_engine:
+            level_int = self.rust_engine.classify(content)
+            return PrivacyLevel(level_int)
 
         # Check for SECRET patterns
         for name, pattern in SECRET_PATTERNS.items():
@@ -136,6 +153,12 @@ class PrivacyGuard:
 
     def sanitize(self, content: str) -> str:
         """Mask sensitive patterns in the content."""
+        if self.rust_engine:
+            sanitized, count = self.rust_engine.sanitize(content)
+            if count > 0:
+                self.session_masked_count += count
+            return sanitized
+
         sanitized = content
         for name, pattern in SECRET_PATTERNS.items():
             new_content, count = re.subn(pattern, f"[MASKED_{name.upper()}]", sanitized)

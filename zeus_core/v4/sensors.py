@@ -15,12 +15,31 @@ def _now() -> float:
     return time.time()
 
 
+try:
+    from zeus_sensors import SensorEngineRust
+    RUST_SENSORS_AVAILABLE = True
+except ImportError:
+    RUST_SENSORS_AVAILABLE = False
+
 @dataclass(slots=True)
 class OsMetricsSensor:
+    def __init__(self):
+        if RUST_SENSORS_AVAILABLE:
+            self.rust_engine = SensorEngineRust()
+        else:
+            self.rust_engine = None
+
     def poll(self) -> list[Event]:
-        cpu = psutil.cpu_percent(interval=None)
-        mem = psutil.virtual_memory().percent
-        disk = psutil.disk_usage("/").percent
+        if self.rust_engine:
+            metrics = self.rust_engine.poll_os_metrics()
+            cpu = metrics.get("cpu", 0.0)
+            mem = metrics.get("mem", 0.0)
+            # Disk via psutil por enquanto
+            disk = psutil.disk_usage("/").percent
+        else:
+            cpu = psutil.cpu_percent(interval=None)
+            mem = psutil.virtual_memory().percent
+            disk = psutil.disk_usage("/").percent
         pressure = "CALM"
         if cpu > 80 or mem > 85 or disk > 90:
             pressure = "CRITICAL"
@@ -44,9 +63,37 @@ class FilePollSensor:
         self._mtimes: dict[str, float] = {}
         self.max_checked = int(os.getenv("ZEUS_V4_FS_MAX_CHECKED", "1200"))
         self.max_seconds = float(os.getenv("ZEUS_V4_FS_MAX_SECONDS", "0.35"))
+        
+        if RUST_SENSORS_AVAILABLE:
+            self.rust_engine = SensorEngineRust()
+        else:
+            self.rust_engine = None
 
     def poll(self) -> list[Event]:
         evs: list[Event] = []
+        
+        if self.rust_engine:
+            for root in self.roots:
+                if not root.exists():
+                    continue
+                raw_results = self.rust_engine.fast_walk(str(root), self.max_checked)
+                for path, mtime in raw_results:
+                    prev = self._mtimes.get(path)
+                    self._mtimes[path] = mtime
+                    if prev is not None and mtime > prev:
+                        evs.append(
+                            Event(
+                                kind="fs",
+                                ts=_now(),
+                                summary=f"File changed (Rust): {os.path.basename(path)}",
+                                data={"path": path},
+                                relevance=0.25,
+                            )
+                        )
+                        if len(evs) >= self.max_events:
+                            return evs
+            return evs
+
         t0 = _now()
         checked = 0
         for root in self.roots:
