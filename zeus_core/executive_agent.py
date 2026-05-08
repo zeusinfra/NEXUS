@@ -1,7 +1,9 @@
 import os
+import time
 import asyncio
 from collections import Counter
 from typing import Dict, List, Optional
+from zeus_core.events.event_bus import event_bus, EventType
 
 class ExecutiveAgent:
     """Agente Executivo para Proatividade no ZEUS.
@@ -9,63 +11,83 @@ class ExecutiveAgent:
     """
     def __init__(self):
         self.action_queue = asyncio.Queue()
-        self.recent_commands: Dict[str, int] = Counter()
-        self.stuck_threshold = 3  # Quantas edições repetidas indicam "travamento"
-        self.file_edits: Dict[str, int] = Counter()
+        self.stuck_score = 0
+        self.recent_files_touched: set = set()
+        self.last_files_reset = time.time()
+        self.conversation_concat_detected = False
+        
+        # Inscreve nos eventos do bus
+        event_bus.subscribe(EventType.FILE_CHANGED, self._on_file_changed)
+        event_bus.subscribe(EventType.COMMAND_FAILED, self._on_failure)
+        event_bus.subscribe(EventType.BUILD_FAILED, self._on_failure)
+        event_bus.subscribe(EventType.TOOL_FAILED, self._on_failure)
+        event_bus.subscribe(EventType.CONVERSATION_CONCAT_DETECTED, self._on_concat)
 
-    async def monitor_event_stream(self, event):
-        """Analisa cada evento em busca de gatilhos para intervenção."""
-        if event.get("type") == "FILE_EVENT":
-            await self._analyze_file_focus(event)
-            await self._detect_loop_pattern(event)
+    async def _on_failure(self, event):
+        self.stuck_score += 1
+        await self._evaluate_stuck_state()
 
-    async def _analyze_file_focus(self, event):
-        """Detecta mudança de contexto para sugerir abertura de arquivos relacionados."""
-        pass  # Será integrado ao WebSocket via broadcast
+    async def _on_concat(self, event):
+        self.conversation_concat_detected = True
+        self.stuck_score += 1
+        await self.action_queue.put({
+            "type": "SUGGEST_CONTEXT_REBUILD",
+            "message": "Detectei concatenação excessiva na conversa. Deseja que eu limpe o contexto para focar no objetivo atual?"
+        })
+        await self._evaluate_stuck_state()
 
-    async def _detect_loop_pattern(self, event):
-        """Detecta se o usuário está editando o mesmo arquivo repetidamente (possível erro/travamento)."""
-        path = event.get("path")
+    async def _on_file_changed(self, event):
+        path = event.payload.get("path") or event.payload.get("source_path")
         if not path:
             return
+            
+        now = time.time()
+        if now - self.last_files_reset > 60: # 1 minute
+            self.recent_files_touched.clear()
+            self.last_files_reset = now
+            
+        self.recent_files_touched.add(path)
         
-        self.file_edits[path] += 1
-        
-        # Se o usuário editou o mesmo arquivo 4 vezes em rápida sucessão...
-        if self.file_edits[path] >= self.stuck_threshold:
+        if len(self.recent_files_touched) >= 4:
+            await self.action_queue.put({
+                "type": "SUGGEST_ARCHITECTURE_REVIEW",
+                "message": "Você modificou muitos arquivos rapidamente. Deseja uma revisão arquitetural para garantir a consistência?"
+            })
+            self.recent_files_touched.clear()
+            
+        self.stuck_score += 0.2
+        await self._evaluate_stuck_state()
+
+    async def _evaluate_stuck_state(self):
+        if self.stuck_score >= 5:
             await self.action_queue.put({
                 "type": "SUGGEST_BREAK",
-                "target": path,
-                "message": "Detectei alta iteração neste arquivo. Deseja que eu analise em busca de erros de sintaxe?",
-                "action_context": "stuck_loop"
+                "message": "Detectei vários erros ou repetições. Deseja que eu faça uma análise profunda do problema atual?",
             })
-            # Reseta o contador para evitar spam
-            self.file_edits[path] = 0
+            self.stuck_score = 0
 
     async def process_actions(self, broadcast_func):
-        """Processa a fila de ações e envia para o frontend ou executa."""
+        """Processa a fila de ações e envia para o frontend."""
         while True:
             action = await self.action_queue.get()
             
-            if action["type"] == "SUGGEST_BREAK":
-                # Envia a sugestão para o frontend
-                await broadcast_func({
-                    "type": "EXECUTIVE_INTERVENTION",
-                    "priority": "high",
-                    "log": {
-                        "channel": "executive",
-                        "title": "Padrão Detectado",
-                        "detail": action["message"],
-                        "meta": f"loops={self.stuck_threshold}"
-                    }
-                })
-            elif action["type"] == "AUTO_OPEN":
-                # Ação automática: abre arquivo ou URL
-                # (Implementação segura requer permissão posterior)
-                pass
+            await broadcast_func({
+                "type": "EXECUTIVE_INTERVENTION",
+                "priority": "high",
+                "log": {
+                    "channel": "executive",
+                    "title": "Intervenção Proativa",
+                    "detail": action["message"],
+                    "meta": f"action={action['type']}"
+                }
+            })
             
             self.action_queue.task_done()
 
     def reset_context(self):
         """Limpa o contexto de curto prazo."""
-        self.file_edits.clear()
+        self.stuck_score = 0
+        self.recent_files_touched.clear()
+        self.conversation_concat_detected = False
+
+executive_agent = ExecutiveAgent()

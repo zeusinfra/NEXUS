@@ -10,10 +10,11 @@ Esta arquitetura transforma o ZEUS de um assistente reativo em um "Segundo Cére
 6. **Observar:** Cyber-Premium Dashboard (GTK4/Web HUD com telemetria em tempo real).
 
 ## Observabilidade e Telemetria
-O ecossistema agora inclui uma camada de **Observabilidade Ativa**:
-- **Sidebar de Telemetria:** Integrada nativamente no Chat GTK4, fornece insights sobre o estado do hardware e o foco cognitivo atual.
-- **Thought Bar:** Uma interface de "consciência exposta" que mostra as etapas lógicas que o ZEUS está percorrendo durante a orquestração de tarefas complexas.
-- **Synaptic Log:** Visibilidade total dos eventos de sincronização entre as pontas do Second Brain diretamente no Web HUD.
+O ecossistema agora inclui uma camada de **Observabilidade Ativa** atrelada à Governança (v4):
+- **Sidebar de Telemetria:** Integrada nativamente no Chat GTK4 com LevelBars e live polling, fornece insights sobre o estado do hardware e o foco cognitivo atual.
+- **Governança de Recursos:** `ResourceGovernor` adapta os ciclos de leitura do Second Brain ativamente caso a memória (RAM) ou CPU excedam limites pré-determinados.
+- **Thought Bar:** Uma interface de "consciência exposta" que mostra as etapas lógicas que o ZEUS está percorrendo durante a orquestração de tarefas complexas, agora pulsando em tempo real.
+- **Synaptic Log:** Visibilidade total dos eventos de sincronização entre as pontas do Second Brain diretamente no Web HUD e EventBus.
 
 ## Fluxo Orientado a Eventos
 1. O **Watcher Rust** (`watcher_rs`) monitora alterações no sistema e no `ZEUS_VAULT_PATH`.

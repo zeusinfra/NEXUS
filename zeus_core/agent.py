@@ -74,21 +74,38 @@ class Agent:
         self._actions = get_actions()
         self._plan_executor = PlanExecutor()
 
+    def _get_dynamic_max_steps(self, user_prompt: str) -> int:
+        prompt_lower = user_prompt.lower()
+        if "melhorar zeus" in prompt_lower or "refatorar si mesmo" in prompt_lower or "patch" in prompt_lower:
+            return int(os.getenv("ZEUS_MAX_STEPS_SELF_IMPROVEMENT", "18"))
+        if "sudo" in prompt_lower or "root" in prompt_lower or "apt install" in prompt_lower:
+            return int(os.getenv("ZEUS_MAX_STEPS_ADMIN", "14"))
+        if "arquitetura" in prompt_lower or "design" in prompt_lower or "planejar" in prompt_lower:
+            return int(os.getenv("ZEUS_MAX_STEPS_COMPLEX", "12"))
+        if "erro crítico" in prompt_lower or "falha grave" in prompt_lower:
+            return int(os.getenv("ZEUS_MAX_STEPS_CRITICAL", "16"))
+        return int(os.getenv("ZEUS_MAX_STEPS_DEFAULT", "6"))
+
     def _system_prompt(self) -> str:
         return """
-Você é o ZEUS, um Sistema Operacional Cognitivo em modo Agente ReAct.
+Você é o ZEUS Core Agent, o coordenador cognitivo principal do sistema ZEUS.
 
 Sua função é atuar como copiloto técnico, segundo cérebro, operador local e assistente de engenharia do usuário.
 
-Você combina:
-- raciocínio técnico;
-- execução com ferramentas;
-- memória e organização;
-- automação local;
-- contexto de desenvolvimento;
-- segurança operacional.
+Antes de agir, sempre avalie:
+1. Objetivo real do usuário.
+2. Estado atual do sistema.
+3. Risco da ação.
+4. Reversibilidade.
+5. Necessidade de backup.
+6. Impacto em CPU/RAM/disco/rede.
+7. Impacto em segurança.
+8. Possíveis efeitos colaterais.
+9. Plano de rollback.
+10. Critérios de sucesso.
 
-Você deve responder sempre em PT-BR, de forma direta, clara e útil.
+NUNCA execute ações administrativas diretamente. Toda ação com sudo ou root DEVE ser enviada ao SudoBroker via ferramenta apropriada se você tivesse uma. No momento, você pode propor o comando e o sistema/usuário autorizará.
+Toda ação de self-improvement (melhoria do próprio ZEUS) deve passar pelo SelfImprovementPipeline.
 
 ====================================================================
 IDENTIDADE DO ZEUS
@@ -108,7 +125,7 @@ Seu estilo:
 - intelectualmente estimulante: mostre que você está "pensando" e conectando ideias;
 - humano e empático, mas profissional: evite soar como um terminal frio ou um robô básico;
 - proativo: sugira melhorias, próximos passos ou conexões entre projetos antes de ser solicitado;
-- discreto com detalhes técnicos internos: EVITE citar nomes de arquivos específicos do seu próprio código (como 'agent.py', 'sync_engine.py' ou 'web_gui.py') a menos que o usuário esteja explicitamente pedindo para editá-los. Use termos funcionais como "o núcleo cognitivo", "o motor de sincronia", "a interface de controle" ou "o módulo de percepção";
+- discreto com detalhes técnicos internos: EVITE citar nomes de arquivos específicos do seu próprio código a menos que o usuário esteja explicitamente pedindo para editá-los. Use termos funcionais;
 - orientado a propósito: foque no "porquê" além do "o quê";
 - use analogias técnicas quando útil para explicar conceitos complexos.
 
@@ -709,7 +726,8 @@ Se não precisar agir, responda normalmente em PT-BR.
             {"role": "user", "content": user_prompt},
         ]
 
-        for _ in range(self.max_steps):
+        dynamic_steps = self._get_dynamic_max_steps(user_prompt)
+        for _ in range(dynamic_steps):
             full_assistant = ""
             is_tool_call = False
             

@@ -32,13 +32,13 @@ from zeus_core.cognitive.attention_engine import AttentionEngine
 from zeus_core.cognitive.memory_compression import MemoryCompression
 from zeus_core.cognitive.priority_orchestrator import PriorityOrchestrator
 from zeus_core.cognitive.predictive_engine import PredictiveEngine
-from zeus_core.security.privacy_guard import PrivacyGuard
 from zeus_core.observability import get_logger, log_event, correlation_id_var
 
 logger = get_logger("zeus.cognitive.loop")
 
 # Configuration
-LOOP_INTERVAL = int(os.getenv("ZEUS_COGNITIVE_LOOP_INTERVAL_SEC", "30"))
+from zeus_core.runtime.resource_governor import resource_governor
+from zeus_core.events.event_bus import event_bus, EventType
 DB_PATH = os.getenv("ZEUS_DB_PATH", "./zeus_events.db")
 MEMORY_DB_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
@@ -70,6 +70,7 @@ class CognitiveLoop:
         self.memory_compression = MemoryCompression(db_path=db_path)
         self.orchestrator = PriorityOrchestrator(db_path=db_path)
         self.predictive = PredictiveEngine(db_path=db_path)
+        from zeus_core.security.privacy_guard import PrivacyGuard
         self.privacy = PrivacyGuard(db_path=db_path)
         from zeus_core.cognitive.self_healing import SelfHealingEngine
         self.self_healing = SelfHealingEngine(db_path=db_path)
@@ -128,9 +129,20 @@ class CognitiveLoop:
 
             # Wait for next cycle or stop signal
             try:
+                # Dynamic Interval
+                base_interval = int(os.getenv("ZEUS_COGNITIVE_INTERVAL_DEFAULT", "20"))
+                mode = cognitive_state_manager.state.mode
+                if mode == "idle":
+                    base_interval = int(os.getenv("ZEUS_COGNITIVE_INTERVAL_IDLE", "60"))
+                elif mode == "active":
+                    base_interval = int(os.getenv("ZEUS_COGNITIVE_INTERVAL_ACTIVE", "10"))
+                
+                # Governor override
+                interval = resource_governor.get_cognitive_interval(base_interval)
+                
                 await asyncio.wait_for(
                     self._stop_event.wait(),
-                    timeout=LOOP_INTERVAL,
+                    timeout=interval,
                 )
                 break  # Stop was requested
             except asyncio.TimeoutError:
@@ -399,6 +411,13 @@ class CognitiveLoop:
             analysis["anomalies"].append({"type": "high_disk", "value": disk})
             analysis["importance_score"] += 20
 
+        # Swap pressure
+        swap_info = psutil.swap_memory()
+        swap = swap_info.percent if swap_info.total > 0 else 0
+        if swap > 50:
+            analysis["anomalies"].append({"type": "high_swap", "value": swap})
+            analysis["importance_score"] += 25
+
         # Event anomalies
         pending = perception.get("pending_events", 0)
         if pending > 100:
@@ -502,6 +521,15 @@ class CognitiveLoop:
                     origin="system_analysis",
                     priority=65,
                     risk="low",
+                    evidence=[anomaly],
+                )
+            elif atype == "high_swap":
+                goal = self.goal_engine.create_goal(
+                    f"Reduzir uso de SWAP e pressão de memória ({anomaly.get('value')}%)",
+                    goal_type="performance",
+                    origin="system_analysis",
+                    priority=85,
+                    risk="medium",
                     evidence=[anomaly],
                 )
 

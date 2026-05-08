@@ -6,14 +6,13 @@ The current default profile is **Ollama Cloud through the local Ollama daemon**,
 
 Current product direction: **the Cinnamon applet is the primary desktop interface**. The desktop chat is a native **GTK4 + Libadwaita** application launched from the Cinnamon applet.
 
-## Current Status (2026-05-06) - Cyber-Premium Evolution
+## Current Status (2026-05-08) - Adaptive Amplification & Secure Autonomy
 
-- **UI/UX:** Nova interface **Cyber-Premium Dashboard** (GTK4/Libadwaita) com Sidebar de Telemetria (CPU/RAM/Contexto), Glassmorphism e alta densidade de informação.
-- **Consciência Exposta:** Implementação da **Thought Bar** no chat, exibindo o fluxo de pensamentos do núcleo cognitivo em tempo real.
-- **Persona 2.0:** Diálogo refinado em **PT-BR**, detalhista e sofisticado, atuando como um parceiro DevOps sênior e menos robótico.
-- **Backend:** FastAPI + Socket.IO (v4.5 Hybrid Core) com novos endpoints de telemetria integrados.
-- **Core Engine (Rust):** Arquitetura híbrida com 8 módulos nativos em Rust (`state`, `policy`, `security`, `memory`, etc.) operacionais.
-- **Cognitive Loop:** Sistema de **Deep Focus** automático que ajusta a interface e a segurança baseado na atividade do usuário.
+- **SudoBroker & RootDaemon:** Sistema agora possui autonomia administrativa isolada. Execuções com privilégios passam por análise estrita de risco, impedindo comandos destrutivos globais.
+- **EventBus & ResourceGovernor:** Arquitetura migrada para Pub/Sub reativo assíncrono. O loop cognitivo acelera ou reduz sua cadência de acordo com o consumo real de RAM, CPU e Swap do host.
+- **Anti-Concatenation Context:** `ConversationManager` e `TopicTracker` refatorados para garantir token budgets exatos, evitando colapso de contexto por injeção duplicada de system prompts e históricos longos.
+- **Self-Improvement Pipeline:** Sistema de automodificação segura incorporado com ferramentas integradas de `RollbackManager` e `PatchManager` auditáveis.
+- **GTK4/Libadwaita Premium Dashboard:** Nova sidebar nativa no chat GTK4 contendo LevelBars de telemetria em tempo real, badges de status de arquitetura e monitoramento individual dos 5 agentes internos (Strategist, Operator, Critic, SudoBroker, EventBus).
 
 ## Architecture
 
@@ -46,15 +45,13 @@ graph TD
 | Path | Purpose |
 | --- | --- |
 | `apps/` | FastAPI app, realtime hub, status routes, orchestration entrypoints. |
-| `zeus_core/` | LLM routing, agents, memory, security guards, event bus, integrations (Notion, Linear), observability. |
+| `zeus_core/` | Agentes, `SudoBroker`, `ResourceGovernor`, LLM routing, event bus, `SelfImprovementPipeline`, observability. |
 | `public/` | Web HUD and frontend tests. |
 | `applets/` | Linux desktop panel integrations, currently Cinnamon `zeus@local`. |
 | `bin/zeus-gtk-chat` | Premium native GTK4/Libadwaita desktop chat launched by the applet. |
 | `watcher_rs/` | Rust filesystem watcher. |
 | `core-rust/` | **Hybrid Core Workspace**: 8 crates Rust para estado compartilhado, políticas, segurança, sensores e lógica cognitiva. |
 | `zeus_core/vision.py` | Módulo de captura de tela, OCR e análise visual via LLM. |
-| `zeus_core/cognitive/self_healing.py` | Motor de monitoramento de logs e reparo automático. |
-| `bin/zeus-summon` | Script para invocação global via atalhos de teclado (Super+Z). |
 | `docs/` | Technical reports and execution plans. |
 | `tests/` | Python regression, security, policy, route, and observability tests. |
 
@@ -74,6 +71,11 @@ ZEUS_DISABLE_OLLAMA=0
 ZEUS_ALLOW_LAN=0
 ZEUS_LAN_AUTH=1
 ZEUS_ALLOW_INSECURE_DEV_SECRET=0
+
+# Governança de Recursos
+ZEUS_RAM_SOFT_LIMIT=75
+ZEUS_RAM_HARD_LIMIT=90
+ZEUS_SWAP_WARNING_LIMIT=50
 
 # Second Brain Integrations
 ZEUS_VAULT_PATH=/home/zeus/Documentos/Brain
@@ -144,7 +146,7 @@ The applet shows backend/LLM status in the Cinnamon panel. Click behavior:
 - backend offline: runs `./bin/zeus ensure-server`.
 
 #### Native GTK4 Chat:
-The desktop client is now built with **GTK4 and Libadwaita** for a native GNOME experience, featuring animations, Markdown code block parsing, toast notifications, and dark mode.
+The desktop client is now built with **GTK4 and Libadwaita** for a native GNOME experience, featuring animations, Markdown code block parsing, toast notifications, live telemetry polling, and dark mode.
 
 Dependencies for Debian/Ubuntu/Linux Mint:
 
@@ -213,7 +215,7 @@ Runtime hardening currently enforced by the backend:
 - `/api/status`, `/api/health`, `/api/chat`, `/api/web-context`, applet routes, ASR, and vision endpoints require trusted local/LAN access.
 - LAN mode should set `ZEUS_ALLOW_LAN=1`, `ZEUS_LAN_AUTH=1`, and a strong `ZEUS_LAN_TOKEN`.
 - `ZEUS_MAX_CHAT_MESSAGE_CHARS`, `ZEUS_MAX_WEB_CONTEXT_CHARS`, and `ZEUS_MAX_VISION_IMAGE_BYTES` cap user-provided payload sizes.
-- Command execution uses `ZEUS_CMD_ALLOWLIST`; interpreter execution flags such as `python3 -c`, `python3 -m`, and `node -e` require explicit confirmation.
+- Command execution uses `SudoBroker` para interceptar escalonamento indevido. Permissões estritas apenas via `RootDaemon`.
 
 Before pushing to a public remote, run:
 
@@ -241,5 +243,5 @@ git push origin main
 
 ## Documentation
 
-- `docs/RELATORIO_COMPLETO_SISTEMA_2026-05-06.md` (Latest: Cognitive Maturity & Adaptive UI)
+- `docs/RELATORIO_COMPLETO_SISTEMA_2026-05-08.md` (Latest: Adaptive Amplification & Secure Autonomy)
 - `docs/ZEUS_SECOND_BRAIN_ARCHITECTURE.md`

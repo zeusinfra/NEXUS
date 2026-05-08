@@ -505,7 +505,17 @@ class StrategistAgent(CloudAgent):
     """Agente Planner: Define a estratégia via LLM."""
 
     def plan(self, blackboard, user_input):
-        system_prompt = "Você é o STRATEGIST do ZEUS. Sua função é analisar o contexto e criar um plano de ação técnico, direto e estratégico. Retorne apenas o plano."
+        system_prompt = (
+            "Você é o STRATEGIST do ZEUS. Analise o contexto e crie um plano técnico MULTI-ETAPAS detalhado.\n"
+            "Seu plano DEVE conter as seguintes seções:\n"
+            "1. Objetivo e Diagnóstico\n"
+            "2. Arquivos Envolvidos\n"
+            "3. Riscos e Impacto (CPU/RAM/Disco)\n"
+            "4. Passo a Passo Técnico\n"
+            "5. Fallbacks e Plano de Rollback\n"
+            "6. Nível de Autonomia Necessário (Requer SudoBroker?)\n"
+            "7. Critérios de Sucesso"
+        )
         user_prompt = (
             f"Contexto: {blackboard.get('context_fragment')}\nObjetivo: {user_input}"
         )
@@ -530,24 +540,22 @@ class OperatorAgent(CloudAgent):
 
     def execute(self, blackboard):
         system_prompt = (
-            "Você é o OPERATOR do ZEUS. Transforme o plano estratégico em comandos de "
-            "terminal (Linux/Bash) precisos, mas não os execute. Deixe explícito que a "
-            "saída é uma proposta técnica em modo DRY-RUN. "
-            "REGRA CRÍTICA DE SEGURANÇA: NUNCA proponha comandos destrutivos (como rm -rf, "
-            "formatações ou mudanças globais de permissões). Priorize comandos seguros e de "
-            "leitura ou modificação isolada."
+            "Você é o OPERATOR do ZEUS. Transforme o plano estratégico em ações ou comandos seguros.\n"
+            "REGRAS OBRIGATÓRIAS:\n"
+            "1. Prefira comandos idempotentes.\n"
+            "2. Exija backup antes de alterações.\n"
+            "3. Proponha dry-run quando possível.\n"
+            "4. NUNCA use sudo diretamente (ex: sudo apt update). Se precisar de admin, delegue para o SudoBroker.\n"
+            "5. NUNCA execute comandos destrutivos (rm -rf /, dd, mkfs, chmod -R 777).\n"
+            "6. Se for um patch em código, proponha patches pequenos."
         )
         user_prompt = f"Plano: {blackboard.get('plan')}"
 
         commands = self._call_llm(system_prompt, user_prompt)
         
-        is_safe = self._validate_commands(commands)
-        mode = "DRY_RUN" if is_safe else "BLOCKED"
-        if not is_safe:
-            commands = "[OPERAÇÃO BLOQUEADA] A proposta continha comandos na blacklist de segurança.\n" + commands
-
+        # O Operator propõe. A execução será gerenciada pela engine ReAct do agent.py ou pelo SudoBroker.
         result = {
-            "mode": mode,
+            "mode": "PROPOSAL",
             "commands": commands,
             "executed": False,
             "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
@@ -562,9 +570,14 @@ class CriticAgent(CloudAgent):
 
     def analyze(self, blackboard):
         system_prompt = (
-            "Você é o CRITIC do ZEUS. Analise a proposta gerada em modo DRY-RUN e "
-            "determine se ela parece suficiente e segura para atingir o objetivo. "
-            "Responda com 'SUCCESS' ou 'FAILED' seguido da justificativa."
+            "Você é o CRITIC do ZEUS. Analise a proposta de execução e o plano.\n"
+            "Você DEVE BLOQUEAR a execução se:\n"
+            "- A ação usa sudo ou shell como root diretamente (sem SudoBroker).\n"
+            "- Modifica /etc sem backup.\n"
+            "- Remove arquivos críticos.\n"
+            "- Modifica código do próprio ZEUS sem rollback.\n"
+            "- A resposta agrupa contextos muito antigos (concatenação indevida).\n\n"
+            "Responda EXATAMENTE com uma das palavras-chave na primeira linha: SUCCESS, REVISE, BLOCK ou NEED_USER_CONFIRMATION, seguida da sua justificativa."
         )
         execution_result = blackboard.get("execution_result")
         serialized_result = json.dumps(execution_result, ensure_ascii=False, indent=2)
@@ -574,7 +587,17 @@ class CriticAgent(CloudAgent):
         )
 
         metric = self._call_llm(system_prompt, user_prompt)
-        status = "SUCCESS" if "SUCCESS" in metric.upper() else "FAILED"
+        first_line = metric.strip().split("\n")[0].upper()
+        
+        status = "UNKNOWN"
+        for kw in ["SUCCESS", "REVISE", "BLOCK", "NEED_USER_CONFIRMATION"]:
+            if kw in first_line:
+                status = kw
+                break
+                
+        if status == "UNKNOWN":
+            status = "REVISE"
+
         blackboard.update("status", status)
         blackboard.update("metrics", metric)
         return metric
