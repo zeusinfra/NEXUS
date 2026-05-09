@@ -50,6 +50,7 @@ from zeus_core.llm_service import LLMService
 from zeus_core.memory_manager import MemoryManager
 from zeus_core.path_filters import is_runtime_noise_path
 from zeus_core.response_text import display_text, speech_text
+from zeus_core.conversation.sqlite_conversation_memory import conversation_memory
 from zeus_core.events.watcher import watch_vault
 from zeus_core.events.sync_worker import sync_worker_loop
 from zeus_core.events.sync_engine import sync_synaptic_to_obsidian, sync_longterm_to_notion, sync_insights_to_linear
@@ -66,6 +67,7 @@ from zeus_core.security_guard import (
     require_lan_token_for_request,
     require_lan_token_for_socketio,
 )
+from zeus_core.security.sudo_broker import sudo_broker
 from fastapi import FastAPI, WebSocket, HTTPException, Request
 from fastapi.responses import StreamingResponse, RedirectResponse
 import socketio
@@ -1153,6 +1155,7 @@ class ChatReq(BaseModel):
     client_msg_id: str | None = None
     source: str | None = None
     client_id: str | None = None
+    session_id: str | None = None
     voice_response: bool | None = False
 
 
@@ -1161,6 +1164,18 @@ class VisionAnalyzeReq(BaseModel):
     question: str
     mode: str | None = "auto"  # auto | llm | ocr
     ocr_lang: str | None = "por"
+
+
+class AdminActionReq(BaseModel):
+    command: str
+    reason: str
+    risk: str | None = "MEDIUM_RISK"
+    requires_backup: bool | None = False
+    rollback_plan: str | None = ""
+    expected_outcome: str | None = ""
+
+
+ADMIN_ACTIONS: dict[str, dict] = {}
 
 
 class AppletVoiceStartReq(BaseModel):
@@ -1261,7 +1276,12 @@ async def autonomous_reflection():
             print(f"Erro no ciclo de reflexão: {e}")
 
 
-async def get_combined_context_prompt(user_message: str) -> str:
+async def get_combined_context_prompt(
+    user_message: str,
+    *,
+    session_id: str = "default",
+    client_id: str = "default",
+) -> str:
     """Gera um prompt rico e ORGANIZADO para o agente cognitivo."""
     # 1. LIBRARIAN RAG
     librarian_context = ""
@@ -1288,6 +1308,13 @@ async def get_combined_context_prompt(user_message: str) -> str:
     
     behavioral_state = pattern_engine.analyze_behavioral_state()
     second_brain_context = build_current_context()
+    conversation_context = await asyncio.to_thread(
+        conversation_memory.build_context_block,
+        user_message,
+        session_id=session_id,
+        client_id=client_id,
+    )
+    conversation_block = f"{conversation_context}\n\n" if conversation_context else ""
     
     return (
         f"ESTADO DO SISTEMA:\n"
@@ -1300,6 +1327,7 @@ async def get_combined_context_prompt(user_message: str) -> str:
         f"{chr(10).join(top_connections) if top_connections else '  Sem conexões ativas no momento.'}\n"
         f"----------------------------\n\n"
         f"{memory_block}"
+        f"{conversation_block}"
         f"{librarian_context}"
         f"MENSAGEM DO USUÁRIO: {user_message}\n\n"
         f"{SYSTEM_INSTRUCTIONS}"
@@ -1328,11 +1356,17 @@ async def api_chat(req: ChatReq, request: Request):
     msg_id = (req.client_msg_id or "").strip() or str(uuid.uuid4())
     source = (req.source or "api").strip().lower()[:32]
     client_id = (req.client_id or "").strip()[:64] or None
+    session_id = (req.session_id or client_id or "default").strip()[:96]
     
     await broadcast_message({"type": "CHAT_USER", "id": msg_id, "source": source, "client_id": client_id, "message": user_message})
     asyncio.create_task(asyncio.to_thread(record_interaction, "chat", user_message, source))
     
-    context_prompt = await get_combined_context_prompt(user_message)
+    await asyncio.to_thread(conversation_memory.add_turn, session_id, client_id or source, "user", user_message)
+    context_prompt = await get_combined_context_prompt(
+        user_message,
+        session_id=session_id,
+        client_id=client_id or source,
+    )
     client_key = (request.client.host if request.client else "unknown")
     
     # Pensamento proativo (Exibido na Thought Bar)
@@ -1357,6 +1391,7 @@ async def api_chat(req: ChatReq, request: Request):
         voice_reply = speech_text(reply)
         latency_ms = round((time.perf_counter() - started_at) * 1000)
         # Final memory update and logs
+        asyncio.create_task(asyncio.to_thread(conversation_memory.add_turn, session_id, client_id or source, "assistant", reply))
         asyncio.create_task(update_memory_after_chat(user_message, reply))
         await broadcast_message({
             "type": "CHAT_AI",
@@ -1392,6 +1427,92 @@ async def api_applet_chat(req: ChatReq, request: Request):
     req.source = (req.source or "cinnamon_applet").strip() or "cinnamon_applet"
     req.client_id = (req.client_id or "zeus_cinnamon_applet").strip() or "zeus_cinnamon_applet"
     return await api_chat(req, request)
+
+
+def _admin_action_public(action: dict) -> dict:
+    return {
+        "id": action["id"],
+        "command": action["command"],
+        "reason": action["reason"],
+        "risk": action["risk"],
+        "requires_backup": action["requires_backup"],
+        "rollback_plan": action["rollback_plan"],
+        "expected_outcome": action["expected_outcome"],
+        "status": action["status"],
+        "created_at": action["created_at"],
+    }
+
+
+@app.get("/api/admin/actions/pending")
+async def api_admin_pending(request: Request):
+    if not _is_trusted_request(request):
+        raise HTTPException(status_code=403, detail="Only trusted (local/LAN) requests are allowed.")
+    _require_lan_token_for_request(request)
+    return {
+        "actions": [
+            _admin_action_public(action)
+            for action in ADMIN_ACTIONS.values()
+            if action.get("status") == "pending"
+        ]
+    }
+
+
+@app.post("/api/admin/actions/propose")
+async def api_admin_propose(req: AdminActionReq, request: Request):
+    if not _is_trusted_request(request):
+        raise HTTPException(status_code=403, detail="Only trusted (local/LAN) requests are allowed.")
+    _require_lan_token_for_request(request)
+    command = (req.command or "").strip()
+    reason = (req.reason or "").strip()
+    if not command or not reason:
+        raise HTTPException(status_code=400, detail="command and reason are required.")
+    action_id = f"adm_{uuid.uuid4().hex[:12]}"
+    ADMIN_ACTIONS[action_id] = {
+        "id": action_id,
+        "command": command,
+        "reason": reason,
+        "risk": (req.risk or "MEDIUM_RISK").strip(),
+        "requires_backup": bool(req.requires_backup),
+        "rollback_plan": req.rollback_plan or "",
+        "expected_outcome": req.expected_outcome or "",
+        "status": "pending",
+        "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+    await broadcast_message({"type": "ADMIN_ACTION_REQUIRED", "admin_action": _admin_action_public(ADMIN_ACTIONS[action_id])})
+    return {"admin_action": _admin_action_public(ADMIN_ACTIONS[action_id])}
+
+
+@app.post("/api/admin/actions/{action_id}/deny")
+async def api_admin_deny(action_id: str, request: Request):
+    if not _is_trusted_request(request):
+        raise HTTPException(status_code=403, detail="Only trusted (local/LAN) requests are allowed.")
+    _require_lan_token_for_request(request)
+    action = ADMIN_ACTIONS.get(action_id)
+    if not action or action.get("status") != "pending":
+        raise HTTPException(status_code=404, detail="Admin action not found or not pending.")
+    action["status"] = "denied"
+    return {"status": "denied", "id": action_id}
+
+
+@app.post("/api/admin/actions/{action_id}/allow")
+async def api_admin_allow(action_id: str, request: Request):
+    if not _is_trusted_request(request):
+        raise HTTPException(status_code=403, detail="Only trusted (local/LAN) requests are allowed.")
+    _require_lan_token_for_request(request)
+    action = ADMIN_ACTIONS.get(action_id)
+    if not action or action.get("status") != "pending":
+        raise HTTPException(status_code=404, detail="Admin action not found or not pending.")
+    result = await sudo_broker.request_admin_action(
+        action["command"],
+        action["reason"],
+        requires_backup=bool(action.get("requires_backup")),
+        rollback_plan=action.get("rollback_plan") or "",
+        expected_outcome=action.get("expected_outcome") or "",
+        user_confirmed=True,
+    )
+    action["status"] = "allowed" if result.get("status") == "success" else "failed"
+    action["result"] = result
+    return {"status": action["status"], "id": action_id, "result": result}
 
 
 @app.post("/api/applet/voice/start")

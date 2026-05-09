@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import base64
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -42,7 +43,10 @@ class ZeusGtkChat(Adw.Application):
         self.toast_overlay: Adw.ToastOverlay | None = None
         self.messages_box: Gtk.Box | None = None
         self.scroller: Gtk.ScrolledWindow | None = None
-        self.input: Gtk.Entry | None = None
+        self.input: Gtk.TextView | None = None
+        self.input_buffer: Gtk.TextBuffer | None = None
+        self.input_scroll: Gtk.ScrolledWindow | None = None
+        self.char_count_label: Gtk.Label | None = None
         self.send_button: Gtk.Button | None = None
         self.cancel_button: Gtk.Button | None = None
         self.spinner: Gtk.Spinner | None = None
@@ -55,6 +59,16 @@ class ZeusGtkChat(Adw.Application):
         self._cancel_requested = False
         self._is_generating = False
         self._autostart_mode = False
+        self._sidebar_visible = True
+        self._seen_admin_action_ids: set[str] = set()
+        self.sidebar_scroll: Gtk.ScrolledWindow | None = None
+        self._session_id = os.getenv("ZEUS_GTK_SESSION_ID") or datetime.now().strftime("gtk-%Y%m%d-%H%M%S")
+        self._history_db = os.path.join(
+            os.getenv("XDG_DATA_HOME", os.path.expanduser("~/.local/share")),
+            "zeus",
+            "gtk_conversations.sqlite",
+        )
+        self._init_history_db()
 
     def do_command_line(self, command_line) -> int:
         args = command_line.get_arguments()
@@ -111,6 +125,7 @@ class ZeusGtkChat(Adw.Application):
 
         # SIDEBAR (Telemetria Premium)
         sidebar_scroll = Gtk.ScrolledWindow()
+        self.sidebar_scroll = sidebar_scroll
         sidebar_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         sidebar_scroll.set_size_request(240, -1)
         sidebar_scroll.add_css_class("sidebar-scroll")
@@ -263,6 +278,16 @@ class ZeusGtkChat(Adw.Application):
         self.window_title = Adw.WindowTitle(title="ZEUS Ops", subtitle="Inicializando...")
         header.set_title_widget(self.window_title)
 
+        sidebar_button = Gtk.Button(icon_name="sidebar-show-symbolic")
+        sidebar_button.set_tooltip_text("Mostrar/ocultar painel lateral")
+        sidebar_button.connect("clicked", self._toggle_sidebar)
+        header.pack_start(sidebar_button)
+
+        palette_button = Gtk.Button(icon_name="edit-find-symbolic")
+        palette_button.set_tooltip_text("Command Palette (Ctrl+K)")
+        palette_button.connect("clicked", self._show_command_palette)
+        header.pack_start(palette_button)
+
         # Voice Toggle
         self.voice_button = Gtk.ToggleButton()
         self.voice_button.set_icon_name("audio-volume-high-symbolic")
@@ -277,7 +302,6 @@ class ZeusGtkChat(Adw.Application):
         hud_button.connect("clicked", lambda _: webbrowser.open(BACKEND))
         header.pack_end(hud_button)
 
-        # Diagnostic Button
         diag_button = Gtk.Button(icon_name="dialog-information-symbolic")
         diag_button.set_tooltip_text("Diagnóstico do ZEUS")
         diag_button.connect("clicked", self._show_diagnostic)
@@ -357,11 +381,40 @@ class ZeusGtkChat(Adw.Application):
         composer.set_margin_bottom(24)
         composer_clamp.set_child(composer)
 
-        self.input = Gtk.Entry()
-        self.input.set_placeholder_text("Peça uma ação, diagnóstico ou sincronização...")
-        self.input.connect("activate", self._send_message)
-        self.input.set_hexpand(True)
-        composer.append(self.input)
+        input_stack = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        input_stack.set_hexpand(True)
+        self.input_scroll = Gtk.ScrolledWindow()
+        self.input_scroll.add_css_class("composer-input")
+        self.input_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        self.input_scroll.set_min_content_height(44)
+        self.input_scroll.set_max_content_height(130)
+
+        self.input = Gtk.TextView()
+        self.input.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+        self.input.set_top_margin(10)
+        self.input.set_bottom_margin(10)
+        self.input.set_left_margin(12)
+        self.input.set_right_margin(12)
+        self.input_buffer = self.input.get_buffer()
+        self.input_buffer.connect("changed", self._on_input_changed)
+        input_key = Gtk.EventControllerKey.new()
+        input_key.connect("key-pressed", self._on_input_key_press)
+        self.input.add_controller(input_key)
+        self.input_scroll.set_child(self.input)
+        input_stack.append(self.input_scroll)
+
+        input_footer = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        self.char_count_label = Gtk.Label(label="0")
+        self.char_count_label.add_css_class("composer-counter")
+        self.char_count_label.set_halign(Gtk.Align.END)
+        input_footer.append(Gtk.Label(label="Enter envia · Shift+Enter quebra linha"))
+        input_footer.get_first_child().add_css_class("composer-hint")
+        spacer_footer = Gtk.Label()
+        spacer_footer.set_hexpand(True)
+        input_footer.append(spacer_footer)
+        input_footer.append(self.char_count_label)
+        input_stack.append(input_footer)
+        composer.append(input_stack)
 
         self.spinner = Gtk.Spinner()
         composer.append(self.spinner)
@@ -385,21 +438,6 @@ class ZeusGtkChat(Adw.Application):
     def _update_contextual_placeholder(self) -> bool:
         if not self._last_status or self._is_generating:
             return True
-            
-        cog = self._last_status.get("cognitive", {})
-        mode = cog.get("mode", "nominal")
-        context = str(self._last_status.get("perception", {}).get("visual_context", ""))
-        
-        placeholder = "Peça uma ação ou diagnóstico..."
-        if "deep_work" in mode:
-            placeholder = "Modo Deep Work ativo. Como posso acelerar seu código?"
-        elif "terminal" in context.lower():
-            placeholder = "Vi que está no terminal. Precisa de ajuda com algum comando?"
-        elif "code" in context.lower() or "cursor" in context.lower():
-            placeholder = "Analisando seu código... Deseja um refactor ou teste?"
-        
-        if self.input:
-            self.input.set_placeholder_text(placeholder)
         return True
 
     def _install_css(self) -> None:
@@ -515,12 +553,21 @@ class ZeusGtkChat(Adw.Application):
             background-color: rgba(12, 12, 16, 0.95);
             border-top: 1px solid rgba(255, 255, 255, 0.04);
         }
+        .composer-input {
+            background-color: #14141a;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+        }
+        .composer-hint, .composer-counter {
+            font-size: 0.7rem;
+            color: @text_secondary;
+        }
 
         /* ========= MESSAGES ========= */
         .message-bubble { 
             border: 1px solid rgba(255, 255, 255, 0.04);
-            border-radius: 14px;
-            padding: 16px 20px; 
+            border-radius: 8px;
+            padding: 12px 16px;
             line-height: 1.65; 
             margin: 6px 0;
             box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
@@ -545,12 +592,35 @@ class ZeusGtkChat(Adw.Application):
             color: @text_secondary;
             margin-top: 4px;
         }
+        .message-header {
+            font-size: 0.72rem;
+            color: @text_secondary;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
 
         .message-bubble-system {
             font-size: 0.75rem;
             color: @text_secondary;
             font-style: italic;
             padding: 6px 14px;
+        }
+        .admin-card {
+            background-color: rgba(35, 24, 12, 0.95);
+            border: 1px solid rgba(255, 209, 102, 0.28);
+            border-radius: 8px;
+            padding: 14px;
+        }
+        .admin-title {
+            color: #ffd166;
+            font-weight: 800;
+        }
+        .admin-command {
+            font-family: 'JetBrains Mono', monospace;
+            color: #f8e6b0;
+            background-color: rgba(0, 0, 0, 0.24);
+            padding: 8px;
+            border-radius: 6px;
         }
 
         /* ========= THOUGHT BAR ========= */
@@ -646,6 +716,115 @@ class ZeusGtkChat(Adw.Application):
         if self.window_title:
             self.window_title.set_subtitle(subtitle)
 
+    def _init_history_db(self) -> None:
+        os.makedirs(os.path.dirname(self._history_db), exist_ok=True)
+        with sqlite3.connect(self._history_db) as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS gtk_messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+                """
+            )
+
+    def _save_local_message(self, role: str, content: str) -> None:
+        try:
+            with sqlite3.connect(self._history_db) as conn:
+                conn.execute(
+                    "INSERT INTO gtk_messages(session_id, role, content, created_at) VALUES (?, ?, ?, ?)",
+                    (self._session_id, role, content[:12000], datetime.now().isoformat(timespec="seconds")),
+                )
+        except Exception as exc:
+            print(f"[GTK] History save failed: {exc}")
+
+    def _get_input_text(self) -> str:
+        if not self.input_buffer:
+            return ""
+        start = self.input_buffer.get_start_iter()
+        end = self.input_buffer.get_end_iter()
+        return self.input_buffer.get_text(start, end, True)
+
+    def _set_input_text(self, text: str) -> None:
+        if self.input_buffer:
+            self.input_buffer.set_text(text)
+
+    def _on_input_changed(self, *_args) -> None:
+        if self.char_count_label:
+            self.char_count_label.set_label(str(len(self._get_input_text())))
+
+    def _on_input_key_press(self, controller, keyval, keycode, state) -> bool:
+        if keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter) and not (state & Gdk.ModifierType.SHIFT_MASK):
+            self._send_message(self.send_button)
+            return True
+        return False
+
+    def _toggle_sidebar(self, *_args) -> None:
+        self._sidebar_visible = not self._sidebar_visible
+        if self.sidebar_scroll:
+            self.sidebar_scroll.set_visible(self._sidebar_visible)
+
+    def _show_command_palette(self, *_args) -> None:
+        dialog = Gtk.Window(title="Command Palette")
+        dialog.set_transient_for(self.window)
+        dialog.set_modal(True)
+        dialog.set_default_size(420, 360)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        box.set_margin_top(16)
+        box.set_margin_bottom(16)
+        box.set_margin_start(16)
+        box.set_margin_end(16)
+        dialog.set_child(box)
+
+        actions = [
+            ("Diagnóstico", self._show_diagnostic),
+            ("Mostrar histórico da sessão", self._show_session_history),
+            ("Limpar chat", self._clear_messages),
+            ("Abrir HUD Web", lambda *_: webbrowser.open(BACKEND)),
+            ("Alternar voz", lambda *_: self.voice_button.set_active(not self.voice_button.get_active()) if self.voice_button else None),
+            ("Ocultar/mostrar sidebar", self._toggle_sidebar),
+            ("Health check", self._check_status),
+        ]
+        for label, callback in actions:
+            btn = Gtk.Button(label=label)
+            btn.set_halign(Gtk.Align.FILL)
+            btn.connect("clicked", lambda _btn, cb=callback: (cb(), dialog.close()))
+            box.append(btn)
+        dialog.present()
+
+    def _show_session_history(self, *_args) -> None:
+        dialog = Gtk.Window(title="Histórico local")
+        dialog.set_transient_for(self.window)
+        dialog.set_modal(True)
+        dialog.set_default_size(640, 520)
+        scroll = Gtk.ScrolledWindow()
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        box.set_margin_top(16)
+        box.set_margin_bottom(16)
+        box.set_margin_start(16)
+        box.set_margin_end(16)
+        scroll.set_child(box)
+        dialog.set_child(scroll)
+        try:
+            with sqlite3.connect(self._history_db) as conn:
+                rows = conn.execute(
+                    "SELECT role, content, created_at FROM gtk_messages "
+                    "WHERE session_id = ? ORDER BY id DESC LIMIT 40",
+                    (self._session_id,),
+                ).fetchall()
+        except Exception as exc:
+            rows = [("system", f"Falha ao abrir histórico: {exc}", "")]
+        for role, content, created_at in reversed(rows):
+            label = Gtk.Label(label=f"{created_at} · {role}\n{content[:1000]}")
+            label.set_wrap(True)
+            label.set_selectable(True)
+            label.set_halign(Gtk.Align.START)
+            box.append(label)
+        dialog.present()
+
     def _show_diagnostic(self, *_args) -> None:
         provider = self._last_status.get("llm", {}).get("provider", "desconhecido")
         is_online = bool(self._last_status) and not self.banner.get_revealed()
@@ -655,6 +834,9 @@ class ZeusGtkChat(Adw.Application):
     def _on_key_press(self, controller, keyval, keycode, state) -> bool:
         if keyval in (Gdk.KEY_l, Gdk.KEY_L) and (state & Gdk.ModifierType.CONTROL_MASK):
             self._clear_messages()
+            return True
+        if keyval in (Gdk.KEY_k, Gdk.KEY_K) and (state & Gdk.ModifierType.CONTROL_MASK):
+            self._show_command_palette()
             return True
         if keyval == Gdk.KEY_Escape and self._is_generating:
             self._cancel_generation()
@@ -680,14 +862,16 @@ class ZeusGtkChat(Adw.Application):
     def _trigger_autostart_greeting(self) -> bool:
         if not self._is_generating and self.input:
             prompt = "INICIALIZAÇÃO DO SISTEMA: Dê as boas-vindas. Faça um diagnóstico detalhado do uso do PC (CPU, RAM, disco) e do status atual do sistema local usando suas ferramentas. Responda num tom de copiloto pronto para o trabalho."
-            self.input.set_text(prompt)
+            self._set_input_text(prompt)
             self._send_message(self.send_button)
-            self.input.set_text("")
+            self._set_input_text("")
         return False
 
     def _add_message(self, role: str, content: str) -> None:
         if self.status_page and self.status_page.get_visible():
             self.status_page.set_visible(False)
+        if role in {"user", "assistant"}:
+            self._save_local_message(role, content)
 
         row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         row.add_css_class("message-row")
@@ -701,8 +885,13 @@ class ZeusGtkChat(Adw.Application):
             content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
             content_box.add_css_class("message-bubble")
             content_box.add_css_class("message-bubble-user")
+
+            header = Gtk.Label(label=f"Você · {timestamp}")
+            header.add_css_class("message-header")
+            header.set_halign(Gtk.Align.END)
+            content_box.append(header)
             
-            label = Gtk.Label(label=f"» {content}")
+            label = Gtk.Label(label=content)
             label.set_wrap(True)
             label.set_selectable(True)
             label.set_halign(Gtk.Align.START)
@@ -732,6 +921,11 @@ class ZeusGtkChat(Adw.Application):
             content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
             content_box.add_css_class("message-bubble")
             content_box.add_css_class("message-bubble-assistant")
+
+            header = Gtk.Label(label=f"ZEUS · {timestamp}")
+            header.add_css_class("message-header")
+            header.set_halign(Gtk.Align.START)
+            content_box.append(header)
             
             rendered_content = self._render_message_content(content)
             content_box.append(rendered_content)
@@ -739,7 +933,7 @@ class ZeusGtkChat(Adw.Application):
             actions_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
             actions_box.set_margin_top(6)
             
-            meta = Gtk.Label(label=f"ZEUS · {timestamp}")
+            meta = Gtk.Label(label=f"{len(content)} chars")
             meta.add_css_class("message-meta")
             actions_box.append(meta)
             
@@ -748,10 +942,22 @@ class ZeusGtkChat(Adw.Application):
             copy_btn.add_css_class("circular")
             copy_btn.set_tooltip_text("Copiar mensagem")
             copy_btn.connect("clicked", lambda _, txt=content: self._copy_to_clipboard(txt, "Mensagem copiada"))
+            speak_btn = Gtk.Button(icon_name="audio-volume-high-symbolic")
+            speak_btn.add_css_class("flat")
+            speak_btn.add_css_class("circular")
+            speak_btn.set_tooltip_text("Falar novamente")
+            speak_btn.connect("clicked", lambda _, txt=content: self._speak_async(speech_text(txt) or txt))
+            insight_btn = Gtk.Button(icon_name="emblem-favorite-symbolic")
+            insight_btn.add_css_class("flat")
+            insight_btn.add_css_class("circular")
+            insight_btn.set_tooltip_text("Salvar insight local")
+            insight_btn.connect("clicked", lambda _, txt=content: self._copy_to_clipboard(txt, "Insight copiado para uso no Second Brain"))
             
             spacer = Gtk.Label()
             spacer.set_hexpand(True)
             actions_box.append(spacer)
+            actions_box.append(speak_btn)
+            actions_box.append(insight_btn)
             actions_box.append(copy_btn)
             
             content_box.append(actions_box)
@@ -775,6 +981,68 @@ class ZeusGtkChat(Adw.Application):
         GLib.idle_add(lambda: revealer.set_reveal_child(True))
         GLib.idle_add(self._scroll_to_bottom)
 
+    def _add_admin_action_card(self, action: dict) -> None:
+        if not self.messages_box:
+            return
+        if self.status_page and self.status_page.get_visible():
+            self.status_page.set_visible(False)
+
+        action_id = str(action.get("id") or "")
+        command = str(action.get("command") or "N/A")
+        reason = str(action.get("reason") or action.get("rationale") or "Ação administrativa proposta.")
+        risk = str(action.get("risk") or "UNKNOWN")
+        rollback = str(action.get("rollback_plan") or "Não informado")
+        expected = str(action.get("expected_outcome") or "Não informado")
+
+        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        card.add_css_class("admin-card")
+        title = Gtk.Label(label=f"Admin Action Required · {risk}")
+        title.add_css_class("admin-title")
+        title.set_halign(Gtk.Align.START)
+        card.append(title)
+
+        cmd = Gtk.Label(label=command)
+        cmd.add_css_class("admin-command")
+        cmd.set_selectable(True)
+        cmd.set_wrap(True)
+        cmd.set_halign(Gtk.Align.START)
+        card.append(cmd)
+
+        details = Gtk.Label(label=f"Motivo: {reason}\nResultado esperado: {expected}\nRollback: {rollback}")
+        details.set_wrap(True)
+        details.set_selectable(True)
+        details.set_halign(Gtk.Align.START)
+        card.append(details)
+
+        buttons = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        deny = Gtk.Button(label="Deny")
+        deny.connect("clicked", lambda *_: self._admin_decision(action_id, "deny"))
+        allow = Gtk.Button(label="Allow")
+        allow.add_css_class("suggested-action")
+        allow.connect("clicked", lambda *_: self._admin_decision(action_id, "allow"))
+        buttons.append(deny)
+        buttons.append(allow)
+        card.append(buttons)
+
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        row.set_halign(Gtk.Align.CENTER)
+        row.append(card)
+        self.messages_box.append(row)
+        GLib.idle_add(self._scroll_to_bottom)
+
+    def _admin_decision(self, action_id: str, decision: str) -> None:
+        if not action_id:
+            self._toast("Ação admin sem ID; não é seguro aprovar.")
+            return
+        path = f"/api/admin/actions/{action_id}/{'allow' if decision == 'allow' else 'deny'}"
+        def worker() -> None:
+            try:
+                self._post_json(path, {"action_id": action_id}, timeout=30)
+                GLib.idle_add(self._toast, f"Ação {decision} registrada.")
+            except Exception as exc:
+                GLib.idle_add(self._toast, f"Falha ao registrar decisão admin: {exc}", 5)
+        threading.Thread(target=worker, daemon=True).start()
+
     def _render_message_content(self, content: str) -> Gtk.Widget:
         container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         
@@ -790,13 +1058,9 @@ class ZeusGtkChat(Adw.Application):
                 if not part.strip():
                     continue
                 lbl = Gtk.Label()
-                # Aplica bold simples (naive) substituindo ** por tags <b>
                 parsed_text = f"» {part}" if i == 0 else part
-                if "**" in parsed_text:
-                    parsed_text = parsed_text.replace("**", "<b>", 1).replace("**", "</b>", 1)
-                
                 try:
-                    lbl.set_markup(parsed_text)
+                    lbl.set_markup(pango_markup(parsed_text))
                 except Exception:
                     lbl.set_text(part)
                 
@@ -890,7 +1154,21 @@ class ZeusGtkChat(Adw.Application):
     def _poll_status(self) -> bool:
         """Called every 2s by GLib.timeout_add. Returns True to keep polling."""
         self._check_status()
+        self._check_admin_actions()
         return True  # Return True = keep the timer alive
+
+    def _check_admin_actions(self) -> None:
+        def worker() -> None:
+            try:
+                data = self._get_json("/api/admin/actions/pending", timeout=4)
+                for action in data.get("actions", []):
+                    action_id = str(action.get("id") or "")
+                    if action_id and action_id not in self._seen_admin_action_ids:
+                        self._seen_admin_action_ids.add(action_id)
+                        GLib.idle_add(self._add_admin_action_card, action)
+            except Exception:
+                pass
+        threading.Thread(target=worker, daemon=True).start()
 
     def _apply_status(self, data: dict) -> bool:
         self._last_status = data
@@ -967,11 +1245,11 @@ class ZeusGtkChat(Adw.Application):
     def _send_message(self, *_args) -> None:
         if self.input is None or self._is_generating:
             return
-        text = self.input.get_text().strip()
+        text = self._get_input_text().strip()
         if not text:
             return
             
-        self.input.set_text("")
+        self._set_input_text("")
         self._add_message("user", text)
         self._set_loading(True, "Gerando resposta...")
         self._cancel_requested = False
@@ -985,6 +1263,7 @@ class ZeusGtkChat(Adw.Application):
             "message": text,
             "source": "cinnamon_gtk_chat",
             "client_id": "zeus_gtk_chat",
+            "session_id": self._session_id,
         }
         try:
             data = self._post_json("/api/applet/chat", payload, timeout=120)
@@ -994,8 +1273,12 @@ class ZeusGtkChat(Adw.Application):
             reply = data.get("reply") or data.get("error") or "Sem resposta."
             speech_reply = data.get("speech_reply") or speech_text(str(reply))
             latency_ms = data.get("latency_ms") or round((time.perf_counter() - started) * 1000)
+            admin_actions = data.get("admin_actions")
+            admin_action = data.get("admin_action")
+            if not admin_action and isinstance(admin_actions, list) and admin_actions:
+                admin_action = admin_actions[0]
             
-            GLib.idle_add(self._on_response, str(reply), int(latency_ms), str(speech_reply or reply))
+            GLib.idle_add(self._on_response, str(reply), int(latency_ms), str(speech_reply or reply), admin_action)
         except urllib.error.HTTPError as exc:
             if self._cancel_requested: return
             try: body = exc.read().decode("utf-8")
@@ -1005,8 +1288,10 @@ class ZeusGtkChat(Adw.Application):
             if self._cancel_requested: return
             GLib.idle_add(self._on_error, str(exc))
 
-    def _on_response(self, reply: str, latency_ms: int, speech_reply: str) -> bool:
+    def _on_response(self, reply: str, latency_ms: int, speech_reply: str, admin_action: dict | None = None) -> bool:
         self._add_message("assistant", reply)
+        if isinstance(admin_action, dict):
+            self._add_admin_action_card(admin_action)
         self._set_loading(False, "Pronto")
         print("[GTK] Response received")
         if self._voice_enabled:

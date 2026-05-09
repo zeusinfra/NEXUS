@@ -110,14 +110,6 @@ def validate_command(command: str, tokens: list[str], *, confirmed: bool = False
     if not tokens:
         raise ToolError("Comando inválido.")
 
-    if _RUST_POLICY:
-        ok, reason = _RUST_POLICY.validate_command(command, tokens, confirmed)
-        if not ok:
-            raise ToolError(reason)
-        # Se passou no Rust, fazemos o de-para para CommandDecision do Python
-        decision = classify_command(tokens)
-        return decision
-
     decision = classify_command(tokens)
     allowlist = _configured_allowlist()
 
@@ -130,6 +122,10 @@ def validate_command(command: str, tokens: list[str], *, confirmed: bool = False
             raise ToolError(f"Comando bloqueado por segurança: {decision.exe}")
         if decision.requires_confirmation and not confirmed:
             raise ToolError(f"Comando de escrita requer confirmação explícita: {decision.exe}")
+        if _RUST_POLICY:
+            ok, reason = _RUST_POLICY.validate_command(command, tokens, confirmed)
+            if not ok:
+                raise ToolError(reason)
         log_event(
             logger,
             20,

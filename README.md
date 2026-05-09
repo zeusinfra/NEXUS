@@ -6,13 +6,14 @@ The current default profile is **Ollama Cloud through the local Ollama daemon**,
 
 Current product direction: **the Cinnamon applet is the primary desktop interface**. The desktop chat is a native **GTK4 + Libadwaita** application launched from the Cinnamon applet.
 
-## Current Status (2026-05-08) - Adaptive Amplification & Secure Autonomy
+## Current Status (2026-05-09) - GTK Ops, Persistent Recall & Approval Gates
 
-- **SudoBroker & RootDaemon:** Sistema agora possui autonomia administrativa isolada. Execuções com privilégios passam por análise estrita de risco, impedindo comandos destrutivos globais.
-- **EventBus & ResourceGovernor:** Arquitetura migrada para Pub/Sub reativo assíncrono. O loop cognitivo acelera ou reduz sua cadência de acordo com o consumo real de RAM, CPU e Swap do host.
-- **Anti-Concatenation Context:** `ConversationManager` e `TopicTracker` refatorados para garantir token budgets exatos, evitando colapso de contexto por injeção duplicada de system prompts e históricos longos.
-- **Self-Improvement Pipeline:** Sistema de automodificação segura incorporado com ferramentas integradas de `RollbackManager` e `PatchManager` auditáveis.
-- **GTK4/Libadwaita Premium Dashboard:** Nova sidebar nativa no chat GTK4 contendo LevelBars de telemetria em tempo real, badges de status de arquitetura e monitoramento individual dos 5 agentes internos (Strategist, Operator, Critic, SudoBroker, EventBus).
+- **GTK4 Ops Chat:** Interface nativa ganhou composer multi-linha, command palette (`Ctrl+K`), sidebar recolhível, histórico local em SQLite, balões de conversa refinados e ações por mensagem.
+- **Persistent Conversation Recall:** `SQLiteConversationMemory` persiste turnos por `session_id`/`client_id`, injeta histórico recente e recupera conversas parecidas antes de chamar o LLM.
+- **Sudo Approval Gates:** Ações administrativas passam por propostas auditáveis com endpoints `pending/propose/allow/deny`; a GTK mostra cards **Allow/Deny** e nunca envia comando cru ao aprovar.
+- **RootDaemon Hardening:** Socket restrito a `0660`, validação segura de unidades systemd e allowlist tokenizada para comandos read-only/baixo risco.
+- **Self-Healing Guardrails:** Correções autônomas passam pelo `command_policy` e não usam `shell=True`.
+- **Cognitive Loop Stability:** Loop cognitivo evita executor assíncrono instável no ambiente atual, corrige `LOOP_INTERVAL` removido e aceita metas como `dict` ou `CognitiveGoal`.
 
 ## Architecture
 
@@ -45,7 +46,7 @@ graph TD
 | Path | Purpose |
 | --- | --- |
 | `apps/` | FastAPI app, realtime hub, status routes, orchestration entrypoints. |
-| `zeus_core/` | Agentes, `SudoBroker`, `ResourceGovernor`, LLM routing, event bus, `SelfImprovementPipeline`, observability. |
+| `zeus_core/` | Agentes, `SudoBroker`, `ResourceGovernor`, LLM routing, event bus, memória conversacional, `SelfImprovementPipeline`, observability. |
 | `public/` | Web HUD and frontend tests. |
 | `applets/` | Linux desktop panel integrations, currently Cinnamon `zeus@local`. |
 | `bin/zeus-gtk-chat` | Premium native GTK4/Libadwaita desktop chat launched by the applet. |
@@ -146,7 +147,7 @@ The applet shows backend/LLM status in the Cinnamon panel. Click behavior:
 - backend offline: runs `./bin/zeus ensure-server`.
 
 #### Native GTK4 Chat:
-The desktop client is now built with **GTK4 and Libadwaita** for a native GNOME experience, featuring animations, Markdown code block parsing, toast notifications, live telemetry polling, and dark mode.
+The desktop client is built with **GTK4 and Libadwaita** for a native GNOME/Linux Mint experience. It includes a multiline composer, improved chat bubbles, local conversation history, command palette, collapsible telemetry sidebar, admin approval cards, toast notifications, live telemetry polling, and dark mode.
 
 Dependencies for Debian/Ubuntu/Linux Mint:
 
@@ -158,6 +159,25 @@ The application respects the dark mode preference automatically but can be overr
 ```bash
 ZEUS_GTK_THEME=dark ./bin/zeus-gtk-chat
 ```
+
+GTK shortcuts and controls:
+
+- `Enter`: send message.
+- `Shift+Enter`: insert a new line.
+- `Ctrl+K`: open the command palette.
+- `Ctrl+L`: clear the local chat view.
+- `Esc`: cancel the current generation.
+
+Admin approval flow:
+
+```text
+GET  /api/admin/actions/pending
+POST /api/admin/actions/propose
+POST /api/admin/actions/{id}/allow
+POST /api/admin/actions/{id}/deny
+```
+
+The GTK client only sends the approved `action_id`; the backend retrieves the audited proposal and calls `SudoBroker` with explicit user confirmation.
 
 If Cinnamon does not reload the applet after installation, run:
 
@@ -176,7 +196,7 @@ http://127.0.0.1:8080
 Python:
 
 ```bash
-python3 -m unittest discover tests
+.venv/bin/python -m pytest -q
 ```
 
 Frontend:
@@ -216,6 +236,9 @@ Runtime hardening currently enforced by the backend:
 - LAN mode should set `ZEUS_ALLOW_LAN=1`, `ZEUS_LAN_AUTH=1`, and a strong `ZEUS_LAN_TOKEN`.
 - `ZEUS_MAX_CHAT_MESSAGE_CHARS`, `ZEUS_MAX_WEB_CONTEXT_CHARS`, and `ZEUS_MAX_VISION_IMAGE_BYTES` cap user-provided payload sizes.
 - Command execution uses `SudoBroker` para interceptar escalonamento indevido. Permissões estritas apenas via `RootDaemon`.
+- RootDaemon uses a tokenized command allowlist and `0660` Unix socket permissions.
+- Self-healing commands are validated by `command_policy` and executed without `shell=True`.
+- Admin approvals are action-id based; UI clients do not submit arbitrary privileged commands.
 
 Before pushing to a public remote, run:
 

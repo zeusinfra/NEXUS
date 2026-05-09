@@ -94,7 +94,7 @@ class CognitiveLoop:
         self._stop_event.clear()
         cognitive_state_manager.mark_started()
         log_event(logger, 20, "cognitive_loop_started",
-                  interval=LOOP_INTERVAL,
+                  interval=int(os.getenv("ZEUS_COGNITIVE_INTERVAL_DEFAULT", "20")),
                   mode=cognitive_state_manager.state.mode)
 
         try:
@@ -154,22 +154,22 @@ class CognitiveLoop:
         mode = cognitive_state_manager.state.mode
 
         # Phase 1: Perceive
-        perception = await asyncio.to_thread(self._perceive)
+        perception = self._perceive()
         
         # 🛡️ Pillar 3: Privacy Shield (Cognitive Shielding)
         # Mask secrets in perception BEFORE analysis or planning
         perception = self.privacy.sanitize_perception(perception)
 
         # Phase 2: Update Memory
-        memory_update = await asyncio.to_thread(self._update_memory, perception)
+        memory_update = self._update_memory(perception)
 
         # Phase 3: Analyze
-        analysis = await asyncio.to_thread(self._analyze, perception, memory_update)
+        analysis = self._analyze(perception, memory_update)
 
         # Phase 4: Generate Goals (skip in manual mode)
         goals_created = 0
         if mode != "manual":
-            goals_created = await asyncio.to_thread(self._generate_goals, analysis, perception)
+            goals_created = self._generate_goals(analysis, perception)
 
         # Phase 5: Orchestrate (Executive Control)
         # 🎯 Pillar 1: Priority Orchestrator
@@ -245,10 +245,13 @@ class CognitiveLoop:
             active_goals=active,
             blocked_goals=blocked,
             pending_confirmations=pending_conf,
-            focus=active_goals[0].title if active_goals else None,
+            focus=self._goal_value(active_goals[0], "title") if active_goals else None,
             health_score=health,
             attention=perception.get("attention"),
-            active_goals_list=[{"title": g.title, "type": g.type} for g in orch_result.selected_goals],
+            active_goals_list=[
+                {"title": self._goal_value(g, "title"), "type": self._goal_value(g, "type")}
+                for g in orch_result.selected_goals
+            ],
             privacy_status={
                 "shield": "active",
                 "masked_count": self.privacy.session_masked_count
@@ -632,6 +635,12 @@ class CognitiveLoop:
         score -= min(20, cognitive_state_manager.state.error_count * 2)
 
         return max(0, min(100, score))
+
+    @staticmethod
+    def _goal_value(goal: Any, key: str, default: Any = None) -> Any:
+        if isinstance(goal, dict):
+            return goal.get(key, default)
+        return getattr(goal, key, default)
 
     async def run_single_cycle(self) -> None:
         """Run a single cycle (for testing)."""

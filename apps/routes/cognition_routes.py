@@ -30,9 +30,10 @@ def create_cognition_router(deps: CognitionRouteDeps) -> APIRouter:
     """Create the /api/cognition router."""
     router = APIRouter(prefix="/api/cognition", tags=["cognition"])
 
-    goal_engine = GoalEngine()
-    reflection_engine = ReflectionEngine()
-    execution_engine = CognitiveExecutionEngine()
+    db_path = deps.cognition_service.db_path
+    goal_engine = GoalEngine(db_path=db_path)
+    reflection_engine = ReflectionEngine(db_path=db_path)
+    execution_engine = CognitiveExecutionEngine(db_path=db_path)
 
     def require_access(request: Request) -> None:
         if not deps.is_trusted_request(request):

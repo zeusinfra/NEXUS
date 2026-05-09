@@ -8,12 +8,14 @@ from __future__ import annotations
 
 import os
 import re
+import shlex
 import subprocess
 from dataclasses import dataclass
 from typing import List, Optional
 
 from zeus_core.observability import get_logger, log_event
 from zeus_core.core_system import call_cloud_llm
+from zeus_core.command_policy import validate_command
 
 logger = get_logger("zeus.cognitive.self_healing")
 
@@ -92,7 +94,9 @@ class SelfHealingEngine:
         success = True
         for cmd in proposal.commands:
             try:
-                subprocess.run(cmd, shell=True, check=True, capture_output=True)
+                tokens = shlex.split(cmd)
+                validate_command(cmd, tokens, confirmed=False)
+                subprocess.run(tokens, check=True, capture_output=True, text=True, timeout=30)
             except Exception as e:
                 logger.error(f"Failed to apply healing command '{cmd}': {e}")
                 success = False

@@ -110,11 +110,11 @@ class PriorityOrchestrator:
     def _score_goal(self, goal: dict, context: dict) -> float:
         """Calculate a dynamic priority score for a goal."""
         # Base priority from goal engine (0-100)
-        base_priority = float(goal.get("priority", 50))
+        base_priority = float(self._goal_value(goal, "priority", 50))
         
         # Modifiers
         attention_state = context.get("attention", {}).get("state", "idle")
-        gtype = goal.get("type", "operational")
+        gtype = self._goal_value(goal, "type", "operational")
         
         score = base_priority
         
@@ -141,8 +141,14 @@ class PriorityOrchestrator:
             score *= 1.4  # Night is good for cleanup
             
         # 3. Urgency / Risk
-        risk = goal.get("risk", "low")
+        risk = self._goal_value(goal, "risk", "low")
         if risk == "high":
             score += 20
             
         return score
+
+    @staticmethod
+    def _goal_value(goal: Any, key: str, default: Any = None) -> Any:
+        if isinstance(goal, dict):
+            return goal.get(key, default)
+        return getattr(goal, key, default)

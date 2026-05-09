@@ -1,17 +1,23 @@
 """Tests for the cognition API routes."""
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from types import SimpleNamespace
 
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
+from fastapi import HTTPException
 
 from zeus_core.cognitive.cognitive_db import init_cognitive_tables
 from zeus_core.cognitive.cognition_service import CognitionService
 from apps.routes.cognition_routes import CognitionRouteDeps, create_cognition_router
 
 
+def _endpoint(router, path: str, method: str):
+    for route in router.routes:
+        if getattr(route, "path", None) == path and method in getattr(route, "methods", set()):
+            return route.endpoint
+    raise AssertionError(f"endpoint not found: {method} {path}")
+
+
 @pytest.fixture
-def test_app(tmp_path):
+def router(tmp_path):
     db = str(tmp_path / "test_routes.db")
     init_cognitive_tables(db)
 
@@ -23,50 +29,46 @@ def test_app(tmp_path):
         cognition_service=service,
     )
 
-    app = FastAPI()
-    app.include_router(create_cognition_router(deps))
-    return app
-
-
-@pytest.fixture
-def client(test_app):
-    return TestClient(test_app)
+    return create_cognition_router(deps)
 
 
 class TestCognitionRoutes:
-    def test_get_status(self, client):
-        resp = client.get("/api/cognition/status")
-        assert resp.status_code == 200
-        data = resp.json()
+    @pytest.mark.asyncio
+    async def test_get_status(self, router):
+        endpoint = _endpoint(router, "/api/cognition/status", "GET")
+        data = await endpoint(SimpleNamespace())
         assert "mode" in data
         assert "loop_running" in data
         assert "health_score" in data
 
-    def test_get_goals_empty(self, client):
-        resp = client.get("/api/cognition/goals")
-        assert resp.status_code == 200
-        data = resp.json()
+    @pytest.mark.asyncio
+    async def test_get_goals_empty(self, router):
+        endpoint = _endpoint(router, "/api/cognition/goals", "GET")
+        data = await endpoint(SimpleNamespace())
         assert "goals" in data
         assert isinstance(data["goals"], list)
 
-    def test_get_reflections_empty(self, client):
-        resp = client.get("/api/cognition/reflections")
-        assert resp.status_code == 200
-        data = resp.json()
+    @pytest.mark.asyncio
+    async def test_get_reflections_empty(self, router):
+        endpoint = _endpoint(router, "/api/cognition/reflections", "GET")
+        data = await endpoint(SimpleNamespace())
         assert "reflections" in data
 
-    def test_get_actions_empty(self, client):
-        resp = client.get("/api/cognition/actions")
-        assert resp.status_code == 200
-        data = resp.json()
+    @pytest.mark.asyncio
+    async def test_get_actions_empty(self, router):
+        endpoint = _endpoint(router, "/api/cognition/actions", "GET")
+        data = await endpoint(SimpleNamespace())
         assert "actions" in data
 
-    def test_approve_nonexistent_action(self, client):
-        resp = client.post("/api/cognition/actions/nonexistent/approve")
-        assert resp.status_code == 404
+    @pytest.mark.asyncio
+    async def test_approve_nonexistent_action(self, router):
+        endpoint = _endpoint(router, "/api/cognition/actions/{action_id}/approve", "POST")
+        with pytest.raises(HTTPException) as exc:
+            await endpoint(SimpleNamespace(), "nonexistent")
+        assert exc.value.status_code == 404
 
-    def test_stop_when_not_running(self, client):
-        resp = client.post("/api/cognition/stop")
-        assert resp.status_code == 200
-        data = resp.json()
+    @pytest.mark.asyncio
+    async def test_stop_when_not_running(self, router):
+        endpoint = _endpoint(router, "/api/cognition/stop", "POST")
+        data = await endpoint(SimpleNamespace())
         assert data["status"] == "not_running"

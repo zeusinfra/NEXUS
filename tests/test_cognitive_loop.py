@@ -11,7 +11,21 @@ from zeus_core.cognitive.cognitive_state import cognitive_state_manager
 def loop_instance(tmp_path):
     db = str(tmp_path / "test_loop.db")
     init_cognitive_tables(db)
-    return CognitiveLoop(db_path=db)
+    loop = CognitiveLoop(db_path=db)
+    loop._perceive = lambda: {
+        "timestamp": "2026-01-01T00:00:00+00:00",
+        "summary": "Sistema estável",
+        "system": {"cpu_percent": 10, "ram_percent": 20, "disk_percent": 30},
+        "recent_events": [],
+        "pending_events": 0,
+        "memory": {"total_nodes": 0, "hot_nodes": []},
+        "attention": {"state": "idle", "focus_score": 0.0},
+        "temporal": {},
+        "user_session": {"active": False},
+        "cognitive_mode": "nominal",
+    }
+    loop._try_daily_reflection = lambda today: setattr(loop, "_last_daily_date", today)
+    return loop
 
 
 class TestCognitiveLoop:

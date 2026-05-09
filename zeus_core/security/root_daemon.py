@@ -1,10 +1,24 @@
 import asyncio
 import json
 import os
+import re
+import shlex
 import subprocess
 from typing import Dict, Any, Callable
 
 SOCKET_PATH = "/tmp/zeus_root_daemon.sock"
+SYSTEMD_UNIT_RE = re.compile(r"^[A-Za-z0-9_.@:-]{1,128}$")
+ALLOWED_COMMANDS = {
+    ("apt", "update"),
+    ("df",),
+    ("free",),
+    ("journalctl",),
+    ("lscpu",),
+    ("lsblk",),
+    ("ps",),
+    ("systemctl", "status"),
+    ("uptime",),
+}
 
 # ==========================================
 # SECURE METHODS (ALLOWLIST)
@@ -22,11 +36,14 @@ def _run_shell(cmd: list) -> Dict[str, Any]:
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+def _valid_systemd_unit(service_name: str) -> bool:
+    return bool(isinstance(service_name, str) and SYSTEMD_UNIT_RE.fullmatch(service_name))
+
 async def get_system_health(**kwargs) -> Dict[str, Any]:
     return _run_shell(["uptime"])
 
 async def get_service_status(service_name: str, **kwargs) -> Dict[str, Any]:
-    if not service_name.isalnum() and "_" not in service_name and "-" not in service_name:
+    if not _valid_systemd_unit(service_name):
         return {"status": "error", "message": "Invalid service name"}
     return _run_shell(["systemctl", "status", service_name])
 
@@ -43,27 +60,27 @@ async def list_upgradable_packages(**kwargs) -> Dict[str, Any]:
     return _run_shell(["apt", "list", "--upgradable"])
 
 async def read_limited_journal(service_name: str, **kwargs) -> Dict[str, Any]:
-    if not service_name.isalnum() and "_" not in service_name and "-" not in service_name:
+    if not _valid_systemd_unit(service_name):
         return {"status": "error", "message": "Invalid service name"}
     return _run_shell(["journalctl", "-u", service_name, "-n", "50", "--no-pager"])
 
 async def execute_safe_command(command: str, **kwargs) -> Dict[str, Any]:
     """Fallback method for specific allowed read-only or low-risk commands sent by the broker."""
-    # This acts as an extra layer of validation on top of SudoBroker.
-    # We strictly enforce only certain prefixes here.
-    ALLOWED_PREFIXES = ["systemctl status", "journalctl", "df", "free", "uptime", "ps", "lsblk", "lscpu", "apt update"]
-    if not any(command.startswith(p) for p in ALLOWED_PREFIXES):
-        return {"status": "error", "message": "Command rejected by RootDaemon strict policy."}
-    
-    # Split using shlex for safety, but for simplicity here we just use shell=True (DANGEROUS if not controlled).
-    # Since we are strictly validating prefixes and it's from our broker, we use it carefully.
-    # In a production environment, use shlex.split() and avoid shell=True.
-    import shlex
     try:
         args = shlex.split(command)
+        if not _command_allowed(args):
+            return {"status": "error", "message": "Command rejected by RootDaemon strict policy."}
         return _run_shell(args)
     except Exception as e:
          return {"status": "error", "message": str(e)}
+
+def _command_allowed(args: list[str]) -> bool:
+    if not args:
+        return False
+    for allowed in ALLOWED_COMMANDS:
+        if tuple(args[:len(allowed)]) == allowed:
+            return True
+    return False
 
 # Registry
 DISPATCH_TABLE: Dict[str, Callable] = {
@@ -114,9 +131,9 @@ async def main():
         
     server = await asyncio.start_unix_server(handle_client, path=SOCKET_PATH)
     
-    # Define permissões restritas no socket (Apenas o usuário root/zeus pode ler/escrever)
-    # Na prática, se rodar como root, zeus precisa estar no grupo certo ou socket precisa de chmod 660 + chown.
-    os.chmod(SOCKET_PATH, 0o666) # Temporário: permitir qualquer local user testar. Em prod: 0o660
+    # Define permissões restritas no socket. O serviço systemd deve configurar
+    # o grupo correto para que apenas usuários autorizados falem com o daemon.
+    os.chmod(SOCKET_PATH, 0o660)
     
     print(f"RootDaemon listening on {SOCKET_PATH}")
     async with server:
