@@ -12,6 +12,7 @@ class ResourceGovernor:
         self.ram_limit = float(os.getenv("ZEUS_RAM_SOFT_LIMIT", "75"))
         self.swap_limit = float(os.getenv("ZEUS_SWAP_SOFT_LIMIT", "50"))
         self.disk_min_free = float(os.getenv("ZEUS_DISK_MIN_FREE_PERCENT", "10"))
+        self.zeus_mode = os.getenv("ZEUS_MODE", "BALANCED").upper()
         
         self.is_low_resource_mode = False
         self.high_cpu_consecutive_checks = 0
@@ -60,7 +61,10 @@ class ResourceGovernor:
             await event_bus.publish_async(EventType.DISK_PRESSURE, {"free": disk_free})
 
         was_low = self.is_low_resource_mode
-        self.is_low_resource_mode = len(issues) > 0
+        if self.zeus_mode == "AGGRESSIVE":
+            self.is_low_resource_mode = False
+        else:
+            self.is_low_resource_mode = len(issues) > 0
 
         if self.is_low_resource_mode and not was_low:
             print(f"[ResourceGovernor] Ativando LOW_RESOURCE mode devido a: {', '.join(issues)}")

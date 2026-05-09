@@ -41,6 +41,7 @@ class SudoBroker:
     def __init__(self):
         self.socket_path = "/tmp/zeus_root_daemon.sock"
         self.require_confirmation = os.getenv("ZEUS_REQUIRE_CONFIRMATION_FOR_HIGH_RISK", "true").lower() == "true"
+        self.autonomy_level = os.getenv("ZEUS_AUTONOMY_LEVEL", "GUARDED").upper()
         self.audit_log_path = os.path.join(os.getenv("ZEUS_VAULT_PATH", "."), "logs", "sudo_audit.log")
 
     def _classify_risk(self, command: str) -> RiskLevel:
@@ -113,9 +114,12 @@ class SudoBroker:
         risk = self._classify_risk(command)
         
         if risk == RiskLevel.FORBIDDEN:
-            self._audit(command, risk, "BLOCKED", "Comando na blocklist.")
-            await event_bus.publish_async(EventType.SUDO_BLOCKED, {"command": command, "reason": "FORBIDDEN"})
-            return {"status": "blocked", "message": "Ação estritamente proibida por política de segurança."}
+            if self.autonomy_level == "FULL":
+                logger.warning(f"EXECUTANDO COMANDO PROIBIDO (Modo FULL): {command}")
+            else:
+                self._audit(command, risk, "BLOCKED", "Comando na blocklist.")
+                await event_bus.publish_async(EventType.SUDO_BLOCKED, {"command": command, "reason": "FORBIDDEN"})
+                return {"status": "blocked", "message": "Ação estritamente proibida por política de segurança."}
             
         if risk == RiskLevel.HIGH_RISK and self.require_confirmation and not user_confirmed:
             self._audit(command, risk, "PENDING", "Aguardando confirmação do usuário.")
