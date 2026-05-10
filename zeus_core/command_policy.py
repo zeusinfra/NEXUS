@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import importlib.util
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -13,6 +14,7 @@ WRITE_COMMANDS = {"cp", "mv", "mkdir", "touch", "chmod", "chown", "git", "rm", "
 CONFIRMATION_ONLY_COMMANDS = {"python3", "python", "node", "npm", "npx", "cargo", "rm", "apt", "systemctl"}
 
 BLOCKED_COMMANDS = {
+    "rm",
     "mkfs",
     "dd",
     "shutdown",
@@ -54,13 +56,32 @@ RISKY_PACKAGE_SUBCOMMANDS = {
 
 logger = get_logger("zeus.command_policy")
 
-try:
-    from zeus_policy import CommandPolicyRust
-    RUST_POLICY_AVAILABLE = True
-    _RUST_POLICY = CommandPolicyRust()
-except ImportError:
-    RUST_POLICY_AVAILABLE = False
-    _RUST_POLICY = None
+def _load_rust_policy():
+    try:
+        from zeus_policy import CommandPolicyRust
+
+        return CommandPolicyRust()
+    except ImportError:
+        pass
+
+    local_extension = Path(__file__).resolve().parents[1] / "core-rust" / "target" / "release" / "libzeus_policy.so"
+    if not local_extension.exists():
+        return None
+
+    try:
+        spec = importlib.util.spec_from_file_location("zeus_policy", local_extension)
+        if spec is None or spec.loader is None:
+            return None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module.CommandPolicyRust()
+    except Exception as exc:
+        log_event(logger, 30, "rust_policy_load_failed", error=str(exc))
+        return None
+
+
+_RUST_POLICY = _load_rust_policy()
+RUST_POLICY_AVAILABLE = _RUST_POLICY is not None
 
 
 @dataclass(frozen=True)

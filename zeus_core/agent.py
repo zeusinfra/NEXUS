@@ -68,6 +68,34 @@ def _is_confirmation_message(text: str) -> bool:
     return t in {"sim", "s", "confirmo", "confirmar", "ok"}
 
 
+def _progress_enabled() -> bool:
+    value = os.getenv("ZEUS_AGENT_PROGRESS_EVENTS", "1").strip().lower()
+    return value in {"1", "true", "yes", "on"}
+
+
+def _summarize_tool_result(result: dict) -> dict:
+    if not isinstance(result, dict):
+        return {"ok": True, "summary": str(result)[:500]}
+
+    summary = {
+        "ok": bool(result.get("ok", result.get("status") not in {"error", "failed"})),
+        "status": result.get("status"),
+        "exit_code": result.get("exit_code"),
+        "category": result.get("category"),
+        "requires_confirmation": result.get("requires_confirmation"),
+        "error": result.get("error"),
+    }
+    stdout = result.get("stdout")
+    stderr = result.get("stderr")
+    if isinstance(stdout, str) and stdout.strip():
+        summary["stdout_preview"] = stdout.strip()[:800]
+    if isinstance(stderr, str) and stderr.strip():
+        summary["stderr_preview"] = stderr.strip()[:800]
+    if "message" in result:
+        summary["message"] = str(result.get("message"))[:800]
+    return {k: v for k, v in summary.items() if v is not None}
+
+
 class Agent:
     def __init__(self, *, max_steps: int = 6):
         self.max_steps = max_steps
@@ -151,6 +179,8 @@ IMPORTANTE:
 - Se precisar de dados reais do sistema, use ferramentas.
 - Se usar ferramenta, aguarde o output antes de responder.
 - Se não precisar de ferramenta, responda normalmente.
+- Não diga "vou verificar", "vou analisar" ou "vou executar" como promessa futura sem chamar ferramenta ou explicar claramente que é só orientação.
+- Depois de qualquer ferramenta, diga ao usuário se foi concluído, se falhou ou se ficou aguardando confirmação.
 
 ====================================================================
 FORMATO OBRIGATÓRIO DE TOOL CALL
@@ -260,7 +290,22 @@ args:
 Uso:
 - instalar suporte OCR quando realmente necessário.
 
-7. obsidian_read_note
+7. system_diagnostics
+args:
+{}
+
+Uso:
+- coletar CPU, RAM, disco, rede e informações do Linux.
+- diagnosticar lentidão ou problemas de infraestrutura.
+
+8. system_capabilities
+args:
+{}
+
+Uso:
+- ver quais sensores, permissões, allowlists, modo de execução e daemon privilegiado estão ativos.
+
+9. obsidian_read_note
 args:
 {
   "path": "..."
@@ -270,7 +315,7 @@ Uso:
 - ler nota do Obsidian;
 - buscar contexto no segundo cérebro local.
 
-8. obsidian_write_insight
+10. obsidian_write_insight
 args:
 {
   "title": "...",
@@ -283,7 +328,7 @@ Uso:
 - criar nota de memória;
 - documentar decisões técnicas.
 
-9. notion_create_page
+11. notion_create_page
 args:
 {
   "title": "...",
@@ -295,7 +340,7 @@ Uso:
 - criar página organizada no Notion;
 - transformar pensamento bruto em documentação estruturada.
 
-10. notion_search
+12. notion_search
 args:
 {
   "query": "..."
@@ -304,7 +349,7 @@ args:
 Uso:
 - pesquisar conhecimento já organizado no Notion.
 
-11. linear_create_issue
+13. linear_create_issue
 args:
 {
   "title": "...",
@@ -319,7 +364,7 @@ Uso:
 - criar issue de desenvolvimento;
 - transformar ideia em execução.
 
-12. linear_current_context
+14. linear_current_context
 args:
 {}
 
@@ -328,7 +373,7 @@ Uso:
 - entender foco de desenvolvimento;
 - obter contexto de execução.
 
-13. agent_task
+15. agent_task
 args:
 {
   "goal": "...",
@@ -340,7 +385,7 @@ Uso:
 - quebrar objetivo complexo em subtarefas;
 - gerar plano de execução.
 
-14. obsidian_mirror_filesystem
+16. obsidian_mirror_filesystem
 args:
 {
   "path": ".",
@@ -350,15 +395,6 @@ args:
 Uso:
 - espelhar a estrutura de diretórios e arquivos do SO no Obsidian;
 - criar um mapa navegável do sistema com links e pesos sinápticos.
-
-15. system_diagnostics
-args:
-{}
-
-Uso:
-- obter relatório completo de saúde do sistema;
-- verificar uso de CPU, RAM, Disco e latência de rede;
-- diagnosticar lentidão ou problemas de infraestrutura.
 
 ====================================================================
 REGRAS DE USO DAS FERRAMENTAS
@@ -662,6 +698,32 @@ Se não precisar agir, responda normalmente em PT-BR.
         except Exception:
             return
 
+    async def _progress(
+        self,
+        broadcast: Optional[BroadcastFn],
+        stage: str,
+        *,
+        text: str,
+        step: int | None = None,
+        total_steps: int | None = None,
+        tool: str | None = None,
+        details: dict | None = None,
+    ) -> None:
+        if not _progress_enabled():
+            return
+        payload = {
+            "type": "AGENT_PROGRESS",
+            "stage": stage,
+            "text": text,
+            "step": step,
+            "total_steps": total_steps,
+            "tool": tool,
+            "details": details or {},
+            "ts": _dt.datetime.now().isoformat(timespec="seconds"),
+        }
+        await self._broadcast(broadcast, payload)
+        await self._broadcast(broadcast, {"type": "HUD_STATUS", "text": text})
+
     async def _run_tool(self, name: str, args: dict) -> dict:
         if name == "agent_task":
             goal = (args or {}).get("goal") or ""
@@ -695,6 +757,12 @@ Se não precisar agir, responda normalmente em PT-BR.
         if _is_confirmation_message(user_prompt):
             pending = _PENDING_CONFIRMATIONS.pop(client_key, None)
             if pending:
+                await self._progress(
+                    broadcast,
+                    "confirmed",
+                    text=f"Confirmação recebida. Executando {pending.get('name')}.",
+                    tool=pending.get("name"),
+                )
                 await self._broadcast(
                     broadcast,
                     {
@@ -705,6 +773,13 @@ Se não precisar agir, responda normalmente em PT-BR.
                     },
                 )
                 tool_out = await self._execute_pending(pending, broadcast=broadcast)
+                await self._progress(
+                    broadcast,
+                    "tool_done",
+                    text=f"{pending.get('name')} concluído. Sintetizando resultado.",
+                    tool=pending.get("name"),
+                    details=_summarize_tool_result(tool_out),
+                )
                 original_prompt = pending.get("original_prompt") or "O usuário confirmou a execução."
                 
                 # Finalizing with tool output (streaming)
@@ -727,25 +802,41 @@ Se não precisar agir, responda normalmente em PT-BR.
         ]
 
         dynamic_steps = self._get_dynamic_max_steps(user_prompt)
-        for _ in range(dynamic_steps):
+        await self._progress(
+            broadcast,
+            "started",
+            text="Análise iniciada. Vou verificar dados reais antes de concluir.",
+            total_steps=dynamic_steps,
+        )
+        for step_index in range(dynamic_steps):
+            step_no = step_index + 1
+            await self._progress(
+                broadcast,
+                "step_started",
+                text=f"Etapa {step_no}/{dynamic_steps}: avaliando se preciso consultar ferramenta ou responder direto.",
+                step=step_no,
+                total_steps=dynamic_steps,
+            )
             full_assistant = ""
-            is_tool_call = False
             
-            # Tentamos detectar se é um tool call logo no início
+            # Buffer the model turn until we know if it is a tool call. This avoids
+            # leaking partial "<tool_call>" tags into the user-visible stream.
             async for chunk in self._call_llm_stream(messages):
                 full_assistant += chunk
-                # Se ainda não detectamos tool call, mas o texto começa a parecer um, aguardamos
-                if not is_tool_call and _TOOL_TAG_OPEN in full_assistant:
-                    is_tool_call = True
-                
-                if not is_tool_call:
-                    if token_callback:
-                        await token_callback(chunk)
-                    await self._broadcast(broadcast, {"type": "CHUNK_AI", "chunk": chunk})
-                    yield chunk
             
             tool_payload, remaining = _extract_tool_call(full_assistant)
             if not tool_payload:
+                if token_callback:
+                    await token_callback(full_assistant)
+                await self._broadcast(broadcast, {"type": "CHUNK_AI", "chunk": full_assistant})
+                yield full_assistant
+                await self._progress(
+                    broadcast,
+                    "completed",
+                    text="Análise concluída. Resposta entregue ao usuário.",
+                    step=step_no,
+                    total_steps=dynamic_steps,
+                )
                 return # Já terminamos de yieldar os chunks
 
             name = tool_payload.get("name")
@@ -754,6 +845,13 @@ Se não precisar agir, responda normalmente em PT-BR.
             if not isinstance(name, str) or not isinstance(args, dict):
                 messages.append({"role": "assistant", "content": full_assistant})
                 messages.append({"role": "user", "content": "Tool call inválido. Retorne apenas um <tool_call> JSON válido."})
+                await self._progress(
+                    broadcast,
+                    "tool_invalid",
+                    text="A chamada de ferramenta veio inválida. Pedi correção ao modelo.",
+                    step=step_no,
+                    total_steps=dynamic_steps,
+                )
                 continue
 
             if mode == "confirm" and name in {"cmd_control"}:
@@ -764,13 +862,40 @@ Se não precisar agir, responda normalmente em PT-BR.
                     "original_prompt": user_prompt,
                 }
                 cmd = (args.get("command") or "").strip()
+                await self._progress(
+                    broadcast,
+                    "awaiting_confirmation",
+                    text=f"{name} requer confirmação antes de executar: {cmd}",
+                    step=step_no,
+                    total_steps=dynamic_steps,
+                    tool=name,
+                    details={"command": cmd},
+                )
                 await self._broadcast(broadcast, {"type": "TOOL_LOG", "stage": "awaiting_confirmation", "tool": name, "args": {"command": cmd}})
                 yield f"\n[Trava de segurança ativa]\nConfirme com 'Sim' para eu executar este comando:\n`{cmd}`"
                 return
 
+            await self._progress(
+                broadcast,
+                "tool_running",
+                text=f"Executando ferramenta {name}.",
+                step=step_no,
+                total_steps=dynamic_steps,
+                tool=name,
+                details={"args": args},
+            )
             await self._broadcast(broadcast, {"type": "TOOL_LOG", "stage": "running", "tool": name, "args": args})
             tool_out = await self._execute_pending({"name": name, "args": args}, broadcast=broadcast)
             await self._broadcast(broadcast, {"type": "TOOL_LOG", "stage": "done", "tool": name, "result": tool_out})
+            await self._progress(
+                broadcast,
+                "tool_done",
+                text=f"Ferramenta {name} finalizada. Resultado recebido.",
+                step=step_no,
+                total_steps=dynamic_steps,
+                tool=name,
+                details=_summarize_tool_result(tool_out),
+            )
 
             tool_out_str = json.dumps(tool_out, ensure_ascii=False)
             messages.append({"role": "assistant", "content": full_assistant})
@@ -778,6 +903,12 @@ Se não precisar agir, responda normalmente em PT-BR.
             if remaining:
                 messages.append({"role": "user", "content": remaining})
 
+        await self._progress(
+            broadcast,
+            "step_limit_reached",
+            text="Limite de etapas atingido antes de concluir a análise.",
+            total_steps=dynamic_steps,
+        )
         yield "\n[Limite de etapas atingido]"
 
     async def run(

@@ -1170,7 +1170,22 @@ function connectRealtime() {
     } else if(d.type === 'HUD_STATUS') {
       setCoreStatus(d.text);
     } else if(d.type === 'CHAT_AI') {
-      addLog({title: 'AI RESPONSE', detail: d.message.slice(0, 100) + '...'});
+      const msg = String(d.message || '');
+      addLog({title: 'AI RESPONSE', detail: msg.slice(0, 160) + (msg.length > 160 ? '...' : '')});
+    } else if(d.type === 'AGENT_PROGRESS') {
+      const stage = String(d.stage || 'progress').replace(/_/g, ' ').toUpperCase();
+      const tool = d.tool ? ` · ${d.tool}` : '';
+      const detail = String(d.text || '').slice(0, 220);
+      addLog({title: `AGENT ${stage}${tool}`, detail}, d.stage === 'chat_failed' ? 'e' : 'l');
+      if(d.text) setCoreStatus(d.text);
+    } else if(d.type === 'TOOL_LOG') {
+      const stage = String(d.stage || 'tool').replace(/_/g, ' ').toUpperCase();
+      const tool = String(d.tool || 'tool');
+      let detail = '';
+      if(d.error) detail = String(d.error).slice(0, 220);
+      else if(d.result && typeof d.result === 'object') detail = `resultado: ${Object.keys(d.result).slice(0, 5).join(', ')}`;
+      else if(d.args && typeof d.args === 'object') detail = `args: ${Object.keys(d.args).slice(0, 5).join(', ')}`;
+      addLog({title: `TOOL ${stage} · ${tool}`, detail}, d.stage === 'step_failed' ? 'e' : 'a');
     } else if(d.type === 'SYSTEM_ALERT') {
       addLog({title: d.title || 'SYSTEM ALERT', detail: String(d.message || '').slice(0, 180)}, 'e');
     } else if(d.type === 'SYSTEM_EVENT') {

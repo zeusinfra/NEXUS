@@ -159,7 +159,7 @@ class ZeusApplet extends Applet.TextIconApplet {
 
     _openChat() {
         const root = _projectRoot();
-        const chat = GLib.build_filenamev([root, 'bin', 'zeus-gtk-chat']);
+        const chat = GLib.build_filenamev([root, 'bin', 'zeus-chat']);
         try {
             GLib.spawn_async(
                 root,

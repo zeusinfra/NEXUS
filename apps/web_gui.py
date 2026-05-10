@@ -50,6 +50,7 @@ from zeus_core.llm_service import LLMService
 from zeus_core.memory_manager import MemoryManager
 from zeus_core.path_filters import is_runtime_noise_path
 from zeus_core.response_text import display_text, speech_text
+from zeus_core.rust_sensors import RUST_SENSORS_AVAILABLE, get_os_snapshot as get_rust_os_snapshot
 from zeus_core.conversation.sqlite_conversation_memory import conversation_memory
 from zeus_core.events.watcher import watch_vault
 from zeus_core.events.sync_worker import sync_worker_loop
@@ -499,6 +500,10 @@ def classify_web_context(url: str):
 
 
 def get_os_snapshot():
+    rust_snapshot = get_rust_os_snapshot()
+    if rust_snapshot:
+        return rust_snapshot
+
     cpu_per_core = psutil.cpu_percent(percpu=True)
     cpu_avg = sum(cpu_per_core) / len(cpu_per_core) if cpu_per_core else 0
     ram = psutil.virtual_memory().percent
@@ -715,6 +720,7 @@ def _build_init_payload() -> dict:
         "memory_summary": memory_summary,
         "vision": vision_caps,
         "asr": asr_caps,
+        "capabilities": _build_operational_capabilities(),
         "system_update": {
             "headline": "Warm boot neural",
             "detail": f"{memory_summary['learned_paths']} trilhas recuperadas do disco.",
@@ -888,6 +894,19 @@ async def get_status(request: Request):
         "project_activity": build_project_activity(),
         "messages": pending_msgs
     }
+
+@app.get("/api/events/drain")
+async def api_events_drain(request: Request, client_id: str | None = None):
+    if not _is_trusted_request(request):
+        raise HTTPException(status_code=403, detail="Only trusted (local/LAN) requests are allowed.")
+    _require_lan_token_for_request(request)
+
+    resolved_client_id = (client_id or request.headers.get("x-zeus-client-id") or "").strip()[:64]
+    if not resolved_client_id:
+        raise HTTPException(status_code=400, detail="client_id is required.")
+
+    realtime_hub.client_inboxes.setdefault(resolved_client_id, [])
+    return {"client_id": resolved_client_id, "events": realtime_hub.drain_inbox(resolved_client_id)}
 
 async def broadcast_message(msg: dict):
     await realtime_hub.broadcast_message(msg)
@@ -1248,6 +1267,64 @@ def _build_second_brain_status() -> dict:
         status["db_error"] = str(e)
     return status
 
+
+def _build_operational_capabilities() -> dict:
+    allowed_edit_paths = [
+        item.strip()
+        for item in os.getenv(
+            "ZEUS_ALLOWED_EDIT_PATHS",
+            "/home/zeus/Documentos/ZEUS_SYSTEM,/home/zeus/Documentos/Brain,/tmp/zeus_",
+        ).split(",")
+        if item.strip()
+    ]
+    command_allowlist = [
+        item.strip()
+        for item in os.getenv(
+            "ZEUS_CMD_ALLOWLIST",
+            "ls,pwd,echo,cat,sed,rg,find,wc,python3,node,npm,cargo,git,systemctl,apt,pip,pip3,df,free,uptime,ip,ss,top,htop",
+        ).split(",")
+        if item.strip()
+    ]
+    root_daemon_socket = os.getenv("ZEUS_DAEMON_SOCKET", "/tmp/zeus/daemon.sock")
+    root_daemon_enabled = _env_flag("ZEUS_ROOT_DAEMON_ENABLED", "0")
+    return {
+        "feedback": {
+            "agent_progress_events": _env_flag("ZEUS_AGENT_PROGRESS_EVENTS", "1"),
+            "tool_logs": True,
+            "chat_completion_status": True,
+        },
+        "inspection": {
+            "system_diagnostics": True,
+            "os_snapshot": True,
+            "rust_sensors_available": RUST_SENSORS_AVAILABLE,
+            "process_snapshot": True,
+            "filesystem_mirror": True,
+            "browser_sensing_enabled": ENABLE_BROWSER_SENSING,
+            "resource_monitor_enabled": ENABLE_RESOURCE_MONITOR,
+            "internal_watcher_enabled": ENABLE_INTERNAL_WATCHER,
+        },
+        "execution": {
+            "tool_execution_mode": os.getenv("ZEUS_TOOL_EXECUTION_MODE", "confirm"),
+            "autonomy_level": os.getenv("ZEUS_AUTONOMY_LEVEL", "GUARDED"),
+            "command_allowlist": command_allowlist,
+            "allowed_edit_paths": allowed_edit_paths,
+        },
+        "privileged": {
+            "root_daemon_enabled": root_daemon_enabled,
+            "socket": root_daemon_socket,
+            "socket_exists": os.path.exists(root_daemon_socket),
+            "approval_gates": True,
+        },
+        "sensors": {
+            "voice_enabled": ENABLE_VOICE,
+            "voice_sensing_enabled": ENABLE_VOICE_SENSING,
+            "usb_monitor_available": True,
+            "bluetooth_monitor_available": True,
+            "cognitive_loop_enabled": ENABLE_COGNITIVE_LOOP,
+            "second_brain_enabled": ENABLE_SECOND_BRAIN,
+        },
+    }
+
 async def call_ollama(prompt: str) -> str:
     return await asyncio.to_thread(
         call_cloud_llm,
@@ -1286,10 +1363,13 @@ async def autonomous_reflection():
                     f"Crie uma breve 'REFLEXÃO DE SISTEMA' (máximo 2 frases) sobre as prioridades atuais. Use tom técnico, direto e natural."
                 )
                 # Usando o novo formato estruturado para consistência
-                reply = await call_cloud_llm([
-                    {"role": "system", "content": SYSTEM_INSTRUCTIONS},
-                    {"role": "user", "content": reflection_prompt}
-                ])
+                reply = await asyncio.to_thread(
+                    call_cloud_llm,
+                    [
+                        {"role": "system", "content": SYSTEM_INSTRUCTIONS},
+                        {"role": "user", "content": reflection_prompt},
+                    ],
+                )
                 if reply and reply.strip():
                     await broadcast_message({"type": "HUD_STATUS", "text": f"🧠 REFLEXÃO: {reply}"})
                     memory_manager.record_sensation({"type": "REFLECTION", "content": reply})
@@ -1380,6 +1460,12 @@ async def api_chat(req: ChatReq, request: Request):
     session_id = (req.session_id or client_id or "default").strip()[:96]
     
     await broadcast_message({"type": "CHAT_USER", "id": msg_id, "source": source, "client_id": client_id, "message": user_message})
+    await broadcast_message({
+        "type": "AGENT_PROGRESS",
+        "stage": "chat_received",
+        "text": "Pedido recebido. Montando contexto operacional.",
+        "details": {"id": msg_id, "source": source, "client_id": client_id},
+    })
     asyncio.create_task(asyncio.to_thread(record_interaction, "chat", user_message, source))
     
     await asyncio.to_thread(conversation_memory.add_turn, session_id, client_id or source, "user", user_message)
@@ -1390,24 +1476,34 @@ async def api_chat(req: ChatReq, request: Request):
     )
     client_key = (request.client.host if request.client else "unknown")
     
-    # Pensamento proativo (Exibido na Thought Bar)
+    # Status sintético para a Thought Bar. O progresso real vem de AGENT_PROGRESS/TOOL_LOG.
     thought_stream = [
         "Acessando córtex de memória...",
         "Analisando padrões comportamentais...",
         "Correlacionando arquivos sinápticos...",
         "Sintetizando resposta neural..."
     ]
+    thought_stop = asyncio.Event()
     
     async def emit_thoughts():
-        for t in thought_stream:
-            await broadcast_message({"type": "HUD_STATUS", "text": t})
-            await asyncio.sleep(0.8)
+        while not thought_stop.is_set():
+            for t in thought_stream:
+                if thought_stop.is_set():
+                    return
+                await broadcast_message({"type": "HUD_STATUS", "text": t})
+                try:
+                    await asyncio.wait_for(thought_stop.wait(), timeout=0.8)
+                    return
+                except asyncio.TimeoutError:
+                    continue
 
-    asyncio.create_task(emit_thoughts())
+    thought_task = asyncio.create_task(emit_thoughts())
     
     started_at = time.perf_counter()
     try:
         reply = await react_agent.run(context_prompt, client_key=client_key, broadcast=broadcast_message)
+        thought_stop.set()
+        await thought_task
         display_reply = display_text(reply)
         voice_reply = speech_text(reply)
         latency_ms = round((time.perf_counter() - started_at) * 1000)
@@ -1424,6 +1520,12 @@ async def api_chat(req: ChatReq, request: Request):
             "speech_message": voice_reply,
         })
         await broadcast_message({"type": "HUD_STATUS", "text": "Aguardando atividade neural..."})
+        await broadcast_message({
+            "type": "AGENT_PROGRESS",
+            "stage": "chat_completed",
+            "text": "Pedido concluído e resposta registrada.",
+            "details": {"id": msg_id, "latency_ms": latency_ms, "reply_chars": len(reply or "")},
+        })
         
         log_event(logger, 20, "chat_request_completed", client_host=client_key, reply_chars=len(reply or ""))
         response = {
@@ -1439,6 +1541,14 @@ async def api_chat(req: ChatReq, request: Request):
             response["audio_mime"] = "audio/mpeg" if audio_b64 else None
         return response
     except Exception as e:
+        thought_stop.set()
+        await thought_task
+        await broadcast_message({
+            "type": "AGENT_PROGRESS",
+            "stage": "chat_failed",
+            "text": f"Falha ao concluir o pedido: {e}",
+            "details": {"id": msg_id},
+        })
         log_event(logger, 40, "chat_request_failed", error=str(e))
         raise HTTPException(status_code=500, detail=str(e)) from e
 
@@ -1807,7 +1917,16 @@ def _build_api_health_payload() -> dict:
     health["config"]["auto_evolve"] = os.getenv("ZEUS_AUTO_EVOLVE", "0") in {"1", "true", "yes"}
     health["metrics"] = get_metrics_snapshot()
     health["second_brain"] = _build_second_brain_status()
+    health["capabilities"] = _build_operational_capabilities()
     return health
+
+
+@app.get("/api/capabilities")
+async def api_capabilities(request: Request):
+    if not _is_trusted_request(request):
+        raise HTTPException(status_code=403, detail="Only trusted (local/LAN) requests are allowed.")
+    _require_lan_token_for_request(request)
+    return _build_operational_capabilities()
 
 
 app.include_router(create_status_router(StatusRouteDeps(

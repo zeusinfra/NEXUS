@@ -15,7 +15,7 @@
 
 ZEUS is a local-first cognitive operating system layer. It combines a FastAPI backend, local/cloud Ollama routing, OpenAI-compatible fallback support, realtime HUD telemetry, GTK4 desktop operations, voice and vision tools, Rust-based file watching, secure privileged-action approval, and a bi-directional Second Brain connecting Obsidian, Notion, and Linear.
 
-The product direction is desktop-native: the **Cinnamon applet** is the launch and status surface, while the **GTK4 + Libadwaita chat** is the primary operator console. The web HUD remains available for visualization and browser-based telemetry.
+The product direction is desktop-native: the **Cinnamon applet** is the launch and status surface, while the **GTK4 + Libadwaita chat** is the primary operator console. The Hermes-style TUI remains available as a standby/experimental terminal console, and the web HUD remains available for visualization and browser-based telemetry.
 
 Current default LLM profile:
 
@@ -33,6 +33,7 @@ Updated: **2026-05-10**
 | Capability | State | Notes |
 | --- | --- | --- |
 | GTK Ops Chat | Production path | Multiline composer, command palette, sidebar, local SQLite history, message actions |
+| Hermes-style TUI | Standby | Terminal fallback with multiline input, history, slash commands, live progress/tool logs |
 | Conversation Recall | Active | `SQLiteConversationMemory` persists turns by `session_id` and `client_id` |
 | Admin Approval Gates | Active | Pending/propose/allow/deny workflow; UI approves by `action_id` |
 | RootDaemon Hardening | Active | `0660` socket, safe systemd validation, tokenized allowlist |
@@ -47,11 +48,13 @@ Updated: **2026-05-10**
 flowchart TD
     Operator[Operator] --> Applet[Cinnamon Applet]
     Operator --> GTK[GTK4 Ops Chat]
+    Operator --> TUI[Hermes TUI Standby]
     Operator --> HUD[Web HUD]
     Operator --> Obsidian[Obsidian Vault]
 
     Applet --> API[FastAPI Backend]
     GTK --> API
+    TUI --> API
     HUD --> API
 
     API --> LLM[LLM Router]
@@ -81,7 +84,9 @@ flowchart TD
 | `public/` | Web HUD and frontend tests |
 | `applets/` | Linux desktop panel integrations, currently Cinnamon `zeus@local` |
 | `bin/zeus` | Unified launcher for server, web, TUI, and diagnostics |
-| `bin/zeus-gtk-chat` | Native GTK4/Libadwaita operator console |
+| `bin/zeus-chat` | Desktop launcher that opens the GTK operator console |
+| `bin/zeus-gtk-chat` | Primary GTK4/Libadwaita operator console |
+| `bin/zeus-hermes-tui` | Standby terminal console with live progress/tool output |
 | `watcher_rs/` | Rust filesystem watcher |
 | `core-rust/` | Rust workspace for state, policy, sensors, security, and cognitive primitives |
 | `docs/` | Architecture and system reports |
@@ -166,7 +171,8 @@ OPENAI_BASE_URL=https://api.openai.com/v1
 | Start backend headless | `./bin/zeus server` |
 | Ensure backend is online | `./bin/zeus ensure-server` |
 | Open web HUD | `./bin/zeus web` |
-| Open TUI | `./bin/zeus tui` |
+| Open GTK chat | `./bin/zeus chat` |
+| Open TUI standby | `./bin/zeus tui` |
 | Tail backend logs | `./bin/zeus logs` |
 
 Manual backend start:
@@ -198,7 +204,7 @@ Click behavior:
 
 | Backend State | Action |
 | --- | --- |
-| Online | Opens `bin/zeus-gtk-chat` |
+| Online | Opens `bin/zeus-chat` (`bin/zeus-gtk-chat`) |
 | Offline | Runs `./bin/zeus ensure-server` |
 
 Reload applet if Cinnamon does not refresh:
@@ -218,6 +224,12 @@ sudo apt install python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 libadwaita-1-0
 Launch:
 
 ```bash
+./bin/zeus chat
+```
+
+Direct GTK launcher:
+
+```bash
 ./bin/zeus-gtk-chat
 ```
 
@@ -225,6 +237,18 @@ Theme override:
 
 ```bash
 ZEUS_GTK_THEME=dark ./bin/zeus-gtk-chat
+```
+
+### Hermes-Style TUI Standby
+
+The TUI uses `prompt_toolkit` and `rich`, matching the Hermes Agent interaction model: multiline input, command history, slash-command completion, live `AGENT_PROGRESS`, and `TOOL_LOG` output while the backend works. It is kept as standby while GTK remains the default.
+
+```bash
+./bin/zeus tui
+```
+
+```bash
+./bin/zeus-hermes-tui
 ```
 
 Shortcuts:

@@ -89,16 +89,11 @@ class RealtimeHub:
             for ws in dead:
                 self.ws_clients.discard(ws)
 
-        if "client_id" in msg:
-            cid = msg["client_id"]
+        cid = msg.get("client_id")
+        if cid:
             self.client_inboxes.setdefault(cid, []).append(msg)
             if len(self.client_inboxes[cid]) > 20:
                 self.client_inboxes[cid].pop(0)
-        else:
-            for cid in self.client_inboxes:
-                self.client_inboxes[cid].append(msg)
-                if len(self.client_inboxes[cid]) > 20:
-                    self.client_inboxes[cid].pop(0)
 
     def drain_inbox(self, client_id: str | None) -> list[dict]:
         if not client_id or client_id not in self.client_inboxes:

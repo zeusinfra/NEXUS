@@ -176,13 +176,17 @@ case "$1" in
         tail -f zeus_server.log
         ;;
     tui|console|ops)
-        echo "📟  Iniciando Console de Operações (TUI)..."
-        "$ROOT_DIR/bin/zeus-tui"
+        echo "📟  Iniciando Console de Operações TUI (standby)..."
+        "$ROOT_DIR/bin/zeus-hermes-tui"
+        ;;
+    chat)
+        echo "💬  Abrindo chat ZEUS GTK..."
+        "$ROOT_DIR/bin/zeus-chat"
         ;;
     setup-aliases)
         echo "🔧  Configurando aliases globais em ~/.bashrc..."
         grep -q "alias zeus-server" ~/.bashrc || echo "alias zeus-server='cd $ROOT_DIR && ./bin/zeus web > zeus_server.log 2>&1 & sleep 1 && tail -f zeus_server.log'" >> ~/.bashrc
-        grep -q "alias zeus-chat" ~/.bashrc || echo "alias zeus-chat='cd $ROOT_DIR && ./bin/zeus-gtk-chat'" >> ~/.bashrc
+        grep -q "alias zeus-chat" ~/.bashrc || echo "alias zeus-chat='cd $ROOT_DIR && ./bin/zeus-chat'" >> ~/.bashrc
         echo "✅  Aliases criados: 'zeus-server' e 'zeus-chat'."
         echo "🔄  Execute 'source ~/.bashrc' para ativar."
         ;;
@@ -194,7 +198,8 @@ case "$1" in
         echo "  ./zeus web           → Iniciar Servidor (Browser)"
         echo "  ./zeus ensure-server → Garantir backend headless online"
         echo "  ./zeus logs          → Ver logs em tempo real"
-        echo "  ./zeus tui           → Iniciar Console de Operações (TUI)"
+        echo "  ./zeus chat          → Abrir chat GTK padrão"
+        echo "  ./zeus tui           → Iniciar Console TUI standby"
         echo "  ./zeus setup-aliases → Instalar aliases zeus-server/zeus-chat"
         echo "  ./zeus v4            → Core v4 (loop contínuo)"
         echo "  ./zeus evolve        → Motor de Evolução"

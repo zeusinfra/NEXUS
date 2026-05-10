@@ -39,6 +39,20 @@
         "value": "planned",
         "updated": "2026-05-09"
       }
+    },
+    "data_scanning": {
+      "target": {
+        "value": "Mia Khalifa",
+        "updated": "2026-05-10"
+      },
+      "scopes": {
+        "value": "['browsers (SQLite)', 'Obsidian (grep)', 'logs']",
+        "updated": "2026-05-10"
+      },
+      "delivery_method": {
+        "value": "email",
+        "updated": "2026-05-10"
+      }
     }
   },
   "relationships": {},
@@ -56,6 +70,10 @@
     "current_state": {
       "value": "System stability confirmed and I/O is stable",
       "updated": "2026-05-09"
+    },
+    "contact_email": {
+      "value": "noxiousvoid@proton.me",
+      "updated": "2026-05-10"
     }
   }
 }

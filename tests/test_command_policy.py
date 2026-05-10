@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch
 
 from zeus_core.actions import cmd_control
-from zeus_core.command_policy import validate_command
+from zeus_core.command_policy import RUST_POLICY_AVAILABLE, validate_command
 from zeus_core.tools import ToolError
 
 
@@ -106,6 +106,40 @@ class CommandPolicyTests(unittest.TestCase):
 
             py_decision = validate_command("python3 -c print(1)", ["python3", "-c", "print(1)"], confirmed=True)
             self.assertEqual(py_decision.category, "exec")
+
+    @unittest.skipUnless(RUST_POLICY_AVAILABLE, "zeus_policy Rust extension is not installed")
+    def test_rust_policy_matches_python_guarded_corpus(self):
+        from zeus_core.command_policy import _RUST_POLICY
+
+        cases = [
+            ("python3 --version", ["python3", "--version"], False, True),
+            ("python3 -c print(1)", ["python3", "-c", "print(1)"], False, False),
+            ("python3 -c print(1)", ["python3", "-c", "print(1)"], True, True),
+            ("git status", ["git", "status"], False, False),
+            ("mkdir out", ["mkdir", "out"], False, False),
+            ("mkdir out", ["mkdir", "out"], True, True),
+            ("rm something", ["rm", "something"], True, False),
+            ("python3 --version && git status", ["python3", "--version", "&&", "git", "status"], False, False),
+        ]
+        env = {
+            "ZEUS_AUTONOMY_LEVEL": "GUARDED",
+            "ZEUS_CMD_ALLOWLIST": "python3,git,mkdir,rm",
+        }
+        with patch.dict(os.environ, env, clear=False):
+            for command, tokens, confirmed, expected_ok in cases:
+                rust_ok, rust_reason = _RUST_POLICY.validate_command(command, tokens, confirmed)
+                try:
+                    validate_command(command, tokens, confirmed=confirmed)
+                    python_ok = True
+                except ToolError:
+                    python_ok = False
+
+                self.assertEqual(
+                    rust_ok,
+                    python_ok,
+                    f"{command!r}: rust={rust_ok} ({rust_reason}) python={python_ok}",
+                )
+                self.assertEqual(rust_ok, expected_ok, command)
 
 
 if __name__ == "__main__":

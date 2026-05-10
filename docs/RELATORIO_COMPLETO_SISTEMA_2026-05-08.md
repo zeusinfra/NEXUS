@@ -33,6 +33,7 @@ The latest operating milestone focuses on enterprise readiness:
 | --- | --- | --- |
 | FastAPI backend | Active | Stable |
 | GTK4 operator console | Active | Production path |
+| Hermes-style TUI | Standby | Terminal fallback for live progress and tool logs |
 | Cinnamon applet | Active | Primary launcher/status surface |
 | Web HUD | Active | Visualization surface |
 | LLM routing | Active | Ollama local/cloud plus OpenAI-compatible profile |
@@ -51,10 +52,12 @@ The latest operating milestone focuses on enterprise readiness:
 flowchart TD
     Desktop[Desktop Operator] --> Applet[Cinnamon Applet]
     Desktop --> GTK[GTK4 Ops Chat]
+    Desktop --> TUI[Hermes TUI Standby]
     Desktop --> HUD[Web HUD]
 
     Applet --> Backend[FastAPI Backend]
     GTK --> Backend
+    TUI --> Backend
     HUD --> Backend
 
     Backend --> LLM[LLM Router]
@@ -144,6 +147,17 @@ Implemented controls:
 | One-click GTK launch | Active |
 | Backend auto-start | Active |
 
+### Hermes-Style TUI
+
+| Feature | State |
+| --- | --- |
+| Terminal fallback | Standby |
+| Multiline input | Available |
+| Command history | Available |
+| Slash commands | Basic |
+| Live agent progress/tool logs | Available |
+| Default desktop launch path | Disabled; GTK remains default |
+
 ### Web HUD
 
 | Feature | State |
@@ -214,6 +228,8 @@ Current environment note: `pytest` is not installed in the active system Python 
 | Start headless backend | `./bin/zeus server` |
 | Ensure backend | `./bin/zeus ensure-server` |
 | Open GTK chat | `./bin/zeus-gtk-chat` |
+| Open default chat | `./bin/zeus chat` |
+| Open TUI standby | `./bin/zeus tui` |
 | View logs | `./bin/zeus logs` |
 | Run Python tests | `.venv/bin/python -m pytest -q` |
 | Run frontend tests | `node --test public/tests/*.test.js` |

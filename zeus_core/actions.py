@@ -298,6 +298,60 @@ def install_tesseract(parameters: dict) -> dict:
     return {**common, "distro_id": distro_id or None, "instructions": "\n".join(instructions)}
 
 
+def system_capabilities(parameters: dict) -> dict:
+    """Report what ZEUS can currently observe or operate without exposing secrets."""
+    allowed_paths = [
+        item.strip()
+        for item in os.getenv(
+            "ZEUS_ALLOWED_EDIT_PATHS",
+            "/home/zeus/Documentos/ZEUS_SYSTEM,/home/zeus/Documentos/Brain,/tmp/zeus_",
+        ).split(",")
+        if item.strip()
+    ]
+    command_allowlist = [
+        item.strip()
+        for item in os.getenv(
+            "ZEUS_CMD_ALLOWLIST",
+            "ls,pwd,echo,cat,sed,rg,find,wc,python3,node,npm,cargo,git,systemctl,apt,pip,pip3,df,free,uptime,ip,ss,top,htop",
+        ).split(",")
+        if item.strip()
+    ]
+    root_daemon_socket = os.getenv("ZEUS_DAEMON_SOCKET", "/tmp/zeus/daemon.sock")
+    return {
+        "telemetry": {
+            "system_diagnostics": True,
+            "process_snapshot": True,
+            "disk_snapshot": True,
+            "temperature_when_available": True,
+        },
+        "filesystem": {
+            "project_root": str(_project_root()),
+            "mirror_available": True,
+            "allowed_edit_paths": allowed_paths,
+        },
+        "command_execution": {
+            "mode": os.getenv("ZEUS_TOOL_EXECUTION_MODE", "confirm"),
+            "autonomy_level": os.getenv("ZEUS_AUTONOMY_LEVEL", "GUARDED"),
+            "allowlist": command_allowlist,
+            "progress_events": os.getenv("ZEUS_AGENT_PROGRESS_EVENTS", "1"),
+        },
+        "privileged_actions": {
+            "root_daemon_enabled": os.getenv("ZEUS_ROOT_DAEMON_ENABLED", "0").strip().lower() in {"1", "true", "yes", "on"},
+            "socket": root_daemon_socket,
+            "socket_exists": Path(root_daemon_socket).exists(),
+        },
+        "sensors": {
+            "voice": os.getenv("ZEUS_ENABLE_VOICE", "1"),
+            "voice_sensing": os.getenv("ZEUS_ENABLE_VOICE_SENSING", "0"),
+            "browser_sensing": os.getenv("ZEUS_ENABLE_BROWSER_SENSING", "0"),
+            "internal_watcher": os.getenv("ZEUS_ENABLE_INTERNAL_WATCHER", "0"),
+            "resource_monitor": os.getenv("ZEUS_ENABLE_RESOURCE_MONITOR", "0"),
+            "cognitive_loop": os.getenv("ZEUS_COGNITIVE_LOOP_ENABLED", "0"),
+            "second_brain": os.getenv("ZEUS_ENABLE_SECOND_BRAIN", "0"),
+        },
+    }
+
+
 def obsidian_read_note(parameters: dict) -> dict:
     path = str((parameters or {}).get("path") or "").strip()
     if not path:
@@ -388,4 +442,5 @@ def get_actions() -> Dict[str, Any]:
         "linear_create_issue": linear_create_issue,
         "linear_current_context": linear_current_context,
         "system_diagnostics": lambda params: get_system_diagnostics(),
+        "system_capabilities": system_capabilities,
     }

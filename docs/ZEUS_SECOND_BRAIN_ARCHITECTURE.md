@@ -9,7 +9,7 @@
 | Orchestration | Event routing and decisions | FastAPI backend, EventBus, SQLite |
 | Organization | Structured operating knowledge | Notion |
 | Execution | Engineering workflow | Linear |
-| Operation | Human command surface | Cinnamon applet, GTK4 chat, Web HUD |
+| Operation | Human command surface | Cinnamon applet, GTK4 chat, Web HUD; TUI standby |
 | Recall | Conversational context | SQLite conversation memory |
 
 ## Strategic Context
@@ -24,7 +24,7 @@ The design principles are:
 | Event-driven | File changes and system events flow through queues and classifiers |
 | Auditable | Sync decisions, admin actions, and privileged execution are explicit |
 | Resilient | Debounce, cache tables, low-memory controls, and route-level limits |
-| Operator-centric | GTK and Cinnamon surfaces are optimized for daily desktop work |
+| Operator-centric | GTK and Cinnamon surfaces are optimized for daily desktop work; TUI stays available as a terminal fallback |
 
 ## Reference Architecture
 
@@ -47,6 +47,7 @@ flowchart LR
     Sync --> Obsidian
 
     GTK[GTK4 Ops Chat] --> API
+    TUI[Hermes TUI Standby] --> API
     Applet[Cinnamon Applet] --> API
     HUD[Web HUD] --> API
 ```
@@ -133,7 +134,7 @@ Behavior:
 | GTK sidebar | CPU, RAM, attention state, privacy shield, mode |
 | Thought bar | Current cognitive processing stage |
 | Web HUD | Event pulses, OS telemetry, metrics stream |
-| TUI | Compact operational console |
+| TUI standby | Compact terminal fallback for live progress/tool logs |
 | Logs | JSON HTTP logs, sync worker traces, security events |
 
 The telemetry model is intentionally split between operational dashboards and persisted system memory. Short-lived UI signals do not automatically become long-term knowledge unless routed through the event pipeline.

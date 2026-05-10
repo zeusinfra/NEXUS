@@ -1,0 +1,297 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import json
+import os
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+import uuid
+from datetime import datetime
+from pathlib import Path
+
+
+def _ensure_tui_deps() -> None:
+    try:
+        import prompt_toolkit  # noqa: F401
+        import rich  # noqa: F401
+        return
+    except ImportError:
+        pass
+
+    root = Path(__file__).resolve().parents[1]
+    candidates = [
+        os.getenv("ZEUS_TUI_PYTHON"),
+        str(root / ".venv" / "bin" / "python"),
+        str(Path.home() / ".hermes" / "hermes-agent" / "venv" / "bin" / "python"),
+        sys.executable,
+    ]
+    current = str(Path(sys.executable).resolve())
+    for candidate in candidates:
+        if not candidate:
+            continue
+        path = Path(candidate)
+        if not path.exists():
+            continue
+        if str(path.resolve()) == current:
+            continue
+        os.execv(str(path), [str(path), __file__, *sys.argv[1:]])
+
+    print("prompt_toolkit/rich nao encontrados. Instale as dependencias ou defina ZEUS_TUI_PYTHON.")
+    raise SystemExit(1)
+
+
+_ensure_tui_deps()
+
+from prompt_toolkit import PromptSession
+from prompt_toolkit.completion import WordCompleter
+from prompt_toolkit.history import FileHistory
+from rich.console import Console
+from rich.panel import Panel
+
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
+BACKEND = (sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("--") else os.getenv("ZEUS_BACKEND_URL", "http://127.0.0.1:8080")).rstrip("/")
+CLIENT_ID = os.getenv("ZEUS_TUI_CLIENT_ID", "zeus_hermes_tui").strip() or "zeus_hermes_tui"
+SESSION_ID = os.getenv("ZEUS_TUI_SESSION_ID") or datetime.now().strftime("tui-%Y%m%d-%H%M%S")
+HISTORY_FILE = Path(os.getenv("XDG_DATA_HOME", str(Path.home() / ".local" / "share"))) / "zeus" / "hermes_tui_history.txt"
+
+console = Console()
+last_status_text = ""
+seen_event_keys: set[str] = set()
+
+
+def _json_request(method: str, path: str, payload: dict | None = None, timeout: float = 30.0) -> dict:
+    body = None
+    headers = {"X-Zeus-Client-Id": CLIENT_ID}
+    if payload is not None:
+        body = json.dumps(payload).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+    req = urllib.request.Request(BACKEND + path, data=body, headers=headers, method=method)
+    with urllib.request.urlopen(req, timeout=timeout) as response:
+        raw = response.read().decode("utf-8")
+    return json.loads(raw or "{}")
+
+
+def _get_json(path: str, timeout: float = 5.0) -> dict:
+    return _json_request("GET", path, timeout=timeout)
+
+
+def _post_json(path: str, payload: dict, timeout: float = 120.0) -> dict:
+    return _json_request("POST", path, payload=payload, timeout=timeout)
+
+
+def _status_panel() -> Panel:
+    try:
+        data = _get_json("/api/applet/status", timeout=2.5)
+    except Exception as exc:
+        return Panel(f"[red]Backend offline[/red]\n{exc}", title="ZEUS", border_style="red")
+
+    llm = data.get("llm") or {}
+    cognitive = data.get("cognitive") or {}
+    perception = data.get("perception") or {}
+    system = perception.get("system") or {}
+
+    line = (
+        f"[bold cyan]ZEUS[/bold cyan]  "
+        f"{llm.get('provider', 'unknown')} / {llm.get('model', 'unknown')}  "
+        f"[dim]foco={str(cognitive.get('attention', 'idle')).upper()} "
+        f"cpu={system.get('cpu_percent', 0)}% ram={system.get('ram_percent', 0)}% "
+        f"session={SESSION_ID}[/dim]"
+    )
+    return Panel(line, border_style="cyan")
+
+
+def _event_title(event: dict) -> tuple[str, str]:
+    event_type = str(event.get("type") or "")
+    if event_type == "AGENT_PROGRESS":
+        stage = str(event.get("stage") or "progress").replace("_", " ").upper()
+        tool = event.get("tool")
+        return f"AGENT {stage}" + (f" · {tool}" if tool else ""), "cyan"
+    if event_type == "TOOL_LOG":
+        stage = str(event.get("stage") or "tool").replace("_", " ").upper()
+        return f"TOOL {stage} · {event.get('tool') or 'tool'}", "magenta"
+    if event_type == "CHAT_AI":
+        return "ZEUS", "green"
+    if event_type == "CHAT_USER":
+        return "VOCE", "blue"
+    if event_type == "SYSTEM_ALERT":
+        return str(event.get("title") or "ALERTA"), "red"
+    return event_type or "EVENTO", "white"
+
+
+def _should_render_event(event: dict) -> bool:
+    event_type = str(event.get("type") or "")
+    if event_type in {"AGENT_PROGRESS", "TOOL_LOG", "SYSTEM_ALERT"}:
+        return True
+    if event_type in {"CHAT_USER", "CHAT_AI"}:
+        return False
+    return False
+
+
+def _format_event(event: dict) -> str:
+    event_type = str(event.get("type") or "")
+    if event_type == "AGENT_PROGRESS":
+        return str(event.get("text") or "")
+    if event_type == "TOOL_LOG":
+        if event.get("error"):
+            return str(event.get("error"))
+        result = event.get("result")
+        if isinstance(result, dict):
+            keys = ", ".join(list(result.keys())[:8])
+            return f"resultado: {keys}" if keys else "concluido"
+        args = event.get("args")
+        if isinstance(args, dict):
+            keys = ", ".join(list(args.keys())[:8])
+            return f"args: {keys}" if keys else "executando"
+        return str(event.get("stage") or "")
+    if event_type in {"CHAT_AI", "CHAT_USER"}:
+        return str(event.get("message") or "")
+    if event_type == "SYSTEM_ALERT":
+        return str(event.get("message") or "")
+    return json.dumps(event, ensure_ascii=False)[:900]
+
+
+def _render_event(event: dict) -> None:
+    global last_status_text
+    if not _should_render_event(event):
+        return
+    if event.get("type") == "HUD_STATUS":
+        text = str(event.get("text") or "").strip()
+        if not text or text == last_status_text:
+            return
+        last_status_text = text
+        console.print(f"[dim cyan]• {text}[/dim cyan]")
+        return
+    title, style = _event_title(event)
+    detail = _format_event(event).strip()
+    if not detail:
+        return
+    if event.get("type") == "AGENT_PROGRESS":
+        stage = str(event.get("stage") or "")
+        if stage in {"step_started"}:
+            console.print(f"[dim cyan]• {detail}[/dim cyan]")
+            return
+        if stage in {"chat_received", "chat_completed", "completed"}:
+            console.print(f"[cyan]• {detail}[/cyan]")
+            return
+    if event.get("type") == "TOOL_LOG":
+        console.print(f"[magenta]› {title}: {detail}[/magenta]")
+        return
+    console.print(Panel(detail, title=title, border_style=style))
+
+
+def _drain_events_once() -> bool:
+    rendered = False
+    try:
+        query = urllib.parse.urlencode({"client_id": CLIENT_ID})
+        data = _get_json(f"/api/events/drain?{query}", timeout=2.0)
+    except Exception:
+        return False
+    for event in data.get("events") or []:
+        if not isinstance(event, dict):
+            continue
+        key = json.dumps(
+            {
+                "type": event.get("type"),
+                "stage": event.get("stage"),
+                "tool": event.get("tool"),
+                "text": event.get("text"),
+                "id": event.get("id") or (event.get("details") or {}).get("id"),
+            },
+            sort_keys=True,
+            ensure_ascii=False,
+        )
+        if key in seen_event_keys:
+            continue
+        seen_event_keys.add(key)
+        if len(seen_event_keys) > 300:
+            seen_event_keys.clear()
+        if not _should_render_event(event):
+            continue
+        _render_event(event)
+        rendered = True
+    return rendered
+
+
+def _send_message(text: str) -> None:
+    started = time.perf_counter()
+    msg_id = str(uuid.uuid4())
+    try:
+        payload = {
+            "message": text,
+            "source": "hermes_tui",
+            "client_id": CLIENT_ID,
+            "session_id": SESSION_ID,
+            "client_msg_id": msg_id,
+        }
+        console.print(Panel(text, title="VOCE", border_style="blue"))
+        data = _post_json("/api/applet/chat", payload, timeout=180.0)
+        _drain_events_once()
+        reply = str(data.get("reply") or data.get("error") or "Sem resposta.")
+        latency_ms = data.get("latency_ms") or round((time.perf_counter() - started) * 1000)
+        console.print(Panel(reply, title=f"ZEUS · {latency_ms} ms", border_style="green"))
+    except urllib.error.HTTPError as exc:
+        try:
+            body = exc.read().decode("utf-8")
+        except Exception:
+            body = str(exc)
+        console.print(Panel(body, title="ERRO HTTP", border_style="red"))
+    except Exception as exc:
+        console.print(Panel(str(exc), title="ERRO", border_style="red"))
+
+
+def _print_help() -> None:
+    console.print("[dim]/status  /clear  /help  /exit  Alt+Enter envia multiline[/dim]")
+
+
+def main() -> int:
+    HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
+    completer = WordCompleter(["/status", "/clear", "/help", "/exit", "/quit", "/new"], ignore_case=True)
+    session = PromptSession(
+        history=FileHistory(str(HISTORY_FILE)),
+        completer=completer,
+        multiline=True,
+        prompt_continuation="... ",
+        bottom_toolbar="Alt+Enter envia · /status · /help · /exit",
+    )
+
+    console.clear()
+    _drain_events_once()
+    console.print(_status_panel())
+    _print_help()
+    console.print()
+
+    while True:
+        try:
+            text = session.prompt([("class:prompt", "zeus@ops> ")])
+        except (KeyboardInterrupt, EOFError):
+            break
+        text = text.strip()
+        if not text:
+            continue
+        command = text.lower()
+        if command in {"/exit", "/quit", "exit", "quit"}:
+            break
+        if command == "/clear":
+            console.clear()
+            continue
+        if command == "/status":
+            console.print(_status_panel())
+            continue
+        if command == "/help":
+            _print_help()
+            continue
+        if command == "/new":
+            console.print("[yellow]Abra outra TUI para uma sessao nova ou defina ZEUS_TUI_SESSION_ID.[/yellow]")
+            continue
+        _send_message(text)
+
+    console.print("[dim]ZEUS TUI encerrada.[/dim]")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -11,6 +11,7 @@ import tempfile
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import webbrowser
 from datetime import datetime
@@ -64,7 +65,10 @@ class ZeusGtkChat(Adw.Application):
         self._sidebar_visible = True
         self._seen_admin_action_ids: set[str] = set()
         self._seen_system_alert_ids: set[str] = set()
+        self._seen_event_keys: set[str] = set()
+        self._events_polling = False
         self.sidebar_scroll: Gtk.ScrolledWindow | None = None
+        self._client_id = os.getenv("ZEUS_GTK_CLIENT_ID", "zeus_gtk_chat").strip() or "zeus_gtk_chat"
         self._session_id = os.getenv("ZEUS_GTK_SESSION_ID") or datetime.now().strftime("gtk-%Y%m%d-%H%M%S")
         self._history_db = os.path.join(
             os.getenv("XDG_DATA_HOME", os.path.expanduser("~/.local/share")),
@@ -87,6 +91,7 @@ class ZeusGtkChat(Adw.Application):
             
             # Live telemetry polling every 2 seconds
             GLib.timeout_add(2000, self._poll_status)
+            GLib.timeout_add(650, self._poll_agent_events)
             
             if self._autostart_mode:
                 GLib.timeout_add(1500, self._trigger_autostart_greeting)
@@ -1174,6 +1179,83 @@ class ZeusGtkChat(Adw.Application):
                 pass
         threading.Thread(target=worker, daemon=True).start()
 
+    def _poll_agent_events(self) -> bool:
+        if self._events_polling:
+            return True
+        self._events_polling = True
+
+        def worker() -> None:
+            try:
+                query = urllib.parse.urlencode({"client_id": self._client_id})
+                data = self._get_json(f"/api/events/drain?{query}", timeout=2)
+                events = data.get("events") or []
+                if events:
+                    GLib.idle_add(self._apply_agent_events, events)
+            except Exception:
+                pass
+            finally:
+                self._events_polling = False
+        threading.Thread(target=worker, daemon=True).start()
+        return True
+
+    def _apply_agent_events(self, events: list[dict]) -> bool:
+        for event in events:
+            if not isinstance(event, dict):
+                continue
+            key = json.dumps(
+                {
+                    "type": event.get("type"),
+                    "stage": event.get("stage"),
+                    "tool": event.get("tool"),
+                    "text": event.get("text"),
+                    "id": event.get("id") or (event.get("details") or {}).get("id"),
+                },
+                sort_keys=True,
+                ensure_ascii=False,
+            )
+            if key in self._seen_event_keys:
+                continue
+            self._seen_event_keys.add(key)
+            if len(self._seen_event_keys) > 200:
+                self._seen_event_keys = set(list(self._seen_event_keys)[-120:])
+            self._show_agent_event(event)
+        return False
+
+    def _show_agent_event(self, event: dict) -> None:
+        event_type = str(event.get("type") or "")
+        if event_type == "AGENT_PROGRESS":
+            text = str(event.get("text") or "").strip()
+            stage = str(event.get("stage") or "progress")
+            tool = str(event.get("tool") or "").strip()
+            if text and hasattr(self, "thought_bar"):
+                self.thought_bar.set_label(f"◉ {text}".upper())
+            if stage in {"started", "tool_running", "tool_done", "awaiting_confirmation", "chat_failed"}:
+                label = f"{stage.replace('_', ' ').title()}"
+                if tool:
+                    label = f"{label} · {tool}"
+                self._add_message("system", f"{label}: {text}")
+            if stage in {"chat_completed", "completed"}:
+                self._set_status("Pronto")
+            elif stage == "chat_failed":
+                self._set_status("Erro")
+            return
+
+        if event_type == "TOOL_LOG":
+            stage = str(event.get("stage") or "tool")
+            tool = str(event.get("tool") or "ferramenta")
+            if stage == "running":
+                self._add_message("system", f"Ferramenta em execução: {tool}")
+                self._set_status(f"Executando {tool}")
+            elif stage == "done":
+                result = event.get("result")
+                summary = ""
+                if isinstance(result, dict):
+                    keys = ", ".join(list(result.keys())[:5])
+                    summary = f" · resultado: {keys}" if keys else ""
+                self._add_message("system", f"Ferramenta concluída: {tool}{summary}")
+            elif stage in {"awaiting_confirmation", "step_failed"}:
+                self._add_message("system", f"{tool}: {stage.replace('_', ' ')}")
+
     def _apply_status(self, data: dict) -> bool:
         self._last_status = data
         if self.banner:
@@ -1273,7 +1355,7 @@ class ZeusGtkChat(Adw.Application):
         payload = {
             "message": text,
             "source": "cinnamon_gtk_chat",
-            "client_id": "zeus_gtk_chat",
+            "client_id": self._client_id,
             "session_id": self._session_id,
         }
         try:
