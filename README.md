@@ -1,6 +1,6 @@
-# ZEUS Cognitive OS
+# NEXUS by ZEUS Protocol
 
-> Local-first cognitive operating layer for Linux desktops, autonomous workflows, secure command governance, realtime telemetry, voice/vision interaction, and Second Brain orchestration.
+> A local-first cognitive operating layer for Linux.
 
 | Domain | Status | Primary Surface |
 | --- | --- | --- |
