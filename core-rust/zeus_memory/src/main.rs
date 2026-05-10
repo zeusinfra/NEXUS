@@ -1,6 +1,7 @@
 use axum::{
+    extract::State,
     routing::{get, post},
-    Json, Router, extract::State,
+    Json, Router,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, RwLock};
@@ -37,7 +38,9 @@ async fn main() {
         .route("/save", post(save_memory))
         .with_state(state);
 
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:8082").await.unwrap();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:8082")
+        .await
+        .unwrap();
     println!("🧠 ZEUS Memory Service (Rust Microservice) rodando em http://127.0.0.1:8082");
     axum::serve(listener, app).await.unwrap();
 }
@@ -64,9 +67,7 @@ async fn query_vector(
     Json(results)
 }
 
-async fn save_memory(
-    State(state): State<Arc<AppState>>,
-) -> Json<serde_json::Value> {
+async fn save_memory(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
     let manager = state.manager.read().unwrap();
     match manager.save_rust() {
         Ok(_) => Json(serde_json::json!({"status": "saved"})),

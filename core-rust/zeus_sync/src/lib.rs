@@ -25,16 +25,18 @@ impl SyncEngineRust {
         SyncEngineRust {}
     }
 
-    pub fn format_neural_map(&self, 
+    pub fn format_neural_map(
+        &self,
         timestamp: String,
         total_nodes: usize,
         total_synapses: usize,
         sensory_size: usize,
         top_nodes_json: String,
-        top_synapses_json: String
+        top_synapses_json: String,
     ) -> String {
         let top_nodes: Vec<SyncNode> = serde_json::from_str(&top_nodes_json).unwrap_or_default();
-        let top_synapses: Vec<SyncSynapse> = serde_json::from_str(&top_synapses_json).unwrap_or_default();
+        let top_synapses: Vec<SyncSynapse> =
+            serde_json::from_str(&top_synapses_json).unwrap_or_default();
 
         let mut lines = vec![
             format!("# Mapa Neural ZEUS (Rust Optimized)"),
@@ -57,9 +59,10 @@ impl SyncEngineRust {
 
         for node in top_nodes {
             let basename = node.path.split('/').last().unwrap_or(&node.path);
-            lines.push(format!("| `{}` | {} | {} |", 
-                basename, 
-                node.weight, 
+            lines.push(format!(
+                "| `{}` | {} | {} |",
+                basename,
+                node.weight,
                 node.last_accessed.as_deref().unwrap_or("N/A")
             ));
         }

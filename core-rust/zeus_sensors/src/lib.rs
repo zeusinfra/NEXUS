@@ -1,11 +1,11 @@
 #![allow(non_local_definitions)]
 
 use pyo3::prelude::*;
-use walkdir::WalkDir;
 use serde::{Deserialize, Serialize};
-use sysinfo::{Disks, System};
 use std::collections::HashMap;
 use std::time::UNIX_EPOCH;
+use sysinfo::{Disks, System};
+use walkdir::WalkDir;
 
 #[derive(Serialize, Deserialize)]
 struct ProcessSnapshot {
@@ -42,14 +42,14 @@ impl SensorEngineRust {
     pub fn poll_os_metrics(&mut self) -> HashMap<String, f32> {
         self.sys.refresh_cpu();
         self.sys.refresh_memory();
-        
+
         let cpu_usage = round1(self.sys.global_cpu_info().cpu_usage());
         let mem_usage = memory_percent(&self.sys);
-        
+
         let mut metrics = HashMap::new();
         metrics.insert("cpu".to_string(), cpu_usage);
         metrics.insert("mem".to_string(), mem_usage);
-        
+
         metrics
     }
 
@@ -137,14 +137,21 @@ impl SensorEngineRust {
             .filter_entry(|e| {
                 let name = e.file_name().to_string_lossy();
                 // Pruning comum em Rust
-                !name.starts_with('.') && name != "node_modules" && name != "target" && name != "venv" && name != "__pycache__"
+                !name.starts_with('.')
+                    && name != "node_modules"
+                    && name != "target"
+                    && name != "venv"
+                    && name != "__pycache__"
             })
-            .filter_map(|e| e.ok()) 
+            .filter_map(|e| e.ok())
         {
             if entry.file_type().is_file() {
                 if let Ok(metadata) = entry.metadata() {
                     if let Ok(mtime) = metadata.modified() {
-                        let secs = mtime.duration_since(UNIX_EPOCH).unwrap_or_default().as_secs_f64();
+                        let secs = mtime
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs_f64();
                         results.push((entry.path().to_string_lossy().to_string(), secs));
                     }
                 }
@@ -195,11 +202,17 @@ fn classify_process_family(name: &str) -> String {
         "browser"
     } else if contains_any(&normalized, &["code", "nvim", "vim", "pycharm", "idea"]) {
         "editor"
-    } else if contains_any(&normalized, &["python", "node", "bun", "cargo", "rust", "java"]) {
+    } else if contains_any(
+        &normalized,
+        &["python", "node", "bun", "cargo", "rust", "java"],
+    ) {
         "runtime"
     } else if contains_any(&normalized, &["docker", "podman", "qemu", "vm"]) {
         "infra"
-    } else if contains_any(&normalized, &["pipewire", "pulseaudio", "wireplumber", "spotify", "vlc"]) {
+    } else if contains_any(
+        &normalized,
+        &["pipewire", "pulseaudio", "wireplumber", "spotify", "vlc"],
+    ) {
         "media"
     } else {
         "system"

@@ -1,7 +1,7 @@
+use chrono::{DateTime, Utc};
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use chrono::{DateTime, Utc};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct EventLog {
@@ -32,23 +32,30 @@ impl PatternEngineRust {
         if self.event_history.len() >= self.max_history {
             self.event_history.remove(0);
         }
-        
-        let event = EventLog { kind: kind.clone(), timestamp, data };
+
+        let event = EventLog {
+            kind: kind.clone(),
+            timestamp,
+            data,
+        };
         self.event_history.push(event);
-        
+
         let counter = self.habit_counters.entry(kind).or_insert(0);
         *counter += 1;
     }
 
     pub fn detect_anomalies(&self, threshold: usize) -> Vec<String> {
         let mut anomalies = Vec::new();
-        
+
         for (kind, count) in &self.habit_counters {
             if *count > threshold {
-                anomalies.push(format!("Anomalia detectada: excesso de eventos do tipo '{}' ({})", kind, count));
+                anomalies.push(format!(
+                    "Anomalia detectada: excesso de eventos do tipo '{}' ({})",
+                    kind, count
+                ));
             }
         }
-        
+
         anomalies
     }
 

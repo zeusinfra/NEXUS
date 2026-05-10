@@ -55,24 +55,9 @@ impl CommandPolicyRust {
                 "systemctl",
             ]),
             blocked_commands: set(&[
-                "rm",
-                "mkfs",
-                "dd",
-                "shutdown",
-                "reboot",
-                "poweroff",
-                "halt",
-                "passwd",
-                "usermod",
-                "useradd",
-                "userdel",
-                "groupadd",
-                "groupmod",
-                "groupdel",
-                "visudo",
-                "chpasswd",
-                "mount",
-                "umount",
+                "rm", "mkfs", "dd", "shutdown", "reboot", "poweroff", "halt", "passwd", "usermod",
+                "useradd", "userdel", "groupadd", "groupmod", "groupdel", "visudo", "chpasswd",
+                "mount", "umount",
             ]),
             shell_control_tokens: vec![
                 "|".to_string(),
@@ -88,7 +73,10 @@ impl CommandPolicyRust {
             risky_interpreter_flags: map_sets(&[
                 ("python", &["-c", "-m"][..]),
                 ("python3", &["-c", "-m"][..]),
-                ("node", &["-e", "--eval", "-p", "--print", "-r", "--require"][..]),
+                (
+                    "node",
+                    &["-e", "--eval", "-p", "--print", "-r", "--require"][..],
+                ),
             ]),
             safe_interpreter_args: map_sets(&[
                 ("python", &["--version", "-V"][..]),
@@ -114,7 +102,9 @@ impl CommandPolicyRust {
                 ("npx", &["*"][..]),
                 (
                     "cargo",
-                    &["bench", "build", "clippy", "fix", "install", "publish", "run", "test"][..],
+                    &[
+                        "bench", "build", "clippy", "fix", "install", "publish", "run", "test",
+                    ][..],
                 ),
                 (
                     "apt",
@@ -131,14 +121,7 @@ impl CommandPolicyRust {
                 (
                     "systemctl",
                     &[
-                        "start",
-                        "stop",
-                        "restart",
-                        "enable",
-                        "disable",
-                        "mask",
-                        "unmask",
-                        "reload",
+                        "start", "stop", "restart", "enable", "disable", "mask", "unmask", "reload",
                     ][..],
                 ),
             ]),
@@ -156,7 +139,11 @@ impl CommandPolicyRust {
 
     pub fn classify_command(&self, tokens: Vec<String>) -> PyResult<(String, String, bool)> {
         let decision = self.classify(&tokens);
-        Ok((decision.exe, decision.category, decision.requires_confirmation))
+        Ok((
+            decision.exe,
+            decision.category,
+            decision.requires_confirmation,
+        ))
     }
 
     pub fn is_risky(&self, tokens: Vec<String>) -> bool {
@@ -244,11 +231,9 @@ impl CommandPolicyRust {
             let safe_args = self.safe_interpreter_args.get(exe);
             return !args.is_empty()
                 && (args.iter().any(|arg| risky_flags.contains(arg))
-                    || args.iter().any(|arg| {
-                        safe_args
-                            .map(|safe| !safe.contains(arg))
-                            .unwrap_or(true)
-                    }));
+                    || args
+                        .iter()
+                        .any(|arg| safe_args.map(|safe| !safe.contains(arg)).unwrap_or(true)));
         }
 
         if let Some(risky_subcommands) = self.risky_package_subcommands.get(exe) {
@@ -337,7 +322,11 @@ mod tests {
     fn allows_safe_read_command() {
         with_env("GUARDED", "python3", || {
             let policy = CommandPolicyRust::new();
-            let (ok, reason) = policy.validate("python3 --version", &vec!["python3".into(), "--version".into()], false);
+            let (ok, reason) = policy.validate(
+                "python3 --version",
+                &vec!["python3".into(), "--version".into()],
+                false,
+            );
             assert!(ok, "{reason}");
             let decision = policy.classify(&vec!["python3".into(), "--version".into()]);
             assert_eq!(decision.category, "read");
@@ -348,7 +337,8 @@ mod tests {
     fn rejects_outside_allowlist() {
         with_env("GUARDED", "python3", || {
             let policy = CommandPolicyRust::new();
-            let (ok, reason) = policy.validate("git status", &vec!["git".into(), "status".into()], false);
+            let (ok, reason) =
+                policy.validate("git status", &vec!["git".into(), "status".into()], false);
             assert!(!ok);
             assert!(reason.contains("allowlist"));
         });
@@ -358,7 +348,8 @@ mod tests {
     fn blocks_absolute_danger_even_in_full() {
         with_env("FULL", "rm", || {
             let policy = CommandPolicyRust::new();
-            let (ok, reason) = policy.validate("rm something", &vec!["rm".into(), "something".into()], true);
+            let (ok, reason) =
+                policy.validate("rm something", &vec!["rm".into(), "something".into()], true);
             assert!(!ok);
             assert!(reason.contains("bloqueado"));
         });
@@ -370,7 +361,13 @@ mod tests {
             let policy = CommandPolicyRust::new();
             let (ok, _) = policy.validate(
                 "python3 --version && git status",
-                &vec!["python3".into(), "--version".into(), "&&".into(), "git".into(), "status".into()],
+                &vec![
+                    "python3".into(),
+                    "--version".into(),
+                    "&&".into(),
+                    "git".into(),
+                    "status".into(),
+                ],
                 false,
             );
             assert!(!ok);
@@ -380,7 +377,13 @@ mod tests {
             let policy = CommandPolicyRust::new();
             let (ok, reason) = policy.validate(
                 "python3 --version && git status",
-                &vec!["python3".into(), "--version".into(), "&&".into(), "git".into(), "status".into()],
+                &vec![
+                    "python3".into(),
+                    "--version".into(),
+                    "&&".into(),
+                    "git".into(),
+                    "status".into(),
+                ],
                 false,
             );
             assert!(ok, "{reason}");
@@ -391,11 +394,19 @@ mod tests {
     fn interpreter_flags_require_confirmation() {
         with_env("GUARDED", "python3,node", || {
             let policy = CommandPolicyRust::new();
-            let (ok, reason) = policy.validate("python3 -c print(1)", &vec!["python3".into(), "-c".into(), "print(1)".into()], false);
+            let (ok, reason) = policy.validate(
+                "python3 -c print(1)",
+                &vec!["python3".into(), "-c".into(), "print(1)".into()],
+                false,
+            );
             assert!(!ok);
             assert!(reason.contains("confirmação"));
 
-            let (ok, reason) = policy.validate("python3 -c print(1)", &vec!["python3".into(), "-c".into(), "print(1)".into()], true);
+            let (ok, reason) = policy.validate(
+                "python3 -c print(1)",
+                &vec!["python3".into(), "-c".into(), "print(1)".into()],
+                true,
+            );
             assert!(ok, "{reason}");
         });
     }

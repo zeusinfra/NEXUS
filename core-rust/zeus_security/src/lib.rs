@@ -13,24 +13,30 @@ impl PrivacyEngineRust {
     #[new]
     pub fn new() -> Self {
         let mut patterns = HashMap::new();
-        
+
         // Usando r#""# para suportar aspas internas sem escape
         let secret_patterns = [
             ("openai_key", r"sk-[a-zA-Z0-9]{48}"),
-            ("generic_key", r#"(?i)(api[_-]?key|secret|password|token)['"]?\s*[:=]\s*['"]?([a-zA-Z0-9]{16,})['"]?"#),
+            (
+                "generic_key",
+                r#"(?i)(api[_-]?key|secret|password|token)['"]?\s*[:=]\s*['"]?([a-zA-Z0-9]{16,})['"]?"#,
+            ),
             ("env_file", r"(?m)^[A-Z_]+=[^\n]+$"),
-            ("auth_header", r#"(?i)Authorization:\s*(Bearer|Basic)\s+[a-zA-Z0-9\._\-+/=]+"#),
+            (
+                "auth_header",
+                r#"(?i)Authorization:\s*(Bearer|Basic)\s+[a-zA-Z0-9\._\-+/=]+"#,
+            ),
         ];
 
         for (name, pattern) in secret_patterns {
             match RegexBuilder::new(pattern)
                 .case_insensitive(true)
                 .multi_line(true)
-                .build() 
+                .build()
             {
                 Ok(re) => {
                     patterns.insert(name.to_string(), re);
-                },
+                }
                 Err(e) => {
                     eprintln!("[ZEUS RUST ERROR] Falha ao compilar regex {}: {}", name, e);
                 }
@@ -64,7 +70,7 @@ impl PrivacyEngineRust {
 
         for (name, re) in &self.patterns {
             let mask = format!("[MASKED_{}]", name.to_uppercase());
-            
+
             // Contagem de matches antes da substituição
             let count = re.find_iter(&sanitized).count();
             if count > 0 {
@@ -78,7 +84,7 @@ impl PrivacyEngineRust {
 
     pub fn classify(&self, content: &str) -> i32 {
         // Levels: 0=PUBLIC, 1=LOCAL_SENSITIVE, 2=HIGHLY_SENSITIVE, 3=SECRET
-        
+
         for re in self.patterns.values() {
             if re.is_match(content) {
                 return 3; // SECRET
@@ -92,8 +98,9 @@ impl PrivacyEngineRust {
         }
 
         let content_lower = content.to_lowercase();
-        if (content_lower.contains("habits") || content_lower.contains("workflow")) &&
-           (content_lower.contains("detected") || content_lower.contains("observed")) {
+        if (content_lower.contains("habits") || content_lower.contains("workflow"))
+            && (content_lower.contains("detected") || content_lower.contains("observed"))
+        {
             return 2; // HIGHLY_SENSITIVE
         }
 

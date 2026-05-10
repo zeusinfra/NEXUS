@@ -1,6 +1,6 @@
+use chrono::Utc;
 use pyo3::prelude::*;
 use rusqlite::{params, Connection, Result};
-use chrono::Utc;
 
 #[pyclass]
 pub struct SynapseManagerRust {
@@ -35,7 +35,8 @@ impl SynapseManagerRust {
                     weight = weight + 1, 
                     last_accessed = excluded.last_accessed",
                 params![path, 1, now],
-            ).map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+            )
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
         }
 
         // Atualiza Synapse
@@ -46,7 +47,8 @@ impl SynapseManagerRust {
                 weight = weight + ?3, 
                 last_interaction = excluded.last_interaction",
             params![source, target, weight_inc, now],
-        ).map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        )
+        .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
         conn.execute("COMMIT", [])
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
@@ -63,12 +65,14 @@ impl SynapseManagerRust {
         conn.execute(
             "UPDATE synapses SET weight = MAX(1, CAST(weight * ?1 AS INTEGER))",
             params![factor],
-        ).map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        )
+        .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
         conn.execute(
             "UPDATE nodes SET weight = MAX(1, CAST(weight * ?1 AS INTEGER))",
             params![factor],
-        ).map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        )
+        .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
         Ok(())
     }
@@ -78,20 +82,24 @@ impl SynapseManagerRust {
         let conn = Connection::open(&self.db_path)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
-        let mut stmt = conn.prepare(
-            "SELECT target FROM synapses 
+        let mut stmt = conn
+            .prepare(
+                "SELECT target FROM synapses 
              WHERE source = ?1 
              ORDER BY weight DESC, last_interaction DESC 
-             LIMIT ?2"
-        ).map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+             LIMIT ?2",
+            )
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
-        let rows = stmt.query_map(params![path, limit], |row| {
-            row.get(0)
-        }).map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        let rows = stmt
+            .query_map(params![path, limit], |row| row.get(0))
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
         let mut results = Vec::new();
         for row in rows {
-            results.push(row.map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?);
+            results.push(
+                row.map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?,
+            );
         }
 
         Ok(results)

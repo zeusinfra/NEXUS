@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
-use std::collections::HashMap;
 use rayon::prelude::*;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[pyclass]
 #[derive(Serialize, Deserialize, Clone)]
@@ -26,9 +26,12 @@ impl VectorMemoryRust {
     }
 
     pub fn find_similar_rust(&self, query_vector: &[f32], top_k: usize) -> Vec<(String, f32)> {
-        if query_vector.is_empty() { return vec![]; }
+        if query_vector.is_empty() {
+            return vec![];
+        }
 
-        let mut similarities: Vec<(&String, f32)> = self.vectors
+        let mut similarities: Vec<(&String, f32)> = self
+            .vectors
             .par_iter()
             .map(|(key, vector)| {
                 let sim = cosine_similarity(query_vector, vector);
@@ -38,7 +41,8 @@ impl VectorMemoryRust {
 
         similarities.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
-        similarities.into_iter()
+        similarities
+            .into_iter()
             .take(top_k)
             .map(|(key, sim)| (key.clone(), sim))
             .collect()
@@ -46,14 +50,18 @@ impl VectorMemoryRust {
 
     pub fn save_rust(&self) -> std::io::Result<()> {
         let file = std::fs::File::create(&self.storage_path)?;
-        bincode::serialize_into(file, &self.vectors).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        bincode::serialize_into(file, &self.vectors)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
         Ok(())
     }
 
     pub fn load_rust(&mut self) -> std::io::Result<()> {
-        if !std::path::Path::new(&self.storage_path).exists() { return Ok(()); }
+        if !std::path::Path::new(&self.storage_path).exists() {
+            return Ok(());
+        }
         let file = std::fs::File::open(&self.storage_path)?;
-        let decoded: HashMap<String, Vec<f32>> = bincode::deserialize_from(file).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        let decoded: HashMap<String, Vec<f32>> = bincode::deserialize_from(file)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
         self.vectors = decoded;
         Ok(())
     }
@@ -70,22 +78,30 @@ impl VectorMemoryRust {
         self.add_vector_rust(key, vector);
     }
 
-    pub fn find_similar(&self, query_vector: Vec<f32>, top_k: usize) -> PyResult<Vec<(String, f32)>> {
+    pub fn find_similar(
+        &self,
+        query_vector: Vec<f32>,
+        top_k: usize,
+    ) -> PyResult<Vec<(String, f32)>> {
         Ok(self.find_similar_rust(&query_vector, top_k))
     }
 
     pub fn save(&self) -> PyResult<()> {
-        self.save_rust().map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))
+        self.save_rust()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))
     }
 
     pub fn load(&mut self) -> PyResult<()> {
-        self.load_rust().map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))
+        self.load_rust()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))
     }
 }
 
 fn cosine_similarity(v1: &[f32], v2: &[f32]) -> f32 {
     let n = v1.len();
-    if n != v2.len() || n == 0 { return 0.0; }
+    if n != v2.len() || n == 0 {
+        return 0.0;
+    }
 
     let mut dot = 0.0;
     let mut norm_a = 0.0;
@@ -100,7 +116,9 @@ fn cosine_similarity(v1: &[f32], v2: &[f32]) -> f32 {
         norm_b += b * b;
     }
 
-    if norm_a <= 0.0 || norm_b <= 0.0 { return 0.0; }
+    if norm_a <= 0.0 || norm_b <= 0.0 {
+        return 0.0;
+    }
     dot / (norm_a.sqrt() * norm_b.sqrt())
 }
 
