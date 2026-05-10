@@ -336,9 +336,3 @@ Primary remote:
 ```text
 origin -> https://github.com/zeusinfra/ZEUS_NEXUS.git
 ```
-
-Legacy remote:
-
-```text
-legacy -> https://github.com/geniusdev-tech/zeus-cognitive-os.git
-```
