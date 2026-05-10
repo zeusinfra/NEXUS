@@ -1,0 +1,16 @@
+name: Feature Request
+description: Suggest an idea or enhancement for NEXUS
+title: "[FEATURE]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for sharing your idea to improve NEXUS!
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the feature
+      description: A clear and concise description of what you want to happen and why it adds value.
+    validations:
+      required: true
