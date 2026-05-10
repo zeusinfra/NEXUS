@@ -63,6 +63,7 @@ class ZeusGtkChat(Adw.Application):
         self._autostart_mode = False
         self._sidebar_visible = True
         self._seen_admin_action_ids: set[str] = set()
+        self._seen_system_alert_ids: set[str] = set()
         self.sidebar_scroll: Gtk.ScrolledWindow | None = None
         self._session_id = os.getenv("ZEUS_GTK_SESSION_ID") or datetime.now().strftime("gtk-%Y%m%d-%H%M%S")
         self._history_db = os.path.join(
@@ -1182,6 +1183,13 @@ class ZeusGtkChat(Adw.Application):
         api_status = data.get("api_status", {})
         cpu = api_status.get("cpu", 0)
         ram = api_status.get("ram", 0)
+        for alert in api_status.get("system_alerts", []):
+            alert_id = str(alert.get("id") or "")
+            if alert_id and alert_id not in self._seen_system_alert_ids:
+                self._seen_system_alert_ids.add(alert_id)
+                title = alert.get("title") or "Alerta do sistema"
+                message = alert.get("message") or ""
+                self._add_message("system", f"{title}: {message}")
         
         if hasattr(self, 'cpu_label'):
             self.cpu_label.set_label(f"CPU   ·  {cpu}%")

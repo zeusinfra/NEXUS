@@ -1,66 +1,97 @@
 # ZEUS Cognitive OS
 
-ZEUS is a local-first cognitive operating layer that combines a FastAPI backend, Ollama/OpenAI-compatible LLM routing, realtime HUD telemetry, voice/vision tools, Rust-based file watching, a Linux Mint/Cinnamon panel applet, and an event-driven **Second Brain Orchestrator** connecting Obsidian, Notion, and Linear.
+> Local-first cognitive operating layer for Linux desktops, autonomous workflows, secure command governance, realtime telemetry, voice/vision interaction, and Second Brain orchestration.
 
-The current default profile is **Ollama Cloud through the local Ollama daemon**, using `gemma4:31b-cloud` when the machine is authenticated with `ollama signin`.
+| Domain | Status | Primary Surface |
+| --- | --- | --- |
+| Desktop operations | Active | Cinnamon applet + GTK4/Libadwaita chat |
+| Backend orchestration | Active | FastAPI, event bus, LLM router |
+| Memory | Active | SQLite conversation recall + Second Brain events |
+| Security | Active | SudoBroker, RootDaemon, approval gates |
+| Peripherals | Active | USB/Bluetooth sentinels with spoken alerts |
+| Integrations | Active | Obsidian, Notion, Linear |
 
-Current product direction: **the Cinnamon applet is the primary desktop interface**. The desktop chat is a native **GTK4 + Libadwaita** application launched from the Cinnamon applet.
+## Executive Overview
 
-## Current Status (2026-05-09) - GTK Ops, Persistent Recall & Approval Gates
+ZEUS is a local-first cognitive operating system layer. It combines a FastAPI backend, local/cloud Ollama routing, OpenAI-compatible fallback support, realtime HUD telemetry, GTK4 desktop operations, voice and vision tools, Rust-based file watching, secure privileged-action approval, and a bi-directional Second Brain connecting Obsidian, Notion, and Linear.
 
-- **GTK4 Ops Chat:** Interface nativa ganhou composer multi-linha, command palette (`Ctrl+K`), sidebar recolhível, histórico local em SQLite, balões de conversa refinados e ações por mensagem.
-- **Persistent Conversation Recall:** `SQLiteConversationMemory` persiste turnos por `session_id`/`client_id`, injeta histórico recente e recupera conversas parecidas antes de chamar o LLM.
-- **Sudo Approval Gates:** Ações administrativas passam por propostas auditáveis com endpoints `pending/propose/allow/deny`; a GTK mostra cards **Allow/Deny** e nunca envia comando cru ao aprovar.
-- **RootDaemon Hardening:** Socket restrito a `0660`, validação segura de unidades systemd e allowlist tokenizada para comandos read-only/baixo risco.
-- **Self-Healing Guardrails:** Correções autônomas passam pelo `command_policy` e não usam `shell=True`.
-- **Cognitive Loop Stability:** Loop cognitivo evita executor assíncrono instável no ambiente atual, corrige `LOOP_INTERVAL` removido e aceita metas como `dict` ou `CognitiveGoal`.
+The product direction is desktop-native: the **Cinnamon applet** is the launch and status surface, while the **GTK4 + Libadwaita chat** is the primary operator console. The web HUD remains available for visualization and browser-based telemetry.
+
+Current default LLM profile:
+
+| Setting | Default |
+| --- | --- |
+| Provider | Ollama through local daemon |
+| Model | `gemma4:31b-cloud` |
+| Backend URL | `http://127.0.0.1:8080` |
+| Security posture | Local-only by default |
+
+## Current Operating State
+
+Updated: **2026-05-10**
+
+| Capability | State | Notes |
+| --- | --- | --- |
+| GTK Ops Chat | Production path | Multiline composer, command palette, sidebar, local SQLite history, message actions |
+| Conversation Recall | Active | `SQLiteConversationMemory` persists turns by `session_id` and `client_id` |
+| Admin Approval Gates | Active | Pending/propose/allow/deny workflow; UI approves by `action_id` |
+| RootDaemon Hardening | Active | `0660` socket, safe systemd validation, tokenized allowlist |
+| Self-Healing Guardrails | Active | Policy validation before autonomous patches and command execution |
+| Cognitive Loop Stability | Active | Safer loop behavior, dict/goal compatibility, runtime guardrails |
+| USB Sentinel | Active | Detects hotplug, classifies device risk, speaks local alerts without GUI |
+| Bluetooth Sentinel | Active | Monitors BlueZ events through `bluetoothctl monitor` |
 
 ## Architecture
 
 ```mermaid
-graph TD
-    User[User] --> WebHUD[Web HUD]
-    User --> Applet[Cinnamon Applet]
-    User --> GTKChat[GTK4/Libadwaita Chat]
-    User --> Obsidian[Obsidian Vault]
+flowchart TD
+    Operator[Operator] --> Applet[Cinnamon Applet]
+    Operator --> GTK[GTK4 Ops Chat]
+    Operator --> HUD[Web HUD]
+    Operator --> Obsidian[Obsidian Vault]
 
-    WebHUD --> API[FastAPI Backend]
-    Applet --> API
-    GTKChat --> API
-    Obsidian --> Watcher[Rust File Watcher]
+    Applet --> API[FastAPI Backend]
+    GTK --> API
+    HUD --> API
 
-    Watcher --> API
-    API --> LLM[LLM Provider]
+    API --> LLM[LLM Router]
     API --> Memory[SQLite / Vector Memory]
-    API --> EventBus[Event Bus & Classifier]
-    
-    EventBus --> Notion[Notion API]
-    EventBus --> Linear[Linear API]
+    API --> Events[Event Bus]
+    API --> Security[SudoBroker / RootDaemon]
+    API --> Peripherals[USB + Bluetooth Sentinels]
+
+    Obsidian --> Watcher[Rust File Watcher]
+    Watcher --> Events
+
+    Events --> Notion[Notion]
+    Events --> Linear[Linear]
+    Events --> Cognition[Cognitive Loop]
 
     LLM --> Ollama[Ollama Local / Cloud]
-    LLM --> OpenAI[OpenAI-compatible API]
+    LLM --> OpenAI[OpenAI-Compatible API]
 ```
 
-## Main Directories
+## Repository Map
 
-| Path | Purpose |
+| Path | Responsibility |
 | --- | --- |
-| `apps/` | FastAPI app, realtime hub, status routes, orchestration entrypoints. |
-| `zeus_core/` | Agentes, `SudoBroker`, `ResourceGovernor`, LLM routing, event bus, memória conversacional, `SelfImprovementPipeline`, observability. |
-| `public/` | Web HUD and frontend tests. |
-| `applets/` | Linux desktop panel integrations, currently Cinnamon `zeus@local`. |
-| `bin/zeus-gtk-chat` | Premium native GTK4/Libadwaita desktop chat launched by the applet. |
-| `watcher_rs/` | Rust filesystem watcher. |
-| `core-rust/` | **Hybrid Core Workspace**: 8 crates Rust para estado compartilhado, políticas, segurança, sensores e lógica cognitiva. |
-| `zeus_core/vision.py` | Módulo de captura de tela, OCR e análise visual via LLM. |
-| `docs/` | Technical reports and execution plans. |
-| `tests/` | Python regression, security, policy, route, and observability tests. |
+| `apps/` | FastAPI app, realtime hub, status routes, lifecycle orchestration |
+| `zeus_core/` | Agents, policies, LLM routing, security, memory, vision, event bus, observability |
+| `zeus_core/peripherals/` | USB and Bluetooth sentinels |
+| `public/` | Web HUD and frontend tests |
+| `applets/` | Linux desktop panel integrations, currently Cinnamon `zeus@local` |
+| `bin/zeus` | Unified launcher for server, web, TUI, and diagnostics |
+| `bin/zeus-gtk-chat` | Native GTK4/Libadwaita operator console |
+| `watcher_rs/` | Rust filesystem watcher |
+| `core-rust/` | Rust workspace for state, policy, sensors, security, and cognitive primitives |
+| `docs/` | Architecture and system reports |
+| `tests/` | Python regression, security, route, policy, and observability tests |
 
 ## Environment
 
-Use `.env.example` as the template for local configuration. Do not commit `.env`.
+Use `.env.example` as the local template. Never commit `.env`.
 
-Recommended local/cloud Ollama profile:
+### Recommended Local Profile
 
 ```env
 ZEUS_ENV=local
@@ -73,41 +104,53 @@ ZEUS_ALLOW_LAN=0
 ZEUS_LAN_AUTH=1
 ZEUS_ALLOW_INSECURE_DEV_SECRET=0
 
-# Governança de Recursos
-ZEUS_RAM_SOFT_LIMIT=75
-ZEUS_RAM_HARD_LIMIT=90
-ZEUS_SWAP_WARNING_LIMIT=50
-
-# Second Brain Integrations
-ZEUS_VAULT_PATH=/home/zeus/Documentos/Brain
-ZEUS_DB_PATH=./zeus_events.db
-NOTION_TOKEN=your_notion_token
-NOTION_DATABASE_ID=your_database_id
-LINEAR_API_KEY=your_linear_key
-LINEAR_TEAM_ID=your_team_id
+ZEUS_ENABLE_VOICE=1
+ZEUS_ENABLE_VOICE_SENSING=0
 ZEUS_ENABLE_SECOND_BRAIN=1
 ZEUS_ENABLE_SECOND_BRAIN_SYNC_ENGINE=0
 ZEUS_ENABLE_NOTION_AUTO_SYNC=1
 ZEUS_ENABLE_OBSIDIAN_AUTO_SYNC=1
 ZEUS_ENABLE_LINEAR_AUTO_SYNC=1
+
+ZEUS_VAULT_PATH=/home/zeus/Documentos/Brain
+ZEUS_DB_PATH=./zeus_events.db
+ZEUS_CONVERSATION_DB_PATH=./data/conversation_memory.db
+```
+
+### Resource Governance
+
+```env
+ZEUS_RAM_SOFT_LIMIT=75
+ZEUS_RAM_HARD_LIMIT=90
+ZEUS_SWAP_WARNING_LIMIT=50
+ZEUS_LOW_MEM_AUTO=1
+```
+
+### Integrations
+
+```env
+NOTION_TOKEN=your_notion_token
+NOTION_DATABASE_ID=your_database_id
+LINEAR_API_KEY=your_linear_key
+LINEAR_TEAM_ID=your_team_id
 ZEUS_ENABLE_NOTION=true
 ZEUS_ENABLE_LINEAR=true
 ```
 
-For Ollama Cloud via the local daemon:
+### Ollama Cloud
 
 ```bash
 ollama signin
 ```
 
-For hosted Ollama API usage, configure one of:
+Hosted Ollama API:
 
 ```env
 OLLAMA_API_KEY=your_ollama_api_key_here
 ZEUS_LLM_API_KEY=your_ollama_api_key_here
 ```
 
-For OpenAI-compatible usage:
+OpenAI-compatible profile:
 
 ```env
 ZEUS_LLM_PROVIDER=openai
@@ -116,24 +159,32 @@ OPENAI_MODEL=gpt-4o-mini
 OPENAI_BASE_URL=https://api.openai.com/v1
 ```
 
-## Run
+## Runbook
 
-Backend/headless:
+| Task | Command |
+| --- | --- |
+| Start backend headless | `./bin/zeus server` |
+| Ensure backend is online | `./bin/zeus ensure-server` |
+| Open web HUD | `./bin/zeus web` |
+| Open TUI | `./bin/zeus tui` |
+| Tail backend logs | `./bin/zeus logs` |
+
+Manual backend start:
 
 ```bash
 source .venv/bin/activate
 python -m apps.web_gui --headless
 ```
 
-Backend health guard:
+Health endpoint:
 
-```bash
-./bin/zeus ensure-server
+```text
+http://127.0.0.1:8080/api/health
 ```
 
-### Linux Desktop Components
+## Desktop Components
 
-#### Cinnamon Applet:
+### Cinnamon Applet
 
 ```bash
 chmod +x bin/install-cinnamon-applet.sh
@@ -141,34 +192,66 @@ chmod +x bin/install-cinnamon-applet.sh
 cinnamon-settings applets
 ```
 
-Then enable **ZEUS Cognitive AI** in Cinnamon Applets. The applet talks to the local backend through HTTP endpoints.
-The applet shows backend/LLM status in the Cinnamon panel. Click behavior:
-- backend online: opens the external GTK chat window from `bin/zeus-gtk-chat`;
-- backend offline: runs `./bin/zeus ensure-server`.
+Enable **ZEUS Cognitive AI** in Cinnamon Applets.
 
-#### Native GTK4 Chat:
-The desktop client is built with **GTK4 and Libadwaita** for a native GNOME/Linux Mint experience. It includes a multiline composer, improved chat bubbles, local conversation history, command palette, collapsible telemetry sidebar, admin approval cards, toast notifications, live telemetry polling, and dark mode.
+Click behavior:
 
-Dependencies for Debian/Ubuntu/Linux Mint:
+| Backend State | Action |
+| --- | --- |
+| Online | Opens `bin/zeus-gtk-chat` |
+| Offline | Runs `./bin/zeus ensure-server` |
+
+Reload applet if Cinnamon does not refresh:
+
+```bash
+gdbus call --session --dest org.Cinnamon --object-path /org/Cinnamon --method org.Cinnamon.ReloadXlet zeus@local APPLET
+```
+
+### GTK4 Ops Chat
+
+Dependencies for Debian, Ubuntu, and Linux Mint:
 
 ```bash
 sudo apt install python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 libadwaita-1-0
 ```
 
-The application respects the dark mode preference automatically but can be overridden:
+Launch:
+
+```bash
+./bin/zeus-gtk-chat
+```
+
+Theme override:
+
 ```bash
 ZEUS_GTK_THEME=dark ./bin/zeus-gtk-chat
 ```
 
-GTK shortcuts and controls:
+Shortcuts:
 
-- `Enter`: send message.
-- `Shift+Enter`: insert a new line.
-- `Ctrl+K`: open the command palette.
-- `Ctrl+L`: clear the local chat view.
-- `Esc`: cancel the current generation.
+| Shortcut | Action |
+| --- | --- |
+| `Enter` | Send message |
+| `Shift+Enter` | Insert newline |
+| `Ctrl+K` | Command palette |
+| `Ctrl+L` | Clear local chat view |
+| `Esc` | Cancel current generation |
 
-Admin approval flow:
+## Security Model
+
+ZEUS defaults to local-only operation and treats privileged actions as explicit, auditable workflows.
+
+| Layer | Control |
+| --- | --- |
+| HTTP access | Trusted local/LAN checks |
+| LAN mode | `ZEUS_ALLOW_LAN=1`, `ZEUS_LAN_AUTH=1`, strong `ZEUS_LAN_TOKEN` |
+| Payload limits | Chat, web-context, and vision payload caps |
+| Privilege escalation | `SudoBroker` and `RootDaemon` only |
+| Admin UI | Approval by `action_id`; no raw privileged command from client |
+| Self-healing | `command_policy` validation, no `shell=True` |
+| Runtime secrets | `.env`, keys, logs, databases, and scratch data remain untracked |
+
+Admin approval API:
 
 ```text
 GET  /api/admin/actions/pending
@@ -177,21 +260,19 @@ POST /api/admin/actions/{id}/allow
 POST /api/admin/actions/{id}/deny
 ```
 
-The GTK client only sends the approved `action_id`; the backend retrieves the audited proposal and calls `SudoBroker` with explicit user confirmation.
+## Peripheral Sentinel
 
-If Cinnamon does not reload the applet after installation, run:
+The USB Sentinel runs in the backend and does not require the GUI to be open. It watches `udev`, filters duplicate low-level interface events, classifies risk, stores operational alerts, and speaks through the local voice pipeline.
 
-```bash
-gdbus call --session --dest org.Cinnamon --object-path /org/Cinnamon --method org.Cinnamon.ReloadXlet zeus@local APPLET
-```
+| Device Class | Risk | Action |
+| --- | --- | --- |
+| USB storage | Medium | Alert, discourage auto-execution, recommend scan before opening files |
+| HID keyboard/mouse | Medium | Alert for potential BadUSB-style input |
+| USB network/modem | High | Alert and recommend network-interface review |
+| Audio/video | Low | Log and monitor |
+| Unknown without serial | Medium | Alert due to low traceability |
 
-Web HUD:
-
-```text
-http://127.0.0.1:8080
-```
-
-## Test
+## Test Matrix
 
 Python:
 
@@ -212,35 +293,9 @@ cargo test --manifest-path core-rust/Cargo.toml
 cargo test --manifest-path watcher_rs/Cargo.toml
 ```
 
-## Security And Repository Hygiene
+## Repository Hygiene
 
-The repository must not include local secrets, runtime memory, logs, screenshots, private keys, or temporary scratch data.
-
-Ignored/local-only examples:
-
-- `.env`
-- `.env.*`
-- `configs/*.pem`
-- `configs/serviceAccountKey.json`
-- `data/`
-- `logs/`
-- `scratch/`
-- `*.db`
-- `*.sqlite`
-- `*.log`
-- `startup_test*.log`
-
-Runtime hardening currently enforced by the backend:
-
-- `/api/status`, `/api/health`, `/api/chat`, `/api/web-context`, applet routes, ASR, and vision endpoints require trusted local/LAN access.
-- LAN mode should set `ZEUS_ALLOW_LAN=1`, `ZEUS_LAN_AUTH=1`, and a strong `ZEUS_LAN_TOKEN`.
-- `ZEUS_MAX_CHAT_MESSAGE_CHARS`, `ZEUS_MAX_WEB_CONTEXT_CHARS`, and `ZEUS_MAX_VISION_IMAGE_BYTES` cap user-provided payload sizes.
-- Command execution uses `SudoBroker` para interceptar escalonamento indevido. Permissões estritas apenas via `RootDaemon`.
-- RootDaemon uses a tokenized command allowlist and `0660` Unix socket permissions.
-- Self-healing commands are validated by `command_policy` and executed without `shell=True`.
-- Admin approvals are action-id based; UI clients do not submit arbitrary privileged commands.
-
-Before pushing to a public remote, run:
+Before pushing to a public remote:
 
 ```bash
 git status --short
@@ -248,23 +303,18 @@ git ls-files | rg "^(configs/.*\\.pem|logs/|.*\\.log$|startup_test|scratch/|data
 rg -l "(sk-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{20,}|mongodb\\+srv://|postgresql://|hvs\\.|private_key|serviceAccountKey)" --glob '!data/**' --glob '!logs/**' --glob '!scratch/**'
 ```
 
-Expected result: no tracked secrets. `.env.example` may appear in pattern scans because it intentionally contains placeholder variable names.
+Expected result: no tracked secrets. `.env.example` may appear in scans because it intentionally contains placeholder names.
 
 ## Git Remote
 
-Current GitHub remote:
+Primary remote:
 
 ```text
-https://github.com/geniusdev-tech/zeus-cognitive-os.git
+origin -> https://github.com/zeusinfra/ZEUS_NEXUS.git
 ```
 
-To push after review:
+Legacy remote:
 
-```bash
-git push origin main
+```text
+legacy -> https://github.com/geniusdev-tech/zeus-cognitive-os.git
 ```
-
-## Documentation
-
-- `docs/RELATORIO_COMPLETO_SISTEMA_2026-05-08.md` (Latest: Adaptive Amplification & Secure Autonomy)
-- `docs/ZEUS_SECOND_BRAIN_ARCHITECTURE.md`

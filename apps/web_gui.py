@@ -178,6 +178,7 @@ recent_events_count = 0
 system_mood = "CALM"
 current_node = "N/A"
 recent_events = []
+recent_system_alerts: list[dict] = []
 loop = None
 event_pipeline = OverflowEventQueue(EVENT_QUEUE_MAXSIZE)
 watcher_runner = RustWatcherRunner(PROJECT_ROOT)
@@ -1203,6 +1204,14 @@ class TTSReq(BaseModel):
     text: str
 
 
+class SystemAlertReq(BaseModel):
+    title: str | None = "Alerta do sistema"
+    message: str
+    severity: str | None = "info"
+    source: str | None = "system"
+    speak: bool | None = False
+
+
 def _build_second_brain_status() -> dict:
     vault_path = os.getenv("ZEUS_VAULT_PATH", "/home/zeus/Documentos/Brain")
     db_path = os.getenv("ZEUS_DB_PATH", "./zeus_events.db")
@@ -1561,6 +1570,41 @@ async def api_tts(req: TTSReq, request: Request):
     return {"ok": bool(audio_b64), "audio": audio_b64, "audio_mime": "audio/mpeg" if audio_b64 else None}
 
 
+@app.post("/api/system/alert")
+async def api_system_alert(req: SystemAlertReq, request: Request):
+    if not _is_trusted_request(request):
+        raise HTTPException(status_code=403, detail="Only trusted (local/LAN) requests are allowed.")
+    _require_lan_token_for_request(request)
+
+    message = (req.message or "").strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="message is required.")
+
+    severity = (req.severity or "info").strip().lower()[:24]
+    title = (req.title or "Alerta do sistema").strip()[:80]
+    source = (req.source or "system").strip().lower()[:48]
+    payload = {
+        "type": "SYSTEM_ALERT",
+        "id": str(uuid.uuid4()),
+        "ts": time.time(),
+        "title": title,
+        "message": message[:2000],
+        "severity": severity,
+        "source": source,
+    }
+    recent_system_alerts.append(payload)
+    del recent_system_alerts[:-20]
+    await broadcast_message(payload)
+    log_event(logger, 20, "system_alert", source=source, severity=severity, message_chars=len(message))
+    if req.speak:
+        spoken_text = speech_text(message[:500])
+        if ENABLE_VOICE:
+            asyncio.create_task(voice_module.speak(spoken_text or message[:500]))
+        else:
+            print(f"[ZEUS VOICE ALERT] {display_text(message[:500])}")
+    return {"ok": True}
+
+
 async def update_memory_after_chat(user_msg, ai_reply):
     global long_term_memory
     try:
@@ -1733,7 +1777,8 @@ def _build_api_status_payload() -> dict:
         "ram": round(ram, 1),
         "mood": system_mood,
         "active_tasks": total_events,
-        "objectives": pattern_engine.analyze_behavioral_state() if hasattr(pattern_engine, 'analyze_behavioral_state') else "Evolving"
+        "objectives": pattern_engine.analyze_behavioral_state() if hasattr(pattern_engine, 'analyze_behavioral_state') else "Evolving",
+        "system_alerts": recent_system_alerts[-5:],
     }
 
 def _build_api_health_payload() -> dict:

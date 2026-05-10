@@ -871,6 +871,10 @@ function reactToSignal(kind,payload={}){
     pulseOrb(.22,-.02,(Math.random()-.5)*.02);
     return;
   }
+  if(kind==='SYSTEM_ALERT'){
+    pulseOrb(.35,.04,-.02);
+    return;
+  }
   pulseOrb(.14,(Math.random()-.5)*.03,(Math.random()-.5)*.03);
 }
 
@@ -1167,6 +1171,8 @@ function connectRealtime() {
       setCoreStatus(d.text);
     } else if(d.type === 'CHAT_AI') {
       addLog({title: 'AI RESPONSE', detail: d.message.slice(0, 100) + '...'});
+    } else if(d.type === 'SYSTEM_ALERT') {
+      addLog({title: d.title || 'SYSTEM ALERT', detail: String(d.message || '').slice(0, 180)}, 'e');
     } else if(d.type === 'SYSTEM_EVENT') {
         addLog({title: 'OS PULSE', detail: d.log.detail}, 'e');
     }

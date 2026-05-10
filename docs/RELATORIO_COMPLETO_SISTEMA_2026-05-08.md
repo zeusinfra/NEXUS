@@ -1,51 +1,223 @@
-# Relatório Completo do Sistema ZEUS Cognitive OS
+# ZEUS Cognitive OS - System Report
 
-Data: 2026-05-08
-Atualizacao: 2026-05-09
+> Enterprise operating report for the current ZEUS platform state, architecture maturity, risk posture, validation status, and execution roadmap.
 
-## Resumo Executivo
+| Report Field | Value |
+| --- | --- |
+| Original date | 2026-05-08 |
+| Last update | 2026-05-10 |
+| Platform | ZEUS Cognitive OS |
+| Operating model | Local-first cognitive desktop layer |
+| Primary interface | Cinnamon applet + GTK4 Ops Chat |
+| Backend | FastAPI, SQLite, Rust watcher, event bus |
+| Security posture | Local-first, approval-gated, policy-controlled |
 
-O sistema ZEUS evoluiu de um monitor maduro para um organismo digital proativo, introduzindo a **Amplificação Adaptativa e Autonomia Segura (v4.0)**. A mais recente refatoração centralizou o controle de comandos privilegiados em um SudoBroker rigoroso, permitiu autonomia administrativa controlada, e adicionou resiliência ao sistema através de pipelines de self-improvement. O sistema GTK4 também recebeu uma interface de telemetria refinada.
+## Executive Summary
 
-Em 2026-05-09, o foco passou para operacionalizar essa autonomia com uma interface nativa mais produtiva: memória persistente de conversas, cards de aprovação **Allow/Deny** para ações administrativas, endurecimento do RootDaemon e melhorias diretas de usabilidade no chat GTK4.
+ZEUS has evolved from a mature monitoring assistant into a proactive cognitive operations platform. The system now combines autonomous planning, secure administrative workflows, desktop-native command surfaces, persistent memory, Second Brain synchronization, and peripheral sensing.
 
-## Estado Atual da Arquitetura
+The latest operating milestone focuses on enterprise readiness:
 
-### 1. Autonomia e Governança
-- **SudoBroker e RootDaemon**: Separação de processos para rodar comandos privilegiados (sudo) de forma auditável, evitando destruição indesejada (rm -rf /) através de uma categorização de riscos de 5 níveis.
-- **Approval Gates**: Propostas administrativas agora podem ser expostas via API (`pending/propose/allow/deny`) e aprovadas na GTK por ID auditado, sem envio de comando cru pela interface.
-- **RootDaemon Hardened**: Socket Unix restrito a `0660`, validação segura de nomes systemd e allowlist tokenizada via `shlex`.
-- **ResourceGovernor**: Monitoramento contínuo de CPU, RAM, Swap e I/O que flexibiliza ou retrai a agressividade do loop cognitivo para proteger a máquina hospedeira.
-- **EventBus**: Migração de polling síncrono para arquitetura Pub/Sub reativa, permitindo que microagentes (Strategist, Operator, Critic) orquestrem soluções sem bloquear a linha principal.
+| Theme | Outcome |
+| --- | --- |
+| Operational UX | GTK4 Ops Chat and Cinnamon applet define the desktop workflow |
+| Governance | Admin actions are proposed, reviewed, approved by ID, and executed through controlled brokers |
+| Memory | SQLite-backed conversation recall and Second Brain persistence reduce context loss |
+| Security | RootDaemon, SudoBroker, command policy, and route trust checks constrain risk |
+| Observability | Backend health, HUD telemetry, GTK sidebar, and structured logs improve traceability |
+| Peripheral awareness | USB/Bluetooth sentinels detect and announce device changes headlessly |
 
-### 2. Conversação Anti-Concatenação
-- **ConversationManager**: Substituição de concatenações brutas no prompt LLM por um gerenciador de contexto granular, usando Hashes de turnos para remover duplicações automáticas de sistema.
-- **TopicTracker e Intent Router**: Conversas ramificam topologicamente quando mudanças bruscas de contexto são identificadas, salvando memória (token budget).
-- **SQLiteConversationMemory**: Histórico recente e conversas semanticamente parecidas são persistidos por `session_id`/`client_id` e reinjetados no prompt com orçamento controlado.
+## Platform Snapshot
 
-### 3. Pipeline de Self-Improvement
-- **Automodificação Segura**: O ZEUS agora pode diagnosticar bugs, injetar patches, rodar suítes de testes (`PatchManager`) e realizar `Rollback` caso a predição piore a estabilidade do repositório.
+| Capability | Current State | Maturity |
+| --- | --- | --- |
+| FastAPI backend | Active | Stable |
+| GTK4 operator console | Active | Production path |
+| Cinnamon applet | Active | Primary launcher/status surface |
+| Web HUD | Active | Visualization surface |
+| LLM routing | Active | Ollama local/cloud plus OpenAI-compatible profile |
+| SQLite conversation memory | Active | Stable |
+| Second Brain sync | Active | Integration-ready |
+| Rust watcher | Active | Stable |
+| SudoBroker | Active | Hardened |
+| RootDaemon | Active | Hardened |
+| Self-healing pipeline | Active | Guarded |
+| USB Sentinel | Active | Newly integrated |
+| Bluetooth monitor | Active | Lightweight native monitor |
 
-### 4. Interfaces e Dashboard Cyber-Premium
-- **GTK4 / Libadwaita**: Sidebar reformulada com indicadores progressivos visuais para CPU/RAM, status explícito dos módulos internos, e badges de arquitetura ativada.
-- **GTK Ops Chat**: Composer multi-linha, `Ctrl+K` command palette, sidebar recolhível, histórico local em SQLite, balões de conversa refinados, ações por mensagem e cards **Allow/Deny** para sudo/admin.
-- **Live Telemetry Polling**: Threads desvinculadas buscam sinais em tempo real do backend sem travar a interface nativa.
+## Architecture State
 
-## Validações de Sistema (Maio 2026)
+```mermaid
+flowchart TD
+    Desktop[Desktop Operator] --> Applet[Cinnamon Applet]
+    Desktop --> GTK[GTK4 Ops Chat]
+    Desktop --> HUD[Web HUD]
 
-- [x] **Autonomia Restrita**: SudoBroker rodando de forma isolada do loop de terminal padrão.
-- [x] **Approval UI**: Cards GTK de aprovação admin integrados a endpoints action-id based.
-- [x] **EventBus Async**: Sinais cognitivos e percepção distribuídos adequadamente para Executivos e Criticos.
-- [x] **GTK4 Redesign**: Sidebar telemetrica com Live Polling e Design System refinado.
-- [x] **Conversation Memory Fix**: Colapso de contexto resolvido via token budgeting dinâmico e memória SQLite persistente.
-- [x] **Regression Suite**: `195 passed, 12 subtests passed`; frontend Node: `3 passed`.
+    Applet --> Backend[FastAPI Backend]
+    GTK --> Backend
+    HUD --> Backend
 
-## Próximos Passos (Roadmap)
+    Backend --> LLM[LLM Router]
+    Backend --> Memory[SQLite Memory]
+    Backend --> Events[Event Bus]
+    Backend --> Security[SudoBroker / RootDaemon]
+    Backend --> Peripheral[USB / Bluetooth Sentinels]
 
-1.  **SysD Daemon Completo**: Levantar e embutir o `RootDaemon` no systemd para inicialização segura no boot do host.
-2.  **WebSocket GTK**: Substituir polling de status por eventos em tempo real para admin actions, telemetria e mensagens.
-3.  **Voice Sensory Mesh**: Expansão do frontend e backend TTS para conversas mais profundas com o LLM.
-4.  **Higiene de Memória Profunda**: Compressão dos logs long-term e vetorização avançada.
+    Events --> Watcher[Rust Watcher]
+    Events --> SecondBrain[Second Brain Sync]
+    Events --> Cognition[Cognitive Loop]
 
----
-*Relatório gerado pelo núcleo ZEUS — O sistema está oficialmente Proativo e Autônomo.*
+    SecondBrain --> Obsidian[Obsidian]
+    SecondBrain --> Notion[Notion]
+    SecondBrain --> Linear[Linear]
+```
+
+## Governance And Autonomy
+
+### Privileged Execution
+
+| Component | Responsibility |
+| --- | --- |
+| `SudoBroker` | Mediates privileged intent and user confirmation |
+| `RootDaemon` | Executes constrained privileged actions |
+| `command_policy` | Classifies and blocks unsafe command patterns |
+| Admin action API | Stores auditable proposals and approval decisions |
+| GTK approval cards | Expose allow/deny decisions without sending raw sudo commands |
+
+Key posture:
+
+- Administrative actions are proposal-driven.
+- Approval uses `action_id`, not arbitrary command text from UI clients.
+- RootDaemon socket permissions are restricted to `0660`.
+- Systemd unit names are validated before privileged operations.
+- Self-healing commands execute without `shell=True`.
+
+### Cognitive Autonomy
+
+| Area | Behavior |
+| --- | --- |
+| Planning | Goals and context are interpreted through the cognitive loop |
+| Execution | High-risk actions require explicit approval |
+| Recovery | Patch and rollback managers support controlled self-improvement |
+| Resource control | CPU, RAM, swap, and disk pressure influence loop intensity |
+
+## Conversation And Memory
+
+ZEUS now uses layered memory instead of relying only on raw prompt concatenation.
+
+| Layer | Purpose |
+| --- | --- |
+| Recent session context | Keeps the current conversation coherent |
+| Similar recall | Retrieves related previous turns |
+| GTK local history | Preserves desktop continuity |
+| Second Brain | Persists longer-term operational knowledge |
+| Event database | Tracks sync and system activity |
+
+Implemented controls:
+
+- `session_id` and `client_id` isolate memory streams.
+- Prompt context is budgeted.
+- Duplicate system text is reduced by sanitizers and turn tracking.
+- SQLite persistence survives process restarts.
+
+## Interface Review
+
+### GTK4 Ops Chat
+
+| Feature | State |
+| --- | --- |
+| Multiline composer | Complete |
+| Command palette | Complete |
+| Collapsible telemetry sidebar | Complete |
+| Local SQLite history | Complete |
+| Refined message bubbles | Complete |
+| Per-message actions | Complete |
+| Admin approval cards | Complete |
+| Live polling | Complete |
+
+### Cinnamon Applet
+
+| Feature | State |
+| --- | --- |
+| Backend status | Active |
+| LLM status | Active |
+| One-click GTK launch | Active |
+| Backend auto-start | Active |
+
+### Web HUD
+
+| Feature | State |
+| --- | --- |
+| Realtime telemetry | Active |
+| Cognitive/event pulses | Active |
+| System alerts | Active |
+| Metrics visualization | Active |
+
+## Peripheral Sentinel
+
+The system now includes a headless USB Sentinel designed for security-oriented awareness.
+
+| Device Signal | Classification | Response |
+| --- | --- | --- |
+| USB storage | Medium | Spoken alert, recommend scan before file access |
+| HID input | Medium | Spoken alert for BadUSB-style risk |
+| USB network/modem | High | Spoken alert and network-interface review recommendation |
+| Audio/video | Low | Log and passive monitoring |
+| Unknown without serial | Medium | Alert due to poor traceability |
+
+Reliability controls:
+
+- Filters low-level `usb_interface` events to avoid duplicate speech.
+- Announces only primary `usb_device` events.
+- Uses global cooldown and fingerprint debounce.
+- Works without the GUI open.
+
+## Validation Status
+
+| Validation | Result |
+| --- | --- |
+| Python regression suite | Previously reported: `195 passed, 12 subtests passed` |
+| Frontend Node tests | Previously reported: `3 passed` |
+| USB monitor classifier tests | Added and manually validated in current environment |
+| Python syntax checks | Passing for updated backend/peripheral modules |
+| Headless backend health | Passing on `http://127.0.0.1:8080/api/health` |
+
+Current environment note: `pytest` is not installed in the active system Python used during the USB work, so the USB tests were executed manually through Python imports.
+
+## Risk Register
+
+| Risk | Impact | Mitigation |
+| --- | --- | --- |
+| Duplicate device hotplug events | Repeated voice alerts | Filter primary `usb_device`, debounce, global cooldown |
+| Privileged command misuse | Host damage | Approval gates, RootDaemon policy, command allowlist |
+| Context overgrowth | LLM latency and poor answers | Conversation budget and similar-turn recall |
+| LAN exposure | Unauthorized access | Local-only default, LAN token when enabled |
+| External API dependency | Sync failure | Local-first Obsidian/SQLite source of truth |
+| Resource pressure | Desktop instability | ResourceGovernor and lightweight profile |
+
+## Roadmap
+
+| Priority | Initiative | Target Outcome |
+| --- | --- | --- |
+| P0 | Systemd RootDaemon productionization | Secure boot-time privileged service |
+| P0 | Full USB scan workflow | Integrate ClamAV or equivalent scanning pipeline |
+| P1 | WebSocket GTK events | Replace polling for actions, alerts, telemetry |
+| P1 | Voice sensory mesh | More natural backend/app/client voice routing |
+| P1 | Deep memory compression | Summaries and durable long-term knowledge compaction |
+| P2 | Enterprise audit dashboard | Unified action, sync, alert, and risk timeline |
+| P2 | Policy packs | Environment-specific command and integration policies |
+
+## Operational Commands
+
+| Task | Command |
+| --- | --- |
+| Start headless backend | `./bin/zeus server` |
+| Ensure backend | `./bin/zeus ensure-server` |
+| Open GTK chat | `./bin/zeus-gtk-chat` |
+| View logs | `./bin/zeus logs` |
+| Run Python tests | `.venv/bin/python -m pytest -q` |
+| Run frontend tests | `node --test public/tests/*.test.js` |
+
+## Conclusion
+
+ZEUS is now positioned as a local-first cognitive operations platform with a stronger enterprise shape: clear operating surfaces, guarded autonomy, persistent memory, structured integrations, and headless peripheral awareness. The next maturity step is converting the newest sentinels and approval flows into fully audited, policy-packaged services suitable for long-running desktop operation.
