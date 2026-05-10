@@ -8,9 +8,10 @@ from zeus_core.observability import get_logger, log_event
 from zeus_core.tools import ToolError
 
 
-READ_COMMANDS = {"ls", "pwd", "echo", "cat", "sed", "rg", "find", "wc", "git", "python3", "node", "npm", "cargo"}
-WRITE_COMMANDS = {"cp", "mv", "mkdir", "touch", "chmod", "chown", "git"}
-CONFIRMATION_ONLY_COMMANDS = {"python3", "python", "node", "npm", "npx", "cargo"}
+READ_COMMANDS = {"ls", "pwd", "echo", "cat", "sed", "rg", "find", "wc", "git", "python3", "node", "npm", "cargo", "df", "free", "uptime", "lscpu", "lsblk", "ip", "ss", "top", "htop", "neofetch", "date", "cal", "which", "whereis", "type", "env", "printenv"}
+WRITE_COMMANDS = {"cp", "mv", "mkdir", "touch", "chmod", "chown", "git", "rm", "apt", "pip", "pip3", "npm", "cargo", "systemctl"}
+CONFIRMATION_ONLY_COMMANDS = {"python3", "python", "node", "npm", "npx", "cargo", "rm", "apt", "systemctl"}
+
 BLOCKED_COMMANDS = {
     "mkfs",
     "dd",
@@ -21,12 +22,16 @@ BLOCKED_COMMANDS = {
     "passwd",
     "usermod",
     "useradd",
+    "userdel",
     "groupadd",
+    "groupmod",
+    "groupdel",
     "visudo",
+    "chpasswd",
     "mount",
     "umount",
-    "rm",
 }
+
 SHELL_CONTROL_TOKENS = {"|", "&&", "||", ";", ">", ">>", "<", "$(", "`"}
 RISKY_INTERPRETER_FLAGS = {
     "python": {"-c", "-m"},
@@ -42,6 +47,8 @@ RISKY_PACKAGE_SUBCOMMANDS = {
     "npm": {"exec", "explore", "install", "i", "link", "rebuild", "run", "run-script", "start", "test"},
     "npx": {"*"},
     "cargo": {"bench", "build", "clippy", "fix", "install", "publish", "run", "test"},
+    "apt": {"install", "remove", "purge", "upgrade", "dist-upgrade", "autoremove", "full-upgrade"},
+    "systemctl": {"start", "stop", "restart", "enable", "disable", "mask", "unmask", "reload"},
 }
 
 
@@ -68,7 +75,7 @@ def _configured_allowlist() -> set[str]:
         item.strip()
         for item in os.getenv(
             "ZEUS_CMD_ALLOWLIST",
-            "ls,pwd,echo,cat,sed,rg,find,wc,python3,node,npm,cargo,git",
+            "ls,pwd,echo,cat,sed,rg,find,wc,python3,node,npm,cargo,git,systemctl,apt,pip,pip3,df,free,uptime,ip,ss,top,htop",
         ).split(",")
         if item.strip()
     }
@@ -80,6 +87,11 @@ def _contains_shell_control(command: str) -> bool:
 
 def classify_command(tokens: list[str]) -> CommandDecision:
     exe = Path(tokens[0]).name if tokens else ""
+    autonomy = os.getenv("ZEUS_AUTONOMY_LEVEL", "GUARDED").upper()
+    
+    if autonomy == "FULL":
+        return CommandDecision(exe=exe, category="autonomous", requires_confirmation=False)
+
     if exe in WRITE_COMMANDS:
         return CommandDecision(exe=exe, category="write", requires_confirmation=True)
     if _requires_confirmation_for_args(exe, tokens[1:]):
@@ -112,20 +124,27 @@ def validate_command(command: str, tokens: list[str], *, confirmed: bool = False
 
     decision = classify_command(tokens)
     allowlist = _configured_allowlist()
+    autonomy = os.getenv("ZEUS_AUTONOMY_LEVEL", "GUARDED").upper()
 
     try:
-        if _contains_shell_control(command):
+        if autonomy != "FULL" and _contains_shell_control(command):
             raise ToolError("Encadeamento/redirecionamento de shell bloqueado em cmd_control.")
-        if decision.exe not in allowlist:
+        
+        if decision.exe not in allowlist and autonomy != "FULL":
             raise ToolError(f"Comando fora da allowlist: {decision.exe}")
+            
         if decision.exe in BLOCKED_COMMANDS:
+            # Blocklist is absolute except maybe in some extreme cases, but per requirement it should never be automatic.
             raise ToolError(f"Comando bloqueado por segurança: {decision.exe}")
-        if decision.requires_confirmation and not confirmed:
-            raise ToolError(f"Comando de escrita requer confirmação explícita: {decision.exe}")
+            
+        if autonomy != "FULL" and decision.requires_confirmation and not confirmed:
+            raise ToolError(f"Comando requer confirmação explícita: {decision.exe}")
+            
         if _RUST_POLICY:
             ok, reason = _RUST_POLICY.validate_command(command, tokens, confirmed)
             if not ok:
                 raise ToolError(reason)
+        
         log_event(
             logger,
             20,

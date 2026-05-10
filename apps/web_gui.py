@@ -67,7 +67,9 @@ from zeus_core.security_guard import (
     require_lan_token_for_request,
     require_lan_token_for_socketio,
 )
-from zeus_core.security.sudo_broker import sudo_broker
+from zeus_core.security.daemon_client import daemon_client
+from zeus_core.peripherals.usb_monitor import usb_monitor
+from zeus_core.peripherals.bluetooth_monitor import bluetooth_monitor
 from fastapi import FastAPI, WebSocket, HTTPException, Request
 from fastapi.responses import StreamingResponse, RedirectResponse
 import socketio
@@ -244,6 +246,16 @@ async def lifespan(app: FastAPI):
     # Saudacao inicial com a cognicao
     if ENABLE_BOOT_GREETING:
         asyncio.create_task(lifecycle_manager.boot_greeting())
+
+    # Iniciar Monitores de Periféricos (Sentinela)
+    try:
+        from zeus_core.peripherals.usb_monitor import usb_monitor
+        from zeus_core.peripherals.bluetooth_monitor import bluetooth_monitor
+        usb_monitor.start()
+        bluetooth_monitor.start()
+        logger.info("Sentinela USB/Bluetooth ativado no Backend.")
+    except Exception as e:
+        logger.error(f"Falha ao iniciar monitores no backend: {e}")
 
     # Second Brain Tasks
     global _watcher_task, _sync_worker_task, _sync_engine_tasks
@@ -1502,13 +1514,13 @@ async def api_admin_allow(action_id: str, request: Request):
     action = ADMIN_ACTIONS.get(action_id)
     if not action or action.get("status") != "pending":
         raise HTTPException(status_code=404, detail="Admin action not found or not pending.")
-    result = await sudo_broker.request_admin_action(
+    result = await daemon_client.execute(
         action["command"],
         action["reason"],
-        requires_backup=bool(action.get("requires_backup")),
+        backup_paths=action.get("backup_paths") or [],
         rollback_plan=action.get("rollback_plan") or "",
-        expected_outcome=action.get("expected_outcome") or "",
-        user_confirmed=True,
+        risk_accepted=True,
+        caller="web_gui_admin"
     )
     action["status"] = "allowed" if result.get("status") == "success" else "failed"
     action["result"] = result

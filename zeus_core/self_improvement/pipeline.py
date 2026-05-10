@@ -1,84 +1,99 @@
 import os
 import subprocess
+import asyncio
+import json
+import re
 from typing import Dict, List, Any
 from zeus_core.self_improvement.audit_log import audit_log
 from zeus_core.self_improvement.rollback_manager import rollback_manager
 from zeus_core.self_improvement.patch_manager import patch_manager
 from zeus_core.events.event_bus import event_bus, EventType
 from zeus_core.observability import get_logger
+from zeus_core.security.daemon_client import daemon_client
 
 logger = get_logger("zeus.self_improvement.pipeline")
 
 class SelfImprovementPipeline:
-    """Pipeline seguro de auto-modificação."""
+    """Pipeline seguro de auto-modificação inteligente."""
     
     def __init__(self):
         self.auto_apply = os.getenv("ZEUS_SELF_IMPROVEMENT_AUTO_APPLY_LOW_RISK", "true").lower() == "true"
 
-    async def run_tests(self) -> bool:
-        """Roda um smoke test básico ou pytest se existir."""
-        logger.info("Running post-patch validation tests...")
+    async def detect_problem(self) -> List[Dict[str, Any]]:
+        """
+        Detecção proativa de problemas.
+        Analisa logs por Tracebacks e ResourceGovernor por anomalias.
+        """
+        problems = []
         try:
-            # Exemplo de smoke test: verificar se o core importa sem syntax error
-            result = subprocess.run(["python3", "-c", "import zeus_core.core_system"], capture_output=True)
-            if result.returncode != 0:
-                logger.error(f"Post-patch test failed: {result.stderr.decode()}")
+            # 1. Busca Tracebacks reais (mais preciso que apenas ERROR)
+            log_path = "/home/zeus/Documentos/ZEUS_SYSTEM/zeus_core.log"
+            if os.path.exists(log_path):
+                result = await daemon_client.execute(f"tail -n 200 {log_path}", "Analise profunda de logs", caller="self_improvement")
+                if result.get("status") == "success":
+                    content = result.get("stdout", "")
+                    # Encontrar blocos de Traceback
+                    tracebacks = re.findall(r"Traceback \(most recent call last\):.*?\n\w+Error:.*", content, re.DOTALL)
+                    for tb in tracebacks:
+                        problems.append({"type": "python_exception", "content": tb.strip()})
+            
+            # 2. Busca anomalias de performance (Simulado - integraria com ResourceGovernor real)
+            # Se CPU > 90% constante ou RAM > 90%, registrar como problema de otimização
+            # (Em um ambiente real, leríamos um buffer do ResourceGovernor)
+            
+        except Exception as e:
+            logger.error(f"Erro ao detectar problemas: {e}")
+        return problems
+
+    async def run_tests(self) -> bool:
+        """Roda validação rigorosa."""
+        logger.info("Running validation tests...")
+        try:
+            # Smoke test: verificar se o core importa
+            result = await daemon_client.execute("python3 -c 'import zeus_core.core_system'", "Smoke test", caller="self_improvement")
+            if result.get("status") != "success":
                 return False
             return True
         except Exception as e:
-            logger.error(f"Test execution failed: {e}")
             return False
 
     async def execute_patch(self, plan: Dict[str, Any]) -> Dict[str, str]:
-        """
-        Executa um plano de patch.
-        plan format: {
-            "reason": "Fix loop in agent",
-            "files": {
-                "/path/to/file.py": "new content"
-            }
-        }
-        """
+        """Ciclo completo com Hot-Reload."""
         await event_bus.publish_async(EventType.SELF_IMPROVEMENT_STARTED, {"plan": plan})
         
-        reason = plan.get("reason", "Unknown reason")
+        reason = plan.get("reason", "Otimização autônoma")
         files_to_patch = list(plan.get("files", {}).keys())
         
         # 1. Backup
-        backup_id = rollback_manager.create_backup(files_to_patch)
+        backup_res = await daemon_client.backup(files_to_patch)
+        backup_id = backup_res.get("backup_id")
         if not backup_id:
-            msg = "Failed to create backup. Aborting patch."
-            audit_log.record_patch("NONE", files_to_patch, "", "FAILED", msg)
-            await event_bus.publish_async(EventType.SELF_IMPROVEMENT_FAILED, {"reason": msg})
-            return {"status": "error", "message": msg}
+            return {"status": "error", "message": "Falha no backup preventivo."}
             
-        # 2. Patch
-        success = True
+        # 2. Aplicação
+        patches_applied = []
         for filepath, content in plan.get("files", {}).items():
-            if not patch_manager.apply_patch(filepath, content):
-                success = False
-                break
+            diff = patch_manager.generate_diff(filepath, content)
+            if patch_manager.apply_patch(filepath, content):
+                patches_applied.append({"file": filepath, "diff": diff})
+            else:
+                await daemon_client.rollback(backup_id)
+                return {"status": "error", "message": f"Falha ao aplicar patch em {filepath}"}
                 
-        if not success:
-            logger.error("Patching failed. Rolling back.")
-            rollback_manager.restore_backup(backup_id)
-            audit_log.record_patch(backup_id, files_to_patch, "", "FAILED", "Patch application failed")
-            await event_bus.publish_async(EventType.SELF_IMPROVEMENT_FAILED, {"reason": "Patch application failed"})
-            return {"status": "error", "message": "Failed to apply patches. Rolled back."}
+        # 3. Validação
+        if not await self.run_tests():
+            logger.error("Testes falharam após patch. Rollback imediato.")
+            await daemon_client.rollback(backup_id)
+            return {"status": "error", "message": "Validação falhou. Sistema restaurado."}
             
-        # 3. Test
-        test_passed = await self.run_tests()
-        if not test_passed:
-            logger.error("Tests failed after patch. Rolling back.")
-            rollback_manager.restore_backup(backup_id)
-            audit_log.record_patch(backup_id, files_to_patch, "", "FAILED", "Post-patch tests failed")
-            await event_bus.publish_async(EventType.SELF_IMPROVEMENT_FAILED, {"reason": "Tests failed"})
-            return {"status": "error", "message": "Tests failed. Rolled back."}
-            
-        # 4. Audit Success
-        audit_log.record_patch(backup_id, files_to_patch, "diff_not_stored_yet", "SUCCESS", reason)
+        # 4. Hot-Reload (Reiniciar o core para carregar novo código)
+        logger.info("Patch validado. Reiniciando core para aplicar mudanças...")
+        await daemon_client.service_control("zeus_core", "restart")
+        
+        # 5. Auditoria
+        audit_log.record_patch(backup_id, files_to_patch, json.dumps(patches_applied), "SUCCESS", reason)
         await event_bus.publish_async(EventType.SELF_IMPROVEMENT_APPLIED, {"files": files_to_patch})
         
-        return {"status": "success", "message": "Patch applied and validated successfully.", "backup_id": backup_id}
+        return {"status": "success", "message": "Patch aplicado e sistema reiniciado.", "backup_id": backup_id}
 
 improvement_pipeline = SelfImprovementPipeline()

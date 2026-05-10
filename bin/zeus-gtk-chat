@@ -30,6 +30,8 @@ from gi.repository import Gdk, Gio, GLib, Gtk, Pango, Adw
 # Inicializar Libadwaita
 Adw.init()
 
+from zeus_core.security.approval_listener import start_approval_listener_glib
+
 # Se o primeiro argumento não começar com '--', assumimos que é a URL do backend.
 _backend_arg = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("--") else None
 BACKEND = (_backend_arg or os.getenv("ZEUS_BACKEND_URL", "http://127.0.0.1:8080")).rstrip("/")
@@ -92,6 +94,7 @@ class ZeusGtkChat(Adw.Application):
             GLib.timeout_add_seconds(15, self._update_contextual_placeholder)
                 
         self.window.present()
+        start_approval_listener_glib()
 
     def _apply_theme(self) -> None:
         style_manager = Adw.StyleManager.get_default()
@@ -223,7 +226,7 @@ class ZeusGtkChat(Adw.Application):
             ("Strategist", "●", "agent-online"),
             ("Operator", "●", "agent-online"),
             ("Critic", "●", "agent-online"),
-            ("SudoBroker", "◆", "agent-armed"),
+            ("RootDaemon", "●", "agent-online"),
             ("EventBus", "●", "agent-online"),
         ]
         for name, icon, css_cls in agents:

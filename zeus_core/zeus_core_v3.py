@@ -10,6 +10,8 @@ import logging
 from enum import Enum
 from typing import Dict, Any, Optional
 from datetime import datetime
+from zeus_core.peripherals.usb_monitor import usb_monitor
+from zeus_core.peripherals.bluetooth_monitor import bluetooth_monitor
 
 # --- CONFIGURAÇÕES DE SEGURANÇA GLOBAL ---
 ALLOWED_ORIGINS = [
@@ -160,6 +162,10 @@ async def run_zeus_core():
     config = BootstrapConfig()
     print(f"ZEUS v3.0 Booting in {config.mode.value} MODE.")
     orchestrator = CognitiveOrchestrator(config)
+    
+    # Iniciar Monitores de Periféricos
+    usb_monitor.start()
+    bluetooth_monitor.start()
     
     try:
         await orchestrator.start()
