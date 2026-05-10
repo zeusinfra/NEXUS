@@ -4,7 +4,7 @@
 
 <div align="center">
   <!-- TODO: Substituir por um GIF real da interface GTK4 -->
-  <img src="https://raw.githubusercontent.com/zeusinfra/ZEUS_NEXUS/main/docs/assets/nexus-demo.png" alt="NEXUS GTK4 Interface Demo" width="800"/>
+  <img src="https://raw.githubusercontent.com/zeusinfra/ZEUS_NEXUS/main/docs/assets/nexus-demo.png?v=2" alt="NEXUS GTK4 Interface Demo" width="800"/>
 </div>
 
 ## What is NEXUS?
