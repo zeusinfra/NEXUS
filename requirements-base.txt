@@ -8,4 +8,5 @@ passlib[bcrypt]
 python-multipart
 numpy
 pyudev
-python-dotenv
+python-dotenv>=1.0.0
+textual>=0.55.0
