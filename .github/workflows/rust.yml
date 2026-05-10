@@ -1,4 +1,4 @@
-name: Rust
+name: NEXUS Rust CI
 
 on:
   push:
@@ -10,13 +10,26 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-
+  rust:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Check Rust projects
+        run: |
+          for dir in core-rust watcher_rs; do
+            if [ -f "$dir/Cargo.toml" ]; then
+              echo "Checking $dir"
+              cd "$dir"
+              cargo fmt --check
+              cargo clippy -- -D warnings
+              cargo test --verbose
+              cd -
+            else
+              echo "Skipping $dir: Cargo.toml not found"
+            fi
+          done
