@@ -199,7 +199,7 @@ case "$1" in
     tui|console|ops)
         echo "📟  Iniciando NEXUS Cyber TUI..."
         ensure_server_background
-        "$PY" "$ROOT_DIR/bin/nexus-cyber-tui"
+        "$PY" "$ROOT_DIR/bin/zeus-cyber-tui"
         ;;
     chat)
         echo "💬  Abrindo chat NEXUS GTK..."
@@ -216,6 +216,6 @@ case "$1" in
         # Padrão: inicia o Cyber TUI com backend
         echo "🧠 NEXUS — Iniciando..."
         ensure_server_background
-        "$PY" "$ROOT_DIR/bin/nexus-cyber-tui"
+        "$PY" "$ROOT_DIR/bin/zeus-cyber-tui"
         ;;
 esac
