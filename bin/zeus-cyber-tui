@@ -7,6 +7,7 @@ import platform
 import shutil
 import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -113,6 +114,13 @@ Screen {
     text-align: center;
 }
 
+#greeting-live {
+    color: #666666;
+    padding-top: 1;
+    content-align: center middle;
+    text-align: center;
+}
+
 #hints {
     color: #444444;
     padding-top: 0;
@@ -129,15 +137,20 @@ Screen {
 
 Input {
     width: 64;
-    border: tall #1a1a1a;
+    height: 3;
+    border: solid #1a1a1a;
     background: #111111;
-    color: #cccccc;
-    padding: 1 2;
+    color: #eeeeee;
+    padding: 0 1;
 }
 
 Input:focus {
-    border: tall #1e3a2e;
+    border: solid #00ffcc;
     background: #141414;
+}
+
+#greet-input {
+    width: 56;
 }
 
 /* ── Chat ── */
@@ -164,12 +177,7 @@ Input:focus {
 }
 
 #chat-footer {
-    dock: bottom;
-    height: 1;
-    width: 100%;
-    background: #111111;
-    color: #555555;
-    padding: 0 2;
+    display: none;
 }
 
 #chat-footer-left {
@@ -189,6 +197,27 @@ Input:focus {
     background: #0e0e0e;
 }
 
+#chat-meta {
+    height: 1;
+    width: 100%;
+    background: #0e0e0e;
+    padding: 0 2;
+}
+
+#chat-status {
+    width: 1fr;
+    height: 1;
+    color: #00aaff;
+    content-align: left middle;
+}
+
+#chat-telemetry {
+    width: auto;
+    height: 1;
+    color: #666666;
+    content-align: right middle;
+}
+
 #input-hint {
     height: 1;
     color: #555555;
@@ -198,12 +227,15 @@ Input:focus {
 
 #chat-input-bar Input {
     width: 100%;
-    border: tall #1a1a1a;
+    height: 3;
+    border: solid #1a1a1a;
     background: #111111;
+    color: #eeeeee;
+    padding: 0 1;
 }
 
 #chat-input-bar Input:focus {
-    border: tall #1e3a2e;
+    border: solid #00ffcc;
 }
 """
 
@@ -243,19 +275,71 @@ def _get_json(path: str, timeout: float = 5.0) -> dict:
 def _post_json(path: str, payload: dict, timeout: float = 120.0) -> dict:
     return _json_request("POST", path, payload=payload, timeout=timeout)
 
+def _read_local_cpu_ram() -> tuple[float, float]:
+    """Best-effort local telemetry fallback when backend omits system stats."""
+    cpu = 0.0
+    ram = 0.0
+    try:
+        import psutil  # type: ignore
+
+        cpu = float(psutil.cpu_percent(interval=0.05))
+        ram = float(psutil.virtual_memory().percent)
+        return cpu, ram
+    except Exception:
+        pass
+
+    try:
+        stat = Path("/proc/stat").read_text().splitlines()[0].split()[1:]
+        values = [float(v) for v in stat[:8]]
+        idle = values[3] + (values[4] if len(values) > 4 else 0.0)
+        total = sum(values)
+        cpu = 0.0 if total <= 0 else max(0.0, min(100.0, 100.0 * (1.0 - idle / total)))
+    except Exception:
+        pass
+
+    try:
+        meminfo = {}
+        for line in Path("/proc/meminfo").read_text().splitlines():
+            key, raw = line.split(":", 1)
+            meminfo[key] = float(raw.strip().split()[0])
+        total = meminfo.get("MemTotal", 0.0)
+        available = meminfo.get("MemAvailable", 0.0)
+        ram = 0.0 if total <= 0 else max(0.0, min(100.0, 100.0 * (1.0 - available / total)))
+    except Exception:
+        pass
+
+    return cpu, ram
+
+def _coerce_percent(*values) -> float | None:
+    for value in values:
+        if value is None:
+            continue
+        try:
+            return round(float(value), 1)
+        except (TypeError, ValueError):
+            continue
+    return None
+
 def _fetch_status() -> dict:
     """Fetch backend status once. Returns a dict with model/provider/cpu/ram."""
     data = _get_json("/api/applet/status", timeout=2.5)
     if data.get("error"):
-        return {"model": "unknown", "provider": "Offline", "cpu": 0, "ram": 0, "online": False, "error": data["error"]}
+        cpu, ram = _read_local_cpu_ram()
+        return {"model": "unknown", "provider": "Offline", "cpu": cpu, "ram": ram, "online": False, "error": data["error"]}
     llm = data.get("llm") or {}
     perception = data.get("perception") or {}
     system = perception.get("system") or {}
+    cpu = _coerce_percent(system.get("cpu_percent"), data.get("cpu_percent"), data.get("cpu"))
+    ram = _coerce_percent(system.get("ram_percent"), data.get("ram_percent"), data.get("ram"))
+    if cpu is None or ram is None:
+        local_cpu, local_ram = _read_local_cpu_ram()
+        cpu = local_cpu if cpu is None else cpu
+        ram = local_ram if ram is None else ram
     return {
         "model": llm.get("model", "unknown"),
         "provider": str(llm.get("provider", "unknown")).capitalize(),
-        "cpu": system.get("cpu_percent", 0),
-        "ram": system.get("ram_percent", 0),
+        "cpu": cpu,
+        "ram": ram,
         "online": True,
         "error": "",
     }
@@ -264,6 +348,22 @@ def _clip(text: str, limit: int = OUTPUT_LIMIT) -> str:
     if len(text) <= limit:
         return text
     return text[:limit] + f"\n...[saida truncada em {limit} caracteres]"
+
+def _preview_text(text: str, limit: int = 72) -> str:
+    compact = " ".join(text.split())
+    if len(compact) <= limit:
+        return compact
+    return compact[: limit - 1] + "…"
+
+def _exit_after_cleanup(app: App | None = None, code: int = 0) -> None:
+    if app is not None:
+        try:
+            app.exit()
+        except Exception:
+            pass
+    timer = threading.Timer(0.25, lambda: os._exit(code))
+    timer.daemon = True
+    timer.start()
 
 def _run_process(args: list[str], timeout: int = SHELL_TIMEOUT) -> tuple[int, str, str]:
     """Run a command without shell expansion and return returncode/stdout/stderr."""
@@ -388,6 +488,7 @@ class GreetingScreen(Screen):
             yield Static(LOGO, id="logo", markup=True)
             yield Static(SUBTITLE, id="subtitle", markup=True)
             yield Center(Input(placeholder='Ask anything... "What is the tech stack of this project?"', id="greet-input"))
+            yield Static("[dim]ready · digite e pressione Enter[/dim]", id="greeting-live", markup=True)
             yield Static("[dim]Build · Connecting...[/dim]", id="build-info", markup=True)
             yield Static("[dim]tab[/dim] agents   [dim]ctrl+p[/dim] commands", id="hints", markup=True)
             yield Static("● [yellow]Tip[/yellow] Press [bold]Ctrl+C[/bold] when typing to clear the input field", id="tip", markup=True)
@@ -411,6 +512,16 @@ class GreetingScreen(Screen):
         except Exception:
             pass
 
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if event.input.id != "greet-input":
+            return
+        size = len(event.value)
+        if size:
+            preview = escape(_preview_text(event.value))
+            self.query_one("#greeting-live", Static).update(f"[#00ffcc]capturando[/] · {size} chars · [dim]{preview}[/dim]")
+        else:
+            self.query_one("#greeting-live", Static).update("[dim]ready · digite e pressione Enter[/dim]")
+
     def on_input_submitted(self, event: Input.Submitted) -> None:
         msg = event.value.strip()
         if msg:
@@ -423,6 +534,17 @@ class GreetingScreen(Screen):
             self.query_one("#greet-input", Input).value = ""
         except Exception:
             pass
+
+    def action_quit(self) -> None:
+        try:
+            input_widget = self.query_one("#greet-input", Input)
+            if input_widget.value:
+                input_widget.value = ""
+                self.query_one("#greeting-live", Static).update("[dim]input limpo[/dim]")
+                return
+        except Exception:
+            pass
+        _exit_after_cleanup(self.app)
 
 # ──────────────────────── Chat Screen ────────────────────────
 
@@ -446,13 +568,21 @@ class ChatScreen(Screen):
 
     def compose(self) -> ComposeResult:
         yield Static(f"ZEUS Ops · {SESSION_ID}", id="chat-header", markup=True)
-        yield RichLog(id="chat-log", highlight=True, markup=True, auto_scroll=True, max_lines=5000)
+        yield RichLog(
+            id="chat-log",
+            highlight=True,
+            markup=True,
+            auto_scroll=True,
+            max_lines=5000,
+            min_width=1,
+            wrap=True,
+        )
         with Container(id="chat-input-bar"):
+            with Horizontal(id="chat-meta"):
+                yield Static("[dim]ready[/dim]", id="chat-status", markup=True)
+                yield Static("[dim]cpu[/dim] --%  [dim]ram[/dim] --%", id="chat-telemetry", markup=True)
             yield Static("[dim]  !cmd  shell  │  /help  comandos  │  Enter  envia para IA[/dim]", id="input-hint", markup=True)
             yield Input(placeholder="Message ZEUS...", id="chat-input")
-        with Horizontal(id="chat-footer"):
-            yield Static(f"[dim]session[/dim] {SESSION_ID}", id="chat-footer-left", markup=True)
-            yield Static(f"[dim]cpu[/dim] --%  [dim]ram[/dim] --% ", id="chat-footer-right", markup=True)
 
     def on_mount(self) -> None:
         self.log_widget = self.query_one("#chat-log", RichLog)
@@ -467,9 +597,12 @@ class ChatScreen(Screen):
 
         if self.initial_message:
             self.handle_message(self.initial_message)
+        else:
+            self._set_status("[dim]ready[/dim]")
 
     def action_clear_log(self) -> None:
         self.log_widget.clear()
+        self._set_status("[dim]log limpo[/dim]")
 
     def on_unmount(self) -> None:
         self.running = False
@@ -489,6 +622,22 @@ class ChatScreen(Screen):
         except Exception:
             return False
 
+    def _set_status(self, text: str) -> None:
+        try:
+            self.query_one("#chat-status", Static).update(text)
+        except Exception:
+            pass
+
+    def action_quit(self) -> None:
+        try:
+            if self.input_widget.value:
+                self.input_widget.value = ""
+                self._set_status("[dim]input limpo[/dim]")
+                return
+        except Exception:
+            pass
+        _exit_after_cleanup(self.app)
+
     # ── Telemetry Polling ──
 
     @work(exclusive=True, thread=True, group="telemetry")
@@ -501,7 +650,7 @@ class ChatScreen(Screen):
                 footer_text = f"[dim]cpu[/dim] {escape(str(status['cpu']))}%  [dim]ram[/dim] {escape(str(status['ram']))}% "
                 header_text = f"[bold #00ffcc]ZEUS[/] Ops · {escape(str(status['model']))} · [dim]{escape(str(status['provider']))}[/dim]"
             else:
-                footer_text = "[dim]cpu[/dim] [red]--[/]%  [dim]ram[/dim] [red]--[/]% "
+                footer_text = f"[dim]cpu[/dim] {escape(str(status['cpu']))}%  [dim]ram[/dim] {escape(str(status['ram']))}% "
                 header_text = "[bold #00ffcc]ZEUS[/] Ops · [red]Offline[/red]"
             if not self._call_from_thread(self._update_bars, header_text, footer_text):
                 return
@@ -513,7 +662,7 @@ class ChatScreen(Screen):
     def _update_bars(self, header: str, footer: str) -> None:
         try:
             self.query_one("#chat-header", Static).update(header)
-            self.query_one("#chat-footer-right", Static).update(footer)
+            self.query_one("#chat-telemetry", Static).update(footer)
         except Exception:
             pass
 
@@ -555,6 +704,9 @@ class ChatScreen(Screen):
     def _render_event(self, event: dict) -> None:
         evt_type = event.get("type")
 
+        if evt_type in {"CHAT_USER", "HUD_FRAME", "HUD_METRICS"}:
+            return
+
         # ── Respostas da IA que chegam via evento (streaming) ──
         if evt_type == "CHAT_AI":
             event_id = str(event.get("id") or (event.get("details") or {}).get("id") or "")
@@ -579,18 +731,24 @@ class ChatScreen(Screen):
                 self.log_widget.write("  [bold #00ffcc]▎ ZEUS[/]")
                 self._write_block(msg.strip())
                 self.log_widget.write("")
+                self._set_status("[dim]resposta recebida[/dim]")
             return
 
         # ── Progresso do agente ──
         if evt_type == "AGENT_PROGRESS":
             stage = event.get("stage", "progress")
             text = event.get("text", stage)
+            self._set_status(f"[dim]{escape(str(text))}[/dim]")
             if stage in {"step_started"}:
                 self.log_widget.write(f"  [dim #00bbaa]⟐ {escape(str(text))}[/]")
             elif stage in {"completed", "chat_completed"}:
                 self.log_widget.write(f"  [#00ffcc]✓ {escape(str(text))}[/]")
             else:
                 self.log_widget.write(f"  [#00ddaa]● {escape(str(text))}[/]")
+        elif evt_type == "HUD_STATUS":
+            text = event.get("text") or ""
+            if text.strip():
+                self._set_status(f"[dim]{escape(text.strip())}[/dim]")
         elif evt_type == "TOOL_LOG":
             tool = event.get("tool", "tool")
             stage = str(event.get("stage", "")).replace("_", " ").upper()
@@ -619,6 +777,7 @@ class ChatScreen(Screen):
         if msg.startswith("!"):
             shell_cmd = msg[1:].strip()
             if shell_cmd:
+                self._set_status(f"[yellow]executando shell[/] · {escape(shell_cmd[:48])}")
                 self.log_widget.write("")
                 self.log_widget.write(f"  [bold yellow]$ {escape(shell_cmd)}[/]")
                 self.run_shell_command(shell_cmd)
@@ -632,20 +791,38 @@ class ChatScreen(Screen):
 
     def submit_message(self, text: str) -> None:
         if self.sending:
+            self._set_status("[yellow]aguarde a resposta atual terminar[/yellow]")
             self.log_widget.write("  [yellow]Envio pausado: aguarde a resposta atual terminar.[/yellow]")
             return
 
         self.sending = True
         self._set_busy_state(True)
+        self._set_status(f"[#00ffcc]enviando[/] · {len(text)} chars")
         self.log_widget.write("")
         self.log_widget.write("  [bold blue]▎ VOCE[/]")
         self._write_block(text)
         self.log_widget.write("")
         self.send_to_backend(text)
 
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if event.input.id != "chat-input":
+            return
+        text = event.value
+        if not text:
+            self._set_status("[dim]ready[/dim]" if not self.sending else "[dim]ZEUS respondendo[/dim]")
+            return
+        preview = escape(_preview_text(text))
+        if text.startswith("!"):
+            self._set_status(f"[yellow]shell[/] · {len(text) - 1} chars · [dim]{preview}[/dim]")
+        elif text.startswith("/"):
+            self._set_status(f"[#bb88ff]comando[/] · [dim]{preview}[/dim]")
+        else:
+            self._set_status(f"[#00ffcc]mensagem[/] · {len(text)} chars · [dim]{preview}[/dim]")
+
     def on_input_submitted(self, event: Input.Submitted) -> None:
         msg = event.value.strip()
         if not msg:
+            self._set_status("[dim]digite uma mensagem, /help ou !comando[/dim]")
             return
         self.input_widget.value = ""
         self.handle_message(msg)
@@ -656,35 +833,48 @@ class ChatScreen(Screen):
         arg = parts[1] if len(parts) > 1 else ""
 
         if base == "/help":
+            self._set_status("[dim]ajuda aberta[/dim]")
             self.log_widget.write(SLASH_HELP)
         elif base == "/clear":
             self.log_widget.clear()
+            self._set_status("[dim]log limpo[/dim]")
         elif base in {"/quit", "/exit"}:
-            self.app.exit()
+            _exit_after_cleanup(self.app)
         elif base == "/status":
+            self._set_status("[dim]consultando status[/dim]")
             self.fetch_status_command()
         elif base == "/sysinfo":
+            self._set_status("[dim]coletando sysinfo[/dim]")
             self.run_builtin_command(_system_summary)
         elif base == "/services":
+            self._set_status("[dim]listando serviços[/dim]")
             self.run_builtin_command(_service_lines)
         elif base == "/logs":
             n = arg.strip() if arg.strip().isdigit() else "30"
+            self._set_status(f"[dim]lendo journal · {n} linhas[/dim]")
             self.run_builtin_command(lambda: _journal_lines(int(n)))
         elif base == "/procs":
+            self._set_status("[dim]listando processos[/dim]")
             self.run_builtin_command(_process_lines)
         elif base == "/net":
+            self._set_status("[dim]lendo rede[/dim]")
             self.run_builtin_command(_network_lines)
         elif base == "/disk":
+            self._set_status("[dim]lendo disco[/dim]")
             self.run_builtin_command(_disk_lines)
         elif base == "/who":
+            self._set_status("[dim]lendo sessões[/dim]")
             self.run_builtin_command(_who_lines)
         elif base == "/env":
             if arg:
                 val = os.environ.get(arg.strip(), "nao definida")
+                self._set_status("[dim]variável lida[/dim]")
                 self.log_widget.write(f"  [dim]{escape(arg.strip())}[/dim] = {escape(val)}")
             else:
+                self._set_status("[yellow]uso: /env NOME_VARIAVEL[/yellow]")
                 self.log_widget.write("  [yellow]Uso: /env NOME_VARIAVEL[/yellow]")
         else:
+            self._set_status(f"[red]comando desconhecido[/red] · {escape(base)}")
             self.log_widget.write(f"  [red]Comando desconhecido:[/red] {escape(base)}  [dim](use /help)[/dim]")
 
     @work(thread=True, group="status_command")
@@ -699,8 +889,10 @@ class ChatScreen(Screen):
                 f"{escape(str(status['model']))} / {escape(str(status['provider']))} · "
                 f"cpu {escape(str(status['cpu']))}% ram {escape(str(status['ram']))}%"
             )
+            self._set_status(f"[#00ffcc]online[/] · {escape(str(status['model']))}")
         else:
             self.log_widget.write(f"  [red]Backend offline[/red] {escape(status.get('error') or '')}")
+            self._set_status("[red]backend offline[/red]")
 
     @work(thread=True, group="builtin_commands")
     def run_builtin_command(self, fn) -> None:
@@ -721,6 +913,10 @@ class ChatScreen(Screen):
         if code != 0:
             self.log_widget.write(f"  [dim red]exit code {code}[/dim red]")
         self.log_widget.write("")
+        if code == 0:
+            self._set_status("[dim]comando concluído[/dim]")
+        else:
+            self._set_status(f"[red]comando falhou[/red] · exit {code}")
 
     @work(thread=True, group="chat_send")
     def send_to_backend(self, text: str) -> None:
@@ -736,6 +932,7 @@ class ChatScreen(Screen):
             "client_msg_id": msg_id,
         }
 
+        self._call_from_thread(self._set_status, "[dim #00ffcc]ZEUS pensando...[/]")
         self._call_from_thread(self.log_widget.write, "  [dim #00ffcc]◌ ZEUS pensando...[/]")
 
         data = _post_json("/api/applet/chat", payload, timeout=180.0)
@@ -750,6 +947,7 @@ class ChatScreen(Screen):
                 self.rendered_reply_ids.clear()
             self.sending = False
             self._set_busy_state(False)
+            self._set_status(f"[#00ffcc]resposta recebida[/] · {latency_ms}ms")
             self.log_widget.write("")
             self.log_widget.write(f"  [bold #00ffcc]▎ ZEUS[/] [dim]· {latency_ms}ms[/dim]")
             self._write_block(reply)
@@ -783,4 +981,8 @@ class ZeusCyberApp(App):
 
 if __name__ == "__main__":
     app = ZeusCyberApp()
-    app.run()
+    try:
+        app.run()
+    except KeyboardInterrupt:
+        os._exit(130)
+    os._exit(0)
