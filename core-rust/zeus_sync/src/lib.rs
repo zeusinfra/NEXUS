@@ -1,3 +1,5 @@
+#![allow(non_local_definitions)]
+
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -39,26 +41,26 @@ impl SyncEngineRust {
             serde_json::from_str(&top_synapses_json).unwrap_or_default();
 
         let mut lines = vec![
-            format!("# Mapa Neural ZEUS (Rust Optimized)"),
-            format!(""),
+            "# Mapa Neural ZEUS (Rust Optimized)".to_string(),
+            String::new(),
             format!("> Snapshot gerado em {}", timestamp),
-            format!(""),
-            format!("## Resumo"),
-            format!(""),
-            format!("| Métrica | Valor |"),
-            format!("|---|---|"),
+            String::new(),
+            "## Resumo".to_string(),
+            String::new(),
+            "| Métrica | Valor |".to_string(),
+            "|---|---|".to_string(),
             format!("| Nós totais | {} |", total_nodes),
             format!("| Sinapses totais | {} |", total_synapses),
             format!("| Buffer sensorial | {} |", sensory_size),
-            format!(""),
-            format!("## Top Nós (por peso)"),
-            format!(""),
-            format!("| Caminho | Peso | Último Acesso |"),
-            format!("|---|---|---|"),
+            String::new(),
+            "## Top Nós (por peso)".to_string(),
+            String::new(),
+            "| Caminho | Peso | Último Acesso |".to_string(),
+            "|---|---|---|".to_string(),
         ];
 
         for node in top_nodes {
-            let basename = node.path.split('/').last().unwrap_or(&node.path);
+            let basename = node.path.split('/').next_back().unwrap_or(&node.path);
             lines.push(format!(
                 "| `{}` | {} | {} |",
                 basename,
@@ -67,19 +69,25 @@ impl SyncEngineRust {
             ));
         }
 
-        lines.push(format!(""));
-        lines.push(format!("## Sinapses Mais Fortes"));
-        lines.push(format!(""));
-        lines.push(format!("| Origem | Destino | Peso |"));
-        lines.push(format!("|---|---|---|"));
+        lines.push(String::new());
+        lines.push("## Sinapses Mais Fortes".to_string());
+        lines.push(String::new());
+        lines.push("| Origem | Destino | Peso |".to_string());
+        lines.push("|---|---|---|".to_string());
 
         for syn in top_synapses {
-            let src = syn.source.split('/').last().unwrap_or(&syn.source);
-            let tgt = syn.target.split('/').last().unwrap_or(&syn.target);
+            let src = syn.source.split('/').next_back().unwrap_or(&syn.source);
+            let tgt = syn.target.split('/').next_back().unwrap_or(&syn.target);
             lines.push(format!("| `{}` | `{}` | {} |", src, tgt, syn.weight));
         }
 
         lines.join("\n")
+    }
+}
+
+impl Default for SyncEngineRust {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

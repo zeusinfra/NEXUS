@@ -1,0 +1,49 @@
+name: Rust
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "core-rust/**"
+      - "watcher_rs/**"
+      - ".github/workflows/rust.yml"
+  pull_request:
+    branches: ["main"]
+
+concurrency:
+  group: rust-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        crate:
+          - core-rust
+          - watcher_rs
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ${{ matrix.crate }}
+
+      - name: Format
+        working-directory: ${{ matrix.crate }}
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        working-directory: ${{ matrix.crate }}
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Test
+        working-directory: ${{ matrix.crate }}
+        run: cargo test --all-targets

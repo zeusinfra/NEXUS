@@ -2,9 +2,10 @@ import os
 import re
 import hashlib
 from datetime import datetime
-from dotenv import load_dotenv
 
-load_dotenv()
+from zeus_core.env import load_project_env
+
+load_project_env()
 
 VAULT_PATH = os.getenv("ZEUS_VAULT_PATH", "/home/zeus/Documentos/Brain")
 

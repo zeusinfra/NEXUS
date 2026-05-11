@@ -2,17 +2,18 @@ import sqlite3
 import os
 import json
 from datetime import datetime
-from dotenv import load_dotenv
 
-load_dotenv()
+from zeus_core.env import load_project_env
+
+load_project_env()
 
 DB_PATH = os.getenv("ZEUS_DB_PATH", "./zeus_events.db")
 
-def get_connection():
-    return sqlite3.connect(DB_PATH)
+def get_connection(db_path: str | None = None):
+    return sqlite3.connect(db_path or os.getenv("ZEUS_DB_PATH", DB_PATH))
 
-def init_db():
-    conn = get_connection()
+def init_db(db_path: str | None = None):
+    conn = get_connection(db_path)
     cursor = conn.cursor()
     
     # Events Table
@@ -71,9 +72,6 @@ def init_db():
     
     conn.commit()
     conn.close()
-
-# Initialize upon import
-init_db()
 
 # DAO Functions
 def insert_event(event_type: str, source: str, source_path: str, payload: dict):

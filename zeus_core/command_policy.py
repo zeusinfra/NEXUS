@@ -57,24 +57,21 @@ RISKY_PACKAGE_SUBCOMMANDS = {
 logger = get_logger("zeus.command_policy")
 
 def _load_rust_policy():
+    local_extension = Path(__file__).resolve().parents[1] / "core-rust" / "target" / "release" / "libzeus_policy.so"
+    if local_extension.exists():
+        try:
+            spec = importlib.util.spec_from_file_location("zeus_policy", local_extension)
+            if spec is not None and spec.loader is not None:
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                return module.CommandPolicyRust()
+        except Exception as exc:
+            log_event(logger, 30, "rust_policy_local_load_failed", error=str(exc))
+
     try:
         from zeus_policy import CommandPolicyRust
 
         return CommandPolicyRust()
-    except ImportError:
-        pass
-
-    local_extension = Path(__file__).resolve().parents[1] / "core-rust" / "target" / "release" / "libzeus_policy.so"
-    if not local_extension.exists():
-        return None
-
-    try:
-        spec = importlib.util.spec_from_file_location("zeus_policy", local_extension)
-        if spec is None or spec.loader is None:
-            return None
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        return module.CommandPolicyRust()
     except Exception as exc:
         log_event(logger, 30, "rust_policy_load_failed", error=str(exc))
         return None

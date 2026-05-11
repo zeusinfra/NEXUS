@@ -1,8 +1,1 @@
-SpeechRecognition
-PyAudio
-edge-tts
-faster-whisper
-soundfile
-sounddevice
-mss
-pillow
+-r requirements/voice.txt

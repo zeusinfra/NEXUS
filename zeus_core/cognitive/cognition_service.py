@@ -21,13 +21,13 @@ _project_root = str(Path(__file__).resolve().parents[2])
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-from dotenv import load_dotenv
-load_dotenv(os.path.join(_project_root, ".env"))
-
 from zeus_core.cognitive.cognitive_db import init_cognitive_tables
 from zeus_core.cognitive.cognitive_loop import CognitiveLoop
 from zeus_core.cognitive.cognitive_state import cognitive_state_manager
+from zeus_core.env import load_project_env
 from zeus_core.observability import get_logger, log_event, setup_logging
+
+load_project_env()
 
 logger = get_logger("zeus.cognitive.service")
 

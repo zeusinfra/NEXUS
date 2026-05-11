@@ -165,6 +165,12 @@ impl SensorEngineRust {
     }
 }
 
+impl Default for SensorEngineRust {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 fn round1(value: f32) -> f32 {
     (value * 10.0).round() / 10.0
 }

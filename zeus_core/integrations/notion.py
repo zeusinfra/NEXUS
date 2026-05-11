@@ -1,11 +1,11 @@
 import os
 import requests
 import json
-from dotenv import load_dotenv
 
+from zeus_core.env import load_project_env
 from zeus_core.security.privacy_guard import PrivacyGuard
 
-load_dotenv()
+load_project_env()
 
 privacy_guard = PrivacyGuard()
 

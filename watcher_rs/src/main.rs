@@ -35,7 +35,7 @@ struct AppState {
 #[tokio::main]
 async fn main() {
     dotenv::dotenv().ok();
-    
+
     // Configurações
     let port = std::env::var("ZEUS_WATCHER_PORT").unwrap_or_else(|_| "8081".to_string());
     let (tx, _rx) = broadcast::channel(100);
@@ -48,13 +48,13 @@ async fn main() {
         loop {
             sys.refresh_cpu();
             sys.refresh_memory();
-            
+
             let event = ZeusEvent::Telemetry {
                 cpu_usage: sys.global_cpu_info().cpu_usage(),
                 ram_usage: (sys.used_memory() as f32 / sys.total_memory() as f32) * 100.0,
                 disk_usage: 0.0, // Simplificado
             };
-            
+
             let _ = tx_telemetry.send(event);
             tokio::time::sleep(Duration::from_secs(2)).await;
         }
@@ -64,17 +64,20 @@ async fn main() {
     let tx_files = tx.clone();
     tokio::spawn(async move {
         let (watcher_tx, mut watcher_rx) = tokio::sync::mpsc::channel(100);
-        
+
         let mut watcher = notify::RecommendedWatcher::new(
             move |res| {
                 let _ = watcher_tx.blocking_send(res);
             },
             Config::default(),
-        ).expect("Error creating watcher");
+        )
+        .expect("Error creating watcher");
 
         let watch_dirs = vec![
-            std::env::var("HOME").unwrap_or_else(|_| "/home/zeus".to_string()) + "/Documentos/ZEUS_BRAIN",
-            std::env::var("HOME").unwrap_or_else(|_| "/home/zeus".to_string()) + "/Documentos/ZEUS_SYSTEM",
+            std::env::var("HOME").unwrap_or_else(|_| "/home/zeus".to_string())
+                + "/Documentos/ZEUS_BRAIN",
+            std::env::var("HOME").unwrap_or_else(|_| "/home/zeus".to_string())
+                + "/Documentos/ZEUS_SYSTEM",
         ];
 
         for dir in watch_dirs {
@@ -107,18 +110,23 @@ async fn main() {
         .layer(CorsLayer::permissive())
         .with_state(app_state);
 
-    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port)).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port))
+        .await
+        .unwrap();
     println!("🧠 ZEUS Watcher Hub rodando em ws://0.0.0.0:{}/ws", port);
     axum::serve(listener, app).await.unwrap();
 }
 
-async fn ws_handler(ws: WebSocketUpgrade, state: axum::extract::State<Arc<AppState>>) -> impl IntoResponse {
+async fn ws_handler(
+    ws: WebSocketUpgrade,
+    state: axum::extract::State<Arc<AppState>>,
+) -> impl IntoResponse {
     ws.on_upgrade(|socket| handle_socket(socket, state))
 }
 
 async fn handle_socket(mut socket: WebSocket, state: axum::extract::State<Arc<AppState>>) {
     let mut rx = state.tx.subscribe();
-    
+
     while let Ok(event) = rx.recv().await {
         let msg = serde_json::to_string(&event).unwrap();
         if socket.send(Message::Text(msg)).await.is_err() {
@@ -129,9 +137,13 @@ async fn handle_socket(mut socket: WebSocket, state: axum::extract::State<Arc<Ap
 
 fn get_project(path: &Path) -> String {
     let path_str = path.to_string_lossy();
-    if path_str.contains("ZEUS_BRAIN") { "ZEUS_BRAIN".to_string() }
-    else if path_str.contains("ZEUS_SYSTEM") { "ZEUS_SYSTEM".to_string() }
-    else { "unknown".to_string() }
+    if path_str.contains("ZEUS_BRAIN") {
+        "ZEUS_BRAIN".to_string()
+    } else if path_str.contains("ZEUS_SYSTEM") {
+        "ZEUS_SYSTEM".to_string()
+    } else {
+        "unknown".to_string()
+    }
 }
 
 fn is_ignored(path: &Path) -> bool {
@@ -152,7 +164,9 @@ fn is_ignored(path: &Path) -> bool {
     ];
     for part in path.components() {
         let p = part.as_os_str().to_string_lossy();
-        if p.starts_with('.') || ignored.contains(&p.as_ref()) { return true; }
+        if p.starts_with('.') || ignored.contains(&p.as_ref()) {
+            return true;
+        }
     }
     let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
         return false;
@@ -184,7 +198,10 @@ fn is_ignored(path: &Path) -> bool {
         ".onnx",
         ".mp3",
     ];
-    if runtime_suffixes.iter().any(|suffix| lowered.ends_with(suffix)) {
+    if runtime_suffixes
+        .iter()
+        .any(|suffix| lowered.ends_with(suffix))
+    {
         return true;
     }
     false
@@ -197,8 +214,14 @@ mod tests {
 
     #[test]
     fn get_project_classifies_known_roots() {
-        assert_eq!(get_project(Path::new("/home/zeus/Documentos/ZEUS_BRAIN/a.md")), "ZEUS_BRAIN");
-        assert_eq!(get_project(Path::new("/home/zeus/Documentos/ZEUS_SYSTEM/a.md")), "ZEUS_SYSTEM");
+        assert_eq!(
+            get_project(Path::new("/home/zeus/Documentos/ZEUS_BRAIN/a.md")),
+            "ZEUS_BRAIN"
+        );
+        assert_eq!(
+            get_project(Path::new("/home/zeus/Documentos/ZEUS_SYSTEM/a.md")),
+            "ZEUS_SYSTEM"
+        );
         assert_eq!(get_project(Path::new("/tmp/a.md")), "unknown");
     }
 

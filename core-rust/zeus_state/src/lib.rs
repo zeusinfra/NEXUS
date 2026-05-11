@@ -1,3 +1,5 @@
+#![allow(non_local_definitions)]
+
 use dashmap::DashMap;
 use pyo3::prelude::*;
 use serde_json::Value;
@@ -63,6 +65,12 @@ impl BlackboardRust {
 
     pub fn clear(&self) {
         self.state.clear();
+    }
+}
+
+impl Default for BlackboardRust {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

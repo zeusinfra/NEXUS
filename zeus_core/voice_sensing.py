@@ -1,4 +1,3 @@
-import speech_recognition as sr
 import asyncio
 import threading
 import tempfile
@@ -7,12 +6,20 @@ import sys
 import subprocess
 import time
 import ctypes
-import edge_tts
 import shutil
 import re
 import unicodedata
-from faster_whisper import WhisperModel
 from zeus_core.response_text import speech_text
+
+try:
+    import speech_recognition as sr
+except Exception:
+    sr = None
+
+try:
+    import edge_tts
+except Exception:
+    edge_tts = None
 
 def _suppress_alsa_errors():
     """Suprime mensagens de erro ALSA/JACK que poluem o terminal."""
@@ -26,11 +33,11 @@ def _suppress_alsa_errors():
     except Exception:
         pass
 
-_suppress_alsa_errors()
-
-# Força encoding UTF-8 para evitar erros com acentos do Português
-os.environ.setdefault("PYTHONIOENCODING", "utf-8")
-if sys.stdout.encoding != "utf-8":
+def _configure_stdout_encoding() -> None:
+    # Força encoding UTF-8 para evitar erros com acentos do Português.
+    os.environ.setdefault("PYTHONIOENCODING", "utf-8")
+    if getattr(sys.stdout, "encoding", None) == "utf-8":
+        return
     try:
         sys.stdout.reconfigure(encoding="utf-8")
         sys.stderr.reconfigure(encoding="utf-8")
@@ -42,7 +49,10 @@ class VoiceSensing:
     Detecta silêncio (VAD), converte áudio localmente via Whisper e toca via Edge-TTS.
     """
     def __init__(self, broadcast_callback=None, wake_word="zeus", llm_callback=None):
-        self.recognizer = sr.Recognizer()
+        _configure_stdout_encoding()
+        _suppress_alsa_errors()
+        self.available = sr is not None and edge_tts is not None
+        self.recognizer = sr.Recognizer() if sr is not None else None
         self.wake_word = wake_word.lower()
         self.llm_callback = llm_callback
         self.broadcast = broadcast_callback
@@ -67,9 +77,10 @@ class VoiceSensing:
         self._wake_re = self._build_wake_regex(self._wake_aliases)
         
         # Ajustes de sensibilidade (VAD)
-        self.recognizer.dynamic_energy_threshold = True
-        self.recognizer.pause_threshold = 0.8
-        self.recognizer.energy_threshold = 600
+        if self.recognizer is not None:
+            self.recognizer.dynamic_energy_threshold = True
+            self.recognizer.pause_threshold = 0.8
+            self.recognizer.energy_threshold = 600
         self.whisper_model = None
 
     @staticmethod
@@ -110,6 +121,13 @@ class VoiceSensing:
         with self._whisper_lock:
             if self.whisper_model is not None:
                 return
+            try:
+                from faster_whisper import WhisperModel
+            except Exception as exc:
+                raise RuntimeError(
+                    "Voice transcription is unavailable. Install requirements/voice.txt "
+                    "to enable faster-whisper."
+                ) from exc
             print("[ZEUS LOCAL] Carregando modelo Faster-Whisper...")
             model_name = os.getenv("ZEUS_WHISPER_MODEL", "small").strip() or "small"
             self.whisper_model = WhisperModel(model_name, device="cpu", compute_type="int8")
@@ -128,6 +146,10 @@ class VoiceSensing:
 
     def _listen_loop(self):
         """Loop síncrono de captura de áudio (roda em thread separada)."""
+        if sr is None or self.recognizer is None:
+            print("[ZEUS LOCAL] Voice sensing unavailable: SpeechRecognition is not installed.")
+            self.is_listening = False
+            return
         if os.getenv("ZEUS_MIC_LIST", "0").strip().lower() in {"1", "true", "yes", "on"}:
             try:
                 names = sr.Microphone.list_microphone_names()
@@ -322,6 +344,8 @@ class VoiceSensing:
             tmp_path = None
             try:
                 VOICE = "pt-BR-AntonioNeural"
+                if edge_tts is None:
+                    raise RuntimeError("edge-tts is not installed")
                 communicate = edge_tts.Communicate(spoken_text, VOICE, rate="+5%", pitch="-2Hz")
 
                 with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False, prefix="zeus_tts_") as tmp:
@@ -411,6 +435,9 @@ class VoiceSensing:
     async def run(self):
         """Inicia o loop assíncrono do módulo."""
         self._loop = asyncio.get_event_loop()
+        if sr is None:
+            await self._send_status("Modulo de voz indisponivel: SpeechRecognition ausente.")
+            return
         await asyncio.to_thread(self._ensure_whisper_loaded)
         
         if not self.is_listening:

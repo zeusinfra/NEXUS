@@ -1,3 +1,5 @@
+#![allow(non_local_definitions)]
+
 use pyo3::prelude::*;
 use regex::{Regex, RegexBuilder};
 use std::collections::HashMap;
@@ -109,6 +111,12 @@ impl PrivacyEngineRust {
         }
 
         0 // PUBLIC
+    }
+}
+
+impl Default for PrivacyEngineRust {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

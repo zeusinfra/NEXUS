@@ -22,9 +22,9 @@ import sqlite3
 from contextlib import contextmanager
 from typing import Generator
 
-from dotenv import load_dotenv
+from zeus_core.env import load_project_env
 
-load_dotenv()
+load_project_env()
 
 DB_PATH = os.getenv("ZEUS_DB_PATH", "./zeus_events.db")
 
@@ -218,4 +218,3 @@ def init_cognitive_tables(db_path: str | None = None) -> None:
 
 # Auto-initialize on import
 init_cognitive_tables()
-

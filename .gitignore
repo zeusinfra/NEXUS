@@ -39,6 +39,7 @@ data/
 *.db
 *.sqlite
 scratch/
+test_mirror_temp/
 
 # OS files
 .DS_Store

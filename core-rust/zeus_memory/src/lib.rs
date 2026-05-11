@@ -1,3 +1,5 @@
+#![allow(non_local_definitions)]
+
 use pyo3::prelude::*;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -50,8 +52,7 @@ impl VectorMemoryRust {
 
     pub fn save_rust(&self) -> std::io::Result<()> {
         let file = std::fs::File::create(&self.storage_path)?;
-        bincode::serialize_into(file, &self.vectors)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        bincode::serialize_into(file, &self.vectors).map_err(std::io::Error::other)?;
         Ok(())
     }
 
@@ -60,8 +61,8 @@ impl VectorMemoryRust {
             return Ok(());
         }
         let file = std::fs::File::open(&self.storage_path)?;
-        let decoded: HashMap<String, Vec<f32>> = bincode::deserialize_from(file)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        let decoded: HashMap<String, Vec<f32>> =
+            bincode::deserialize_from(file).map_err(std::io::Error::other)?;
         self.vectors = decoded;
         Ok(())
     }

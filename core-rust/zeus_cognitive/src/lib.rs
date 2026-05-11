@@ -1,3 +1,5 @@
+#![allow(non_local_definitions)]
+
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -124,6 +126,12 @@ impl CognitiveEngineRust {
         });
 
         Ok(result.to_string())
+    }
+}
+
+impl Default for CognitiveEngineRust {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

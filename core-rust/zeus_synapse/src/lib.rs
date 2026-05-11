@@ -1,6 +1,8 @@
+#![allow(non_local_definitions)]
+
 use chrono::Utc;
 use pyo3::prelude::*;
-use rusqlite::{params, Connection, Result};
+use rusqlite::{params, Connection};
 
 #[pyclass]
 pub struct SynapseManagerRust {

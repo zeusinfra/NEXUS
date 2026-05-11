@@ -1,4 +1,1 @@
--r requirements-base.txt
--r requirements-desktop.txt
--r requirements-browser.txt
--r requirements-voice.txt
+-r requirements/base.txt

@@ -258,6 +258,12 @@ impl CommandPolicyRust {
     }
 }
 
+impl Default for CommandPolicyRust {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 fn set(items: &[&str]) -> HashSet<String> {
     items.iter().map(|item| item.to_string()).collect()
 }
@@ -303,6 +309,7 @@ fn zeus_policy(_py: Python, m: &PyModule) -> PyResult<()> {
 }
 
 #[cfg(test)]
+#[allow(clippy::useless_vec)]
 mod tests {
     use super::*;
     use std::sync::Mutex;

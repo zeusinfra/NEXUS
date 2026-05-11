@@ -1,4 +1,6 @@
-use chrono::{DateTime, Utc};
+#![allow(non_local_definitions)]
+
+use chrono::Utc;
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

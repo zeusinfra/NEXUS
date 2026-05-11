@@ -1,20 +1,34 @@
 version: 2
-
 updates:
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      python-runtime:
+        patterns:
+          - "*"
 
   - package-ecosystem: "cargo"
     directory: "/core-rust"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      rust-core:
+        patterns:
+          - "*"
 
   - package-ecosystem: "cargo"
     directory: "/watcher_rs"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      rust-watcher:
+        patterns:
+          - "*"
 
   - package-ecosystem: "github-actions"
     directory: "/"

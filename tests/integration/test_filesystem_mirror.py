@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 from zeus_core.integrations.filesystem_mirror import FilesystemMirror
 
-def test_filesystem_mirror_basic():
+def test_filesystem_mirror_basic(monkeypatch):
     # Setup temporary directory structure
     # We use a subfolder in the project to avoid the /tmp ignore filter
     test_root = Path("test_mirror_temp").resolve()
@@ -20,7 +20,7 @@ def test_filesystem_mirror_basic():
         vault_dir = test_root / "vault"
         vault_dir.mkdir(parents=True, exist_ok=True)
         
-        os.environ["ZEUS_VAULT_PATH"] = str(vault_dir)
+        monkeypatch.setenv("ZEUS_VAULT_PATH", str(vault_dir))
         mirror = FilesystemMirror()
         
         # Run mirror
