@@ -303,7 +303,7 @@ fn configured_allowlist() -> HashSet<String> {
 }
 
 #[pymodule]
-fn zeus_policy(_py: Python, m: &PyModule) -> PyResult<()> {
+fn zeus_policy(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<CommandPolicyRust>()?;
     Ok(())
 }

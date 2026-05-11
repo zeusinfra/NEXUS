@@ -231,7 +231,7 @@ fn contains_any(value: &str, needles: &[&str]) -> bool {
 }
 
 #[pymodule]
-fn zeus_sensors(_py: Python, m: &PyModule) -> PyResult<()> {
+fn zeus_sensors(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<SensorEngineRust>()?;
     Ok(())
 }

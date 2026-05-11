@@ -94,7 +94,7 @@ impl PatternEngineRust {
 }
 
 #[pymodule]
-fn zeus_patterns(_py: Python, m: &PyModule) -> PyResult<()> {
+fn zeus_patterns(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PatternEngineRust>()?;
     Ok(())
 }

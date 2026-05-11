@@ -124,7 +124,7 @@ fn cosine_similarity(v1: &[f32], v2: &[f32]) -> f32 {
 }
 
 #[pymodule]
-fn zeus_memory(_py: Python, m: &PyModule) -> PyResult<()> {
+fn zeus_memory(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<VectorMemoryRust>()?;
     Ok(())
 }

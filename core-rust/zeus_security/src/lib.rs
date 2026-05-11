@@ -121,7 +121,7 @@ impl Default for PrivacyEngineRust {
 }
 
 #[pymodule]
-fn zeus_security(_py: Python, m: &PyModule) -> PyResult<()> {
+fn zeus_security(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PrivacyEngineRust>()?;
     Ok(())
 }

@@ -109,7 +109,7 @@ impl SynapseManagerRust {
 }
 
 #[pymodule]
-fn zeus_synapse(_py: Python, m: &PyModule) -> PyResult<()> {
+fn zeus_synapse(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<SynapseManagerRust>()?;
     Ok(())
 }

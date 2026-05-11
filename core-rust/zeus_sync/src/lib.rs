@@ -92,7 +92,7 @@ impl Default for SyncEngineRust {
 }
 
 #[pymodule]
-fn zeus_sync(_py: Python, m: &PyModule) -> PyResult<()> {
+fn zeus_sync(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<SyncEngineRust>()?;
     Ok(())
 }

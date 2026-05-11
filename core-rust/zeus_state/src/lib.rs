@@ -75,7 +75,7 @@ impl Default for BlackboardRust {
 }
 
 #[pymodule]
-fn zeus_state(_py: Python, m: &PyModule) -> PyResult<()> {
+fn zeus_state(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<BlackboardRust>()?;
     Ok(())
 }

@@ -136,7 +136,7 @@ impl Default for CognitiveEngineRust {
 }
 
 #[pymodule]
-fn zeus_cognitive(_py: Python, m: &PyModule) -> PyResult<()> {
+fn zeus_cognitive(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<CognitiveEngineRust>()?;
     Ok(())
 }
