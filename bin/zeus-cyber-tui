@@ -456,6 +456,9 @@ class ChatScreen(Screen):
         self.running = False
         self.sending = False
         self.pending_reply_ids: set[str] = set()
+        self.local_reply_ids: set[str] = set()
+        self.rendered_reply_ids: set[str] = set()
+        self.recent_reply_texts: set[str] = set()
 
     def compose(self) -> ComposeResult:
         yield Static(f"[bold #00ffcc]ZEUS[/] [#5fb3ff]Cyber TUI[/]  [dim]{SESSION_ID}[/dim]", id="chat-header", markup=True)
@@ -509,12 +512,6 @@ class ChatScreen(Screen):
         """Atualiza CPU/RAM no footer a cada 3 segundos."""
         worker = get_current_worker()
         while self.running and not worker.is_cancelled:
-            for _ in range(30):
-                if not self.running or worker.is_cancelled:
-                    return
-                time.sleep(0.1)
-            if not self.running or worker.is_cancelled:
-                return
             status = _fetch_status()
             if status["online"]:
                 footer_text = f"[dim]cpu[/dim] {escape(str(status['cpu']))}%  [dim]ram[/dim] {escape(str(status['ram']))}% "
@@ -524,6 +521,10 @@ class ChatScreen(Screen):
                 header_text = "[bold #00ffcc]ZEUS[/] Ops · [red]Offline[/red]"
             if not self._call_from_thread(self._update_bars, header_text, footer_text):
                 return
+            for _ in range(30):
+                if not self.running or worker.is_cancelled:
+                    return
+                time.sleep(0.1)
 
     def _update_bars(self, header: str, footer: str) -> None:
         try:
@@ -539,12 +540,6 @@ class ChatScreen(Screen):
         """Drena eventos do backend em loop para renderizar progresso de agentes e tools."""
         worker = get_current_worker()
         while self.running and not worker.is_cancelled:
-            for _ in range(10):
-                if not self.running or worker.is_cancelled:
-                    return
-                time.sleep(0.1)
-            if not self.running or worker.is_cancelled:
-                return
             try:
                 query = urllib.parse.urlencode({"client_id": CLIENT_ID})
                 data = _get_json(f"/api/events/drain?{query}", timeout=2.0)
@@ -568,6 +563,10 @@ class ChatScreen(Screen):
                         return
             except Exception:
                 pass
+            for _ in range(10):
+                if not self.running or worker.is_cancelled:
+                    return
+                time.sleep(0.1)
 
     def _render_event(self, event: dict) -> None:
         evt_type = event.get("type")
@@ -575,10 +574,23 @@ class ChatScreen(Screen):
         # ── Respostas da IA que chegam via evento (streaming) ──
         if evt_type == "CHAT_AI":
             event_id = str(event.get("id") or (event.get("details") or {}).get("id") or "")
-            if event_id and event_id in self.pending_reply_ids:
+            if event_id and event_id in self.local_reply_ids:
+                self.rendered_reply_ids.add(event_id)
+                return
+            if event_id and event_id in self.rendered_reply_ids:
                 return
             msg = event.get("message") or event.get("text") or ""
+            msg_key = msg.strip()
+            if msg_key and msg_key in self.recent_reply_texts:
+                return
             if msg.strip():
+                if event_id:
+                    self.rendered_reply_ids.add(event_id)
+                    if len(self.rendered_reply_ids) > 300:
+                        self.rendered_reply_ids.clear()
+                self.recent_reply_texts.add(msg_key)
+                if len(self.recent_reply_texts) > 80:
+                    self.recent_reply_texts.clear()
                 self.log_widget.write("")
                 self.log_widget.write("  [bold #00ffcc]╭─ ZEUS[/]")
                 self._write_block(msg.strip(), indent="  │ ")
@@ -640,6 +652,8 @@ class ChatScreen(Screen):
             self.log_widget.write("  [yellow]Envio pausado: aguarde a resposta atual terminar.[/yellow]")
             return
 
+        self.sending = True
+        self._set_busy_state(True)
         self.log_widget.write("")
         self.log_widget.write("  [bold #5fb3ff]╭─ VOCE[/]")
         self._write_block(text, indent="  │ ")
@@ -731,7 +745,7 @@ class ChatScreen(Screen):
         started = time.perf_counter()
         msg_id = str(uuid.uuid4())
         self.pending_reply_ids.add(msg_id)
-        self.sending = True
+        self.local_reply_ids.add(msg_id)
         payload = {
             "message": text,
             "source": "cyber_tui",
@@ -740,7 +754,6 @@ class ChatScreen(Screen):
             "client_msg_id": msg_id,
         }
 
-        self._call_from_thread(self._set_input_enabled, False)
         self._call_from_thread(self.log_widget.write, "  [dim #00ffcc]◌ ZEUS pensando...[/]")
 
         data = _post_json("/api/applet/chat", payload, timeout=180.0)
@@ -750,8 +763,11 @@ class ChatScreen(Screen):
 
         def _write_reply():
             self.pending_reply_ids.discard(msg_id)
+            self.rendered_reply_ids.add(msg_id)
+            if len(self.rendered_reply_ids) > 300:
+                self.rendered_reply_ids.clear()
             self.sending = False
-            self._set_input_enabled(True)
+            self._set_busy_state(False)
             self.log_widget.write("")
             self.log_widget.write(f"  [bold #00ffcc]╭─ ZEUS[/] [dim]· {latency_ms}ms[/dim]")
             self._write_block(reply, indent="  │ ")
@@ -760,12 +776,16 @@ class ChatScreen(Screen):
 
         self._call_from_thread(_write_reply)
 
-    def _set_input_enabled(self, enabled: bool) -> None:
+    def _set_busy_state(self, busy: bool) -> None:
         try:
-            self.input_widget.disabled = not enabled
-            self.input_widget.placeholder = "Aguardando resposta do ZEUS..." if not enabled else "Mensagem para ZEUS..."
-            if enabled:
-                self.input_widget.focus()
+            self.input_widget.disabled = False
+            self.input_widget.placeholder = "Comandos locais ativos; aguarde para novo chat..." if busy else "Mensagem para ZEUS..."
+            hint = self.query_one("#input-hint", Static)
+            if busy:
+                hint.update("[#00d9b8]ZEUS respondendo[/]  [#d4a84f]!cmd[/] e [#8f7cff]/status[/] seguem ativos")
+            else:
+                hint.update("[#d4a84f]!cmd[/] shell  [#8f7cff]/help[/] comandos  [#00d9b8]Enter[/] envia para IA")
+            self.input_widget.focus()
         except Exception:
             pass
 
