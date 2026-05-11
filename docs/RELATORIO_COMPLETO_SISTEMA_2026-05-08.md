@@ -52,7 +52,7 @@ The latest operating milestone focuses on enterprise readiness:
 flowchart TD
     Desktop[Desktop Operator] --> Applet[Cinnamon Applet]
     Desktop --> GTK[GTK4 Ops Chat]
-    Desktop --> TUI[Hermes TUI Standby]
+    Desktop --> TUI[Cyber TUI]
     Desktop --> HUD[Web HUD]
 
     Applet --> Backend[FastAPI Backend]

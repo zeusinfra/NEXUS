@@ -47,7 +47,7 @@ flowchart LR
     Sync --> Obsidian
 
     GTK[GTK4 Ops Chat] --> API
-    TUI[Hermes TUI Standby] --> API
+    TUI[Cyber TUI] --> API
     Applet[Cinnamon Applet] --> API
     HUD[Web HUD] --> API
 ```

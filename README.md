@@ -67,7 +67,7 @@ NEXUS is built on a hybrid Python/Rust stack to guarantee both high-level cognit
 flowchart TD
     Operator[Operator] --> Applet[Cinnamon Applet]
     Operator --> GTK[GTK4 Ops Chat]
-    Operator --> TUI[Hermes TUI Standby]
+    Operator --> TUI[Cyber TUI]
 
     Applet --> API[FastAPI Backend]
     GTK --> API

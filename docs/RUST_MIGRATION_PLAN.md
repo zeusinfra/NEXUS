@@ -191,8 +191,7 @@ faster command/sensor substrate.
 
 - GTK4/Libadwaita chat remains the default operator console.
 - `bin/zeus-chat` launches GTK by default.
-- `bin/zeus-hermes-tui` and `./bin/zeus tui` remain available as standby
-  terminal surfaces for progress/tool-log experiments.
+- `./bin/zeus tui` launches the Cyber TUI terminal surface.
 - Rust migration work should not depend on replacing the GTK desktop flow.
 
 ## Phase 1 Progress
