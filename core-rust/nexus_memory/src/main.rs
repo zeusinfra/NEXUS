@@ -3,9 +3,9 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use nexus_memory::VectorMemoryRust;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, RwLock};
-use nexus_memory::VectorMemoryRust;
 
 #[derive(Serialize, Deserialize)]
 struct MemoryEntry {

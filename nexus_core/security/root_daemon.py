@@ -136,7 +136,13 @@ READ_ONLY_COMMANDS = {
 
 # Comandos de serviço permitidos explicitamente
 SERVICE_COMMANDS = {"restart", "status", "stop", "start", "reload"}
-NEXUS_SERVICES = {"nexus-core", "nexus-root-daemon", "nexus-gtk-chat", "nexus"}
+NEXUS_SERVICES = {
+    "nexus_core",
+    "nexus-core",
+    "nexus-root-daemon",
+    "nexus-gtk-chat",
+    "nexus",
+}
 
 # Subcomandos que tornam um comando read-only em escrita
 WRITE_SUBCOMMANDS = {
