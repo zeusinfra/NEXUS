@@ -1,6 +1,6 @@
 import unittest
 
-from zeus_core.path_filters import is_runtime_noise_path
+from nexus_core.path_filters import is_runtime_noise_path
 
 
 class PathFilterTests(unittest.TestCase):
@@ -8,7 +8,7 @@ class PathFilterTests(unittest.TestCase):
         noisy_paths = [
             "/repo/data/zeus_memory.db",
             "/repo/nexus_events.db-journal",
-            "/repo/zeus_core.log",
+            "/repo/nexus_core.log",
             "/repo/logs/watcher.log",
             "/repo/.venv/lib/site.py",
             "/repo/target/release/watcher_rs",
@@ -23,7 +23,7 @@ class PathFilterTests(unittest.TestCase):
     def test_source_paths_are_not_ignored(self):
         source_paths = [
             "/repo/apps/web_gui.py",
-            "/repo/zeus_core/events/watcher.py",
+            "/repo/nexus_core/events/watcher.py",
             "/repo/README.md",
             "/repo/public/index.html",
         ]

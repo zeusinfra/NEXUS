@@ -3,8 +3,8 @@ from types import SimpleNamespace
 
 from fastapi import HTTPException
 
-from zeus_core.config_guard import LanSecurityConfig
-from zeus_core.security_guard import (
+from nexus_core.config_guard import LanSecurityConfig
+from nexus_core.security_guard import (
     extract_bearer_token,
     is_trusted_host,
     require_lan_token_for_request,

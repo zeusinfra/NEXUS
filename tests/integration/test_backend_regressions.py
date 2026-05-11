@@ -7,9 +7,9 @@ import time
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from zeus_core.core_system import _extract_message_content
-from zeus_core import core_system
-from zeus_core.health_status import build_external_watcher_status, build_watcher_status
+from nexus_core.core_system import _extract_message_content
+from nexus_core import core_system
+from nexus_core.health_status import build_external_watcher_status, build_watcher_status
 from pattern_engine import PatternEngine
 import web_gui
 
@@ -86,9 +86,9 @@ class BackendRegressionTests(unittest.TestCase):
             }
 
         with patch(
-            "zeus_core.health_status.psutil.process_iter", return_value=[Proc()]
+            "nexus_core.health_status.psutil.process_iter", return_value=[Proc()]
         ):
-            with patch("zeus_core.health_status._watcher_port_open", return_value=True):
+            with patch("nexus_core.health_status._watcher_port_open", return_value=True):
                 status = build_external_watcher_status("/repo", port=8081)
 
         self.assertEqual(status["status"], "online")
@@ -97,9 +97,9 @@ class BackendRegressionTests(unittest.TestCase):
         self.assertTrue(status["port_open"])
 
     def test_external_watcher_status_reports_offline_when_absent(self):
-        with patch("zeus_core.health_status.psutil.process_iter", return_value=[]):
+        with patch("nexus_core.health_status.psutil.process_iter", return_value=[]):
             with patch(
-                "zeus_core.health_status._watcher_port_open", return_value=False
+                "nexus_core.health_status._watcher_port_open", return_value=False
             ):
                 status = build_external_watcher_status("/repo", port=8081)
 
@@ -121,10 +121,10 @@ class BackendRegressionTests(unittest.TestCase):
                 "create_time": time.time() - 5,
             }
 
-        with patch("zeus_core.health_status._watcher_port_open", return_value=True):
+        with patch("nexus_core.health_status._watcher_port_open", return_value=True):
             # Simulando a primeira execução
             with patch(
-                "zeus_core.health_status.psutil.process_iter", return_value=[Proc1()]
+                "nexus_core.health_status.psutil.process_iter", return_value=[Proc1()]
             ):
                 status1 = build_external_watcher_status("/repo", port=8081)
                 self.assertEqual(status1["pid"], 1111)
@@ -133,7 +133,7 @@ class BackendRegressionTests(unittest.TestCase):
 
             # Simulando restart (novo PID, tempo de atividade resetado)
             with patch(
-                "zeus_core.health_status.psutil.process_iter", return_value=[Proc2()]
+                "nexus_core.health_status.psutil.process_iter", return_value=[Proc2()]
             ):
                 status2 = build_external_watcher_status("/repo", port=8081)
                 self.assertEqual(status2["pid"], 2222)

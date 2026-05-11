@@ -2,7 +2,7 @@
 
 import pytest
 
-from zeus_core.cognitive.cognitive_state import CognitiveStateManager
+from nexus_core.cognitive.cognitive_state import CognitiveStateManager
 
 
 class TestCognitiveState:

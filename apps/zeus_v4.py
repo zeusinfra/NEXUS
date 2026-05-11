@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
-from zeus_core.v4.core import ZeusCognitiveCoreV4
+from nexus_core.v4.core import ZeusCognitiveCoreV4
 
 
 async def main() -> None:

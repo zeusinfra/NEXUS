@@ -2,8 +2,8 @@
 
 import pytest
 from unittest.mock import patch
-from zeus_core.cognitive.cognitive_db import init_cognitive_tables
-from zeus_core.cognitive.attention_engine import AttentionEngine, AttentionState
+from nexus_core.cognitive.cognitive_db import init_cognitive_tables
+from nexus_core.cognitive.attention_engine import AttentionEngine, AttentionState
 
 
 @pytest.fixture
@@ -25,11 +25,11 @@ class TestAttentionEngine:
         assert "Visual Studio Code" in title
 
     @patch(
-        "zeus_core.cognitive.attention_engine.AttentionEngine._get_active_window_title"
+        "nexus_core.cognitive.attention_engine.AttentionEngine._get_active_window_title"
     )
     @patch("psutil.cpu_percent")
     def test_state_detection_development(self, mock_cpu, mock_title, engine):
-        mock_title.return_value = "zeus_core/agent.py - VSCode"
+        mock_title.return_value = "nexus_core/agent.py - VSCode"
         mock_cpu.return_value = 10.0
 
         snapshot = engine.get_current_attention()
@@ -38,10 +38,10 @@ class TestAttentionEngine:
         assert snapshot.suggestion_suppression is True
 
     @patch(
-        "zeus_core.cognitive.attention_engine.AttentionEngine._get_active_window_title"
+        "nexus_core.cognitive.attention_engine.AttentionEngine._get_active_window_title"
     )
     @patch("psutil.cpu_percent")
-    @patch("zeus_core.cognitive.attention_engine.AttentionEngine._is_process_running")
+    @patch("nexus_core.cognitive.attention_engine.AttentionEngine._is_process_running")
     def test_state_detection_mining(self, mock_proc, mock_cpu, mock_title, engine):
         mock_title.return_value = "Desktop"
         mock_cpu.return_value = 95.0

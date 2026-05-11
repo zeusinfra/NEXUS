@@ -3,9 +3,9 @@
 import asyncio
 import pytest
 
-from zeus_core.cognitive.cognitive_db import init_cognitive_tables
-from zeus_core.cognitive.cognitive_loop import CognitiveLoop
-from zeus_core.cognitive.cognitive_state import cognitive_state_manager
+from nexus_core.cognitive.cognitive_db import init_cognitive_tables
+from nexus_core.cognitive.cognitive_loop import CognitiveLoop
+from nexus_core.cognitive.cognitive_state import cognitive_state_manager
 
 
 @pytest.fixture

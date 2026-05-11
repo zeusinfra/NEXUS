@@ -1,4 +1,4 @@
-from zeus_core.cognitive.self_healing import HealingProposal, SelfHealingEngine
+from nexus_core.cognitive.self_healing import HealingProposal, SelfHealingEngine
 
 
 def test_self_healing_blocks_shell_control_commands():

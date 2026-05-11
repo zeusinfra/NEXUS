@@ -2,8 +2,8 @@
 
 import pytest
 
-from zeus_core.cognitive.cognitive_db import init_cognitive_tables
-from zeus_core.cognitive.goal_engine import GoalEngine
+from nexus_core.cognitive.cognitive_db import init_cognitive_tables
+from nexus_core.cognitive.goal_engine import GoalEngine
 
 
 @pytest.fixture

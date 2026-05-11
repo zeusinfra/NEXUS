@@ -2,8 +2,8 @@
 
 import pytest
 from datetime import datetime, timedelta
-from zeus_core.cognitive.cognitive_db import init_cognitive_tables
-from zeus_core.cognitive.user_profile_engine import (
+from nexus_core.cognitive.cognitive_db import init_cognitive_tables
+from nexus_core.cognitive.user_profile_engine import (
     UserProfileEngine,
     record_interaction,
 )
@@ -31,7 +31,7 @@ class TestUserProfileEngine:
         # First interaction creates session
         iid1 = record_interaction("chat", "Msg 1", db_path=db)
         # Get session_id
-        from zeus_core.cognitive.cognitive_db import get_connection
+        from nexus_core.cognitive.cognitive_db import get_connection
 
         with get_connection(db) as conn:
             s1 = conn.execute(
@@ -83,7 +83,7 @@ class TestUserProfileEngine:
         # Actually session gap is 5 mins. I'll mock the timestamp or just use different sessions if I can.
         # record_interaction doesn't take session_id, it resolves it.
         # I'll just insert directly to create a second session.
-        from zeus_core.cognitive.cognitive_db import get_connection
+        from nexus_core.cognitive.cognitive_db import get_connection
 
         now = datetime.now()
         old = (now - timedelta(minutes=10)).isoformat()

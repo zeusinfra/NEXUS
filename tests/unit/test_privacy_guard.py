@@ -1,8 +1,8 @@
 """Tests for the Privacy Guard."""
 
 import pytest
-from zeus_core.cognitive.cognitive_db import init_cognitive_tables
-from zeus_core.security.privacy_guard import PrivacyGuard, PrivacyLevel
+from nexus_core.cognitive.cognitive_db import init_cognitive_tables
+from nexus_core.security.privacy_guard import PrivacyGuard, PrivacyLevel
 
 
 @pytest.fixture

@@ -2,7 +2,7 @@
 
 import pytest
 
-from zeus_core.cognitive.simulator import CognitiveSimulator
+from nexus_core.cognitive.simulator import CognitiveSimulator
 
 
 @pytest.fixture

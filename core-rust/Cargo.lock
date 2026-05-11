@@ -529,6 +529,101 @@ dependencies = [
 ]
 
 [[package]]
+name = "nexus_cognitive"
+version = "0.1.0"
+dependencies = [
+ "pyo3",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "nexus_memory"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "bincode",
+ "pyo3",
+ "rayon",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower-http",
+]
+
+[[package]]
+name = "nexus_patterns"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "pyo3",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "nexus_policy"
+version = "0.1.0"
+dependencies = [
+ "pyo3",
+ "regex",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "nexus_security"
+version = "0.1.0"
+dependencies = [
+ "pyo3",
+ "regex",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "nexus_sensors"
+version = "0.1.0"
+dependencies = [
+ "pyo3",
+ "serde",
+ "serde_json",
+ "sysinfo",
+ "walkdir",
+]
+
+[[package]]
+name = "nexus_state"
+version = "0.1.0"
+dependencies = [
+ "arc-swap",
+ "dashmap",
+ "pyo3",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "nexus_synapse"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "pyo3",
+ "rusqlite",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "nexus_sync"
+version = "0.1.0"
+dependencies = [
+ "pyo3",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "ntapi"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1298,101 +1393,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "zeus_cognitive"
-version = "0.1.0"
-dependencies = [
- "pyo3",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "zeus_memory"
-version = "0.1.0"
-dependencies = [
- "axum",
- "bincode",
- "pyo3",
- "rayon",
- "serde",
- "serde_json",
- "tokio",
- "tower-http",
-]
-
-[[package]]
-name = "zeus_patterns"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "pyo3",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "zeus_policy"
-version = "0.1.0"
-dependencies = [
- "pyo3",
- "regex",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "zeus_security"
-version = "0.1.0"
-dependencies = [
- "pyo3",
- "regex",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "zeus_sensors"
-version = "0.1.0"
-dependencies = [
- "pyo3",
- "serde",
- "serde_json",
- "sysinfo",
- "walkdir",
-]
-
-[[package]]
-name = "zeus_state"
-version = "0.1.0"
-dependencies = [
- "arc-swap",
- "dashmap",
- "pyo3",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "zeus_synapse"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "pyo3",
- "rusqlite",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "zeus_sync"
-version = "0.1.0"
-dependencies = [
- "pyo3",
- "serde",
- "serde_json",
 ]
 
 [[package]]

@@ -1,7 +1,7 @@
 import os
 import datetime
 import sys
-from zeus_core.core_system import (
+from nexus_core.core_system import (
     Blackboard,
     LibrarianAgent,
     StrategistAgent,

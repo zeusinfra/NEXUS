@@ -1,6 +1,6 @@
 import unittest
 
-from zeus_core.rust_sensors import RUST_SENSORS_AVAILABLE, get_os_snapshot
+from nexus_core.rust_sensors import RUST_SENSORS_AVAILABLE, get_os_snapshot
 
 
 class RustSensorsTests(unittest.TestCase):

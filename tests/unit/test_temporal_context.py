@@ -1,6 +1,6 @@
 """Tests for Temporal Context logic."""
 
-from zeus_core.cognitive.user_profile_engine import _period_label, TemporalContext
+from nexus_core.cognitive.user_profile_engine import _period_label, TemporalContext
 
 
 def test_period_labels():

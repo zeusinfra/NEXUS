@@ -1,6 +1,6 @@
 import unittest
 
-from zeus_core.event_pipeline import OverflowEventQueue
+from nexus_core.event_pipeline import OverflowEventQueue
 
 
 class EventPipelineTests(unittest.IsolatedAsyncioTestCase):

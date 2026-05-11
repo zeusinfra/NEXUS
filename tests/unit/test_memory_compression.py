@@ -1,8 +1,8 @@
 import pytest
 import datetime
 from unittest.mock import patch
-from zeus_core.cognitive.cognitive_db import init_cognitive_tables, get_connection
-from zeus_core.cognitive.memory_compression import MemoryCompression
+from nexus_core.cognitive.cognitive_db import init_cognitive_tables, get_connection
+from nexus_core.cognitive.memory_compression import MemoryCompression
 
 
 @pytest.fixture
@@ -33,7 +33,7 @@ class TestMemoryCompression:
             assert "r2" in ids
             assert "r3" in ids
 
-    @patch("zeus_core.core_system.call_cloud_llm")
+    @patch("nexus_core.core_system.call_cloud_llm")
     def test_summarize_interactions(self, mock_llm, mc):
         mock_llm.return_value = "Resumo semântico consolidado."
 

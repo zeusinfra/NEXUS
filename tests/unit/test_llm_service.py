@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from zeus_core.llm_service import LLMService
+from nexus_core.llm_service import LLMService
 
 
 class LLMServiceTests(unittest.TestCase):
@@ -11,7 +11,7 @@ class LLMServiceTests(unittest.TestCase):
             call_llm=lambda messages: "ZEUS LLM OK",
         )
 
-        with patch("zeus_core.llm_service.log_event"):
+        with patch("nexus_core.llm_service.log_event"):
             result = service.test_connectivity()
 
         self.assertTrue(result["ok"])
@@ -24,7 +24,7 @@ class LLMServiceTests(unittest.TestCase):
             call_llm=lambda messages: "Error: unauthorized",
         )
 
-        with patch("zeus_core.llm_service.log_event"):
+        with patch("nexus_core.llm_service.log_event"):
             result = service.test_connectivity()
 
         self.assertFalse(result["ok"])

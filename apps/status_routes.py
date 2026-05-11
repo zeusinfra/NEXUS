@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Callable
 
 from fastapi import APIRouter, HTTPException, Request
-from zeus_core.llm_service import LLMService
+from nexus_core.llm_service import LLMService
 
 
 @dataclass(frozen=True)
@@ -50,7 +50,7 @@ def create_status_router(deps: StatusRouteDeps) -> APIRouter:
     @router.get("/api/applet/status")
     async def get_api_applet_status(request: Request):
         require_access(request)
-        from zeus_core.cognitive.cognitive_state import cognitive_state_manager
+        from nexus_core.cognitive.cognitive_state import cognitive_state_manager
 
         # Add cognitive state
         state = cognitive_state_manager.state

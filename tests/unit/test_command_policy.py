@@ -3,14 +3,14 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from zeus_core.actions import cmd_control
-from zeus_core.command_policy import RUST_POLICY_AVAILABLE, validate_command
-from zeus_core.tools import ToolError
+from nexus_core.actions import cmd_control
+from nexus_core.command_policy import RUST_POLICY_AVAILABLE, validate_command
+from nexus_core.tools import ToolError
 
 
 class CommandPolicyTests(unittest.TestCase):
     def setUp(self):
-        self._log_patcher = patch("zeus_core.command_policy.log_event")
+        self._log_patcher = patch("nexus_core.command_policy.log_event")
         self._log_patcher.start()
 
     def tearDown(self):
@@ -19,8 +19,8 @@ class CommandPolicyTests(unittest.TestCase):
     def test_cmd_control_allows_allowlisted_command(self):
         with tempfile.TemporaryDirectory() as tmp:
             env = {
-                "ZEUS_PROJECT_ROOT": tmp,
-                "ZEUS_CMD_ALLOWLIST": "python3",
+                "NEXUS_PROJECT_ROOT": tmp,
+                "NEXUS_CMD_ALLOWLIST": "python3",
             }
             with patch.dict(os.environ, env, clear=False):
                 result = cmd_control({"command": "python3 --version", "timeout_s": 5})
@@ -32,8 +32,8 @@ class CommandPolicyTests(unittest.TestCase):
     def test_cmd_control_rejects_command_outside_allowlist(self):
         with tempfile.TemporaryDirectory() as tmp:
             env = {
-                "ZEUS_PROJECT_ROOT": tmp,
-                "ZEUS_CMD_ALLOWLIST": "python3",
+                "NEXUS_PROJECT_ROOT": tmp,
+                "NEXUS_CMD_ALLOWLIST": "python3",
             }
             with patch.dict(os.environ, env, clear=False):
                 with self.assertRaisesRegex(ToolError, "allowlist"):
@@ -42,8 +42,8 @@ class CommandPolicyTests(unittest.TestCase):
     def test_cmd_control_blocks_rm_even_if_allowlisted(self):
         with tempfile.TemporaryDirectory() as tmp:
             env = {
-                "ZEUS_PROJECT_ROOT": tmp,
-                "ZEUS_CMD_ALLOWLIST": "rm",
+                "NEXUS_PROJECT_ROOT": tmp,
+                "NEXUS_CMD_ALLOWLIST": "rm",
             }
             with patch.dict(os.environ, env, clear=False):
                 with self.assertRaisesRegex(ToolError, "bloqueado"):
@@ -52,8 +52,8 @@ class CommandPolicyTests(unittest.TestCase):
     def test_cmd_control_rejects_shell_control_tokens(self):
         with tempfile.TemporaryDirectory() as tmp:
             env = {
-                "ZEUS_PROJECT_ROOT": tmp,
-                "ZEUS_CMD_ALLOWLIST": "python3",
+                "NEXUS_PROJECT_ROOT": tmp,
+                "NEXUS_CMD_ALLOWLIST": "python3",
             }
             with patch.dict(os.environ, env, clear=False):
                 with self.assertRaisesRegex(ToolError, "shell bloqueado"):
@@ -62,8 +62,8 @@ class CommandPolicyTests(unittest.TestCase):
     def test_write_command_requires_confirmation(self):
         with tempfile.TemporaryDirectory() as tmp:
             env = {
-                "ZEUS_PROJECT_ROOT": tmp,
-                "ZEUS_CMD_ALLOWLIST": "mkdir",
+                "NEXUS_PROJECT_ROOT": tmp,
+                "NEXUS_CMD_ALLOWLIST": "mkdir",
             }
             with patch.dict(os.environ, env, clear=False):
                 with self.assertRaisesRegex(ToolError, "confirmação"):
@@ -72,8 +72,8 @@ class CommandPolicyTests(unittest.TestCase):
     def test_write_command_runs_when_confirmed(self):
         with tempfile.TemporaryDirectory() as tmp:
             env = {
-                "ZEUS_PROJECT_ROOT": tmp,
-                "ZEUS_CMD_ALLOWLIST": "mkdir",
+                "NEXUS_PROJECT_ROOT": tmp,
+                "NEXUS_CMD_ALLOWLIST": "mkdir",
             }
             with patch.dict(os.environ, env, clear=False):
                 result = cmd_control({"command": "mkdir out", "confirmed": True})
@@ -84,8 +84,8 @@ class CommandPolicyTests(unittest.TestCase):
 
     def test_command_policy_audits_allowed_and_rejected_decisions(self):
         self._log_patcher.stop()
-        with patch("zeus_core.command_policy.log_event") as log_event:
-            with patch.dict(os.environ, {"ZEUS_CMD_ALLOWLIST": "python3"}, clear=False):
+        with patch("nexus_core.command_policy.log_event") as log_event:
+            with patch.dict(os.environ, {"NEXUS_CMD_ALLOWLIST": "python3"}, clear=False):
                 validate_command(
                     "python3 --version", ["python3", "--version"], confirmed=False
                 )
@@ -99,7 +99,7 @@ class CommandPolicyTests(unittest.TestCase):
 
     def test_interpreter_execution_flags_require_confirmation(self):
         with patch.dict(
-            os.environ, {"ZEUS_CMD_ALLOWLIST": "python3,node"}, clear=False
+            os.environ, {"NEXUS_CMD_ALLOWLIST": "python3,node"}, clear=False
         ):
             with self.assertRaisesRegex(ToolError, "confirmação"):
                 validate_command(
@@ -124,10 +124,10 @@ class CommandPolicyTests(unittest.TestCase):
             self.assertEqual(py_decision.category, "exec")
 
     @unittest.skipUnless(
-        RUST_POLICY_AVAILABLE, "zeus_policy Rust extension is not installed"
+        RUST_POLICY_AVAILABLE, "nexus_policy Rust extension is not installed"
     )
     def test_rust_policy_matches_python_guarded_corpus(self):
-        from zeus_core.command_policy import _RUST_POLICY
+        from nexus_core.command_policy import _RUST_POLICY
 
         cases = [
             ("python3 --version", ["python3", "--version"], False, True),
@@ -145,8 +145,8 @@ class CommandPolicyTests(unittest.TestCase):
             ),
         ]
         env = {
-            "ZEUS_AUTONOMY_LEVEL": "GUARDED",
-            "ZEUS_CMD_ALLOWLIST": "python3,git,mkdir,rm",
+            "NEXUS_AUTONOMY_LEVEL": "GUARDED",
+            "NEXUS_CMD_ALLOWLIST": "python3,git,mkdir,rm",
         }
         with patch.dict(os.environ, env, clear=False):
             for command, tokens, confirmed, expected_ok in cases:

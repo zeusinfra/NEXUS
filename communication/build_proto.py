@@ -19,7 +19,7 @@ protoc.main(
         "-I" + PROTO_DIR,
         f"--python_out={PYTHON_OUT_DIR}",
         f"--grpc_python_out={PYTHON_OUT_DIR}",
-        os.path.join(PROTO_DIR, "zeus_core.proto"),
+        os.path.join(PROTO_DIR, "nexus_core.proto"),
     )
 )
 

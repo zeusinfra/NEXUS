@@ -12,11 +12,11 @@ from typing import Callable
 
 from fastapi import APIRouter, HTTPException, Request
 
-from zeus_core.cognitive.cognitive_state import cognitive_state_manager
-from zeus_core.cognitive.cognition_service import CognitionService
-from zeus_core.cognitive.goal_engine import GoalEngine
-from zeus_core.cognitive.reflection_engine import ReflectionEngine
-from zeus_core.cognitive.execution_engine import CognitiveExecutionEngine
+from nexus_core.cognitive.cognitive_state import cognitive_state_manager
+from nexus_core.cognitive.cognition_service import CognitionService
+from nexus_core.cognitive.goal_engine import GoalEngine
+from nexus_core.cognitive.reflection_engine import ReflectionEngine
+from nexus_core.cognitive.execution_engine import CognitiveExecutionEngine
 
 
 @dataclass(frozen=True)

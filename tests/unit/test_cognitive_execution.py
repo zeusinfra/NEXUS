@@ -2,8 +2,8 @@
 
 import pytest
 
-from zeus_core.cognitive.cognitive_db import init_cognitive_tables
-from zeus_core.cognitive.execution_engine import CognitiveExecutionEngine, ActionResult
+from nexus_core.cognitive.cognitive_db import init_cognitive_tables
+from nexus_core.cognitive.execution_engine import CognitiveExecutionEngine, ActionResult
 
 
 @pytest.fixture

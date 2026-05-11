@@ -5,7 +5,7 @@ from unittest.mock import patch
 from fastapi import HTTPException
 
 from apps.status_routes import StatusRouteDeps, create_status_router
-from zeus_core.llm_service import LLMService
+from nexus_core.llm_service import LLMService
 
 
 def _endpoint(router, path: str, method: str):

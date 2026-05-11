@@ -8,12 +8,12 @@ use tokio_stream::wrappers::ReceiverStream;
 use tonic::{transport::Server, Request, Response, Status};
 
 // Import generated gRPC code
-pub mod zeus_core {
-    tonic::include_proto!("zeus_core");
+pub mod nexus_core {
+    tonic::include_proto!("nexus_core");
 }
 
-use zeus_core::zeus_core_server::{ZeusCore, ZeusCoreServer};
-use zeus_core::{
+use nexus_core::nexus_core_server::{ZeusCore, ZeusCoreServer};
+use nexus_core::{
     ActionRequest, ActionResponse, ModeRequest, ModeResponse, SimulationRequest, SimulationResponse,
     ProcessInfo, TelemetryRequest, TelemetryUpdate,
 };
@@ -217,13 +217,13 @@ mod tests {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = "[::1]:50051".parse()?;
-    let zeus_service = ZeusCoreService::new();
+    let nexus_service = ZeusCoreService::new();
 
-    println!("🚀 ZEUS CORE (Rust) started on {}", addr);
+    println!("🚀 NEXUS CORE (Rust) started on {}", addr);
     println!("🛡️ Guardian Active. Mode: SAFE");
 
     Server::builder()
-        .add_service(ZeusCoreServer::new(zeus_service))
+        .add_service(ZeusCoreServer::new(nexus_service))
         .serve(addr)
         .await?;
 

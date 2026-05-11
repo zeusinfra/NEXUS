@@ -1,6 +1,6 @@
 import pytest
 
-from zeus_core.security.root_daemon import RootDaemon
+from nexus_core.security.root_daemon import RootDaemon
 
 
 @pytest.fixture
@@ -22,11 +22,11 @@ async def test_service_name_accepts_common_systemd_units(
     monkeypatch.setattr("asyncio.to_thread", mock_to_thread)
 
     result = await root_daemon_instance.handle_service_control(
-        {"service": "zeus_core", "service_action": "status"}
+        {"service": "nexus_core", "service_action": "status"}
     )
 
     assert result["status"] == "success"
-    assert calls == ["systemctl --user status zeus_core"]
+    assert calls == ["systemctl --user status nexus_core"]
 
 
 @pytest.mark.asyncio

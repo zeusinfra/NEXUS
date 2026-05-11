@@ -5,14 +5,14 @@ from typing import Dict, List, Optional, AsyncGenerator
 
 # Import generated stubs
 try:
-    from .stubs import zeus_core_pb2
-    from .stubs import zeus_core_pb2_grpc
+    from .stubs import nexus_core_pb2
+    from .stubs import nexus_core_pb2_grpc
 except ImportError:
     import sys
 
     sys.path.append(os.path.dirname(__file__))
-    from stubs import zeus_core_pb2
-    from stubs import zeus_core_pb2_grpc
+    from stubs import nexus_core_pb2
+    from stubs import nexus_core_pb2_grpc
 
 
 class RustConnect:
@@ -29,7 +29,7 @@ class RustConnect:
     async def connect(self):
         """Establishes connection to Rust Core."""
         self.channel = grpc.aio.insecure_channel(self.target)
-        self.stub = zeus_core_pb2_grpc.ZeusCoreStub(self.channel)
+        self.stub = nexus_core_pb2_grpc.ZeusCoreStub(self.channel)
         print(f"🔗 Connected to ZEUS CORE (Rust) at {self.target}")
 
     async def disconnect(self):
@@ -42,7 +42,7 @@ class RustConnect:
         self, command: str, target_files: List[str] = None
     ) -> Dict:
         """Sends command for execution via Rust Core."""
-        request = zeus_core_pb2.ActionRequest(
+        request = nexus_core_pb2.ActionRequest(
             command=command, target_files=target_files or []
         )
         try:
@@ -63,7 +63,7 @@ class RustConnect:
         self, command: str, target_files: List[str] = None
     ) -> Dict:
         """Simulates command in Rust Shadow Environment."""
-        request = zeus_core_pb2.SimulationRequest(
+        request = nexus_core_pb2.SimulationRequest(
             command=command, target_files=target_files or []
         )
         try:
@@ -83,7 +83,7 @@ class RustConnect:
 
     async def stream_telemetry(self) -> AsyncGenerator[Dict, None]:
         """Receives realtime telemetry stream from Rust."""
-        request = zeus_core_pb2.TelemetryRequest(include_processes=True)
+        request = nexus_core_pb2.TelemetryRequest(include_processes=True)
 
         try:
             async for telemetry in self.stub.StreamTelemetry(request):
@@ -99,7 +99,7 @@ class RustConnect:
 
     async def set_mode(self, mode: str) -> bool:
         """Sets Rust Core mode (SAFE, DEV, AUTONOMOUS)."""
-        request = zeus_core_pb2.ModeRequest(mode=mode)
+        request = nexus_core_pb2.ModeRequest(mode=mode)
         try:
             resp = await self.stub.SetMode(request)
             print(f"🛡️ Core Mode set to: {resp.current_mode}")

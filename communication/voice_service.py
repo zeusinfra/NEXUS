@@ -1,7 +1,7 @@
 import os
 import base64
 
-from zeus_core.response_text import speech_text
+from nexus_core.response_text import speech_text
 
 try:
     import edge_tts

@@ -1,6 +1,6 @@
 import unittest
 
-from zeus_core.response_text import display_text, pango_markup, speech_text
+from nexus_core.response_text import display_text, pango_markup, speech_text
 
 
 class ResponseTextTests(unittest.TestCase):

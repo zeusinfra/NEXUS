@@ -1,4 +1,4 @@
-from zeus_core.peripherals.usb_monitor import USBMonitor
+from nexus_core.peripherals.usb_monitor import USBMonitor
 
 
 class FakeDevice:

@@ -1,5 +1,5 @@
 import os
-from zeus_core.env import load_project_env
+from nexus_core.env import load_project_env
 
 load_project_env()
 
@@ -23,71 +23,71 @@ from apps.realtime_hub import RealtimeDeps, RealtimeHub
 from apps.status_routes import StatusRouteDeps, create_status_router
 from apps.routes.cognition_routes import CognitionRouteDeps, create_cognition_router
 from apps.routes.privacy_routes import PrivacyRouteDeps, create_privacy_router
-from zeus_core.cognitive import CognitionService
-from zeus_core.cognitive.cognitive_state import cognitive_state_manager
-from zeus_core.cognitive.goal_engine import GoalEngine
-from zeus_core.cognitive.user_profile_engine import record_interaction
-from zeus_core.security.privacy_guard import PrivacyGuard
+from nexus_core.cognitive import CognitionService
+from nexus_core.cognitive.cognitive_state import cognitive_state_manager
+from nexus_core.cognitive.goal_engine import GoalEngine
+from nexus_core.cognitive.user_profile_engine import record_interaction
+from nexus_core.security.privacy_guard import PrivacyGuard
 from apps.lifecycle_manager import LifecycleManager
 from pattern_engine import PatternEngine
 from apps.nexus_evolution import NexusBrain
-from zeus_core.core_system import call_cloud_llm, get_llm_status
-from zeus_core.agent import Agent
-from zeus_core.vector_memory import VectorMemory
-from zeus_core.voice_sensing import VoiceSensing
-from zeus_core.vision import (
+from nexus_core.core_system import call_cloud_llm, get_llm_status
+from nexus_core.agent import Agent
+from nexus_core.vector_memory import VectorMemory
+from nexus_core.voice_sensing import VoiceSensing
+from nexus_core.vision import (
     analyze_image_with_llm,
     analyze_with_ocr_fallback,
     is_tesseract_available,
     capture_screen,
 )
-from zeus_core.resource_control import ResourceControl
-from zeus_core.long_term_memory import (
+from nexus_core.resource_control import ResourceControl
+from nexus_core.long_term_memory import (
     extract_memory,
     format_memory_for_prompt,
     load_memory as load_long_memory,
     should_extract_memory,
     update_memory as update_long_memory,
 )
-from zeus_core.asr import transcribe_audio_bytes
-from zeus_core.config_guard import (
+from nexus_core.asr import transcribe_audio_bytes
+from nexus_core.config_guard import (
     LanSecurityConfig,
     build_config_diagnostics,
     env_flag,
     validate_startup_config,
 )
-from zeus_core.event_pipeline import OverflowEventQueue, RustWatcherRunner
-from zeus_core.llm_service import LLMService
-from zeus_core.memory_manager import MemoryManager
-from zeus_core.path_filters import is_runtime_noise_path
-from zeus_core.response_text import display_text, speech_text
-from zeus_core.rust_sensors import (
+from nexus_core.event_pipeline import OverflowEventQueue, RustWatcherRunner
+from nexus_core.llm_service import LLMService
+from nexus_core.memory_manager import MemoryManager
+from nexus_core.path_filters import is_runtime_noise_path
+from nexus_core.response_text import display_text, speech_text
+from nexus_core.rust_sensors import (
     RUST_SENSORS_AVAILABLE,
     get_os_snapshot as get_rust_os_snapshot,
 )
-from zeus_core.conversation.sqlite_conversation_memory import conversation_memory
-from zeus_core.events.watcher import watch_vault
-from zeus_core.events.sync_worker import sync_worker_loop
-from zeus_core.events.sync_engine import (
+from nexus_core.conversation.sqlite_conversation_memory import conversation_memory
+from nexus_core.events.watcher import watch_vault
+from nexus_core.events.sync_worker import sync_worker_loop
+from nexus_core.events.sync_engine import (
     sync_synaptic_to_obsidian,
     sync_longterm_to_notion,
     sync_insights_to_linear,
 )
-from zeus_core.cognitive.context_engine import build_current_context
-from zeus_core.memory.sqlite_memory import get_connection as get_second_brain_connection
-from zeus_core.health_status import (
+from nexus_core.cognitive.context_engine import build_current_context
+from nexus_core.memory.sqlite_memory import get_connection as get_second_brain_connection
+from nexus_core.health_status import (
     build_external_watcher_status,
     build_runtime_health,
     build_watcher_status,
 )
-from zeus_core.observability import (
+from nexus_core.observability import (
     correlation_id_middleware,
     get_logger,
     get_metrics_snapshot,
     log_event,
     setup_logging,
 )
-from zeus_core.security_guard import (
+from nexus_core.security_guard import (
     extract_bearer_token,
     is_local_host,
     is_local_request,
@@ -96,7 +96,7 @@ from zeus_core.security_guard import (
     require_lan_token_for_request,
     require_lan_token_for_socketio,
 )
-from zeus_core.security.daemon_client import daemon_client
+from nexus_core.security.daemon_client import daemon_client
 from fastapi import FastAPI, WebSocket, HTTPException, Request
 from fastapi.responses import RedirectResponse
 import socketio
@@ -311,8 +311,8 @@ async def lifespan(app: FastAPI):
 
     # Iniciar Monitores de Periféricos (Sentinela)
     try:
-        from zeus_core.peripherals.usb_monitor import usb_monitor
-        from zeus_core.peripherals.bluetooth_monitor import bluetooth_monitor
+        from nexus_core.peripherals.usb_monitor import usb_monitor
+        from nexus_core.peripherals.bluetooth_monitor import bluetooth_monitor
 
         usb_monitor.start()
         bluetooth_monitor.start()

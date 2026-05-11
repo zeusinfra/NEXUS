@@ -1,6 +1,6 @@
-from zeus_core.cognitive.priority_orchestrator import PriorityOrchestrator
-from zeus_core.cognitive.predictive_engine import PredictiveEngine
-from zeus_core.security.privacy_guard import PrivacyGuard
+from nexus_core.cognitive.priority_orchestrator import PriorityOrchestrator
+from nexus_core.cognitive.predictive_engine import PredictiveEngine
+from nexus_core.security.privacy_guard import PrivacyGuard
 
 
 class TestCognitiveMaturityFinal:

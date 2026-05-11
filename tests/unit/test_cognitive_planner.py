@@ -2,7 +2,7 @@
 
 import pytest
 
-from zeus_core.cognitive.planner import CognitivePlanner, CognitivePlan, PlanStep
+from nexus_core.cognitive.planner import CognitivePlanner, CognitivePlan, PlanStep
 
 
 @pytest.fixture

@@ -1,14 +1,14 @@
 [workspace]
 members = [
-    "zeus_memory",
-    "zeus_synapse",
-    "zeus_security",
-    "zeus_patterns",
-    "zeus_sync",
-    "zeus_sensors",
-    "zeus_state",
-    "zeus_policy",
-    "zeus_cognitive"
+    "nexus_memory",
+    "nexus_synapse",
+    "nexus_security",
+    "nexus_patterns",
+    "nexus_sync",
+    "nexus_sensors",
+    "nexus_state",
+    "nexus_policy",
+    "nexus_cognitive"
 ]
 resolver = "2"
 

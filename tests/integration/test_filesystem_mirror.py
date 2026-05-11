@@ -1,6 +1,6 @@
 import shutil
 from pathlib import Path
-from zeus_core.integrations.filesystem_mirror import FilesystemMirror
+from nexus_core.integrations.filesystem_mirror import FilesystemMirror
 
 
 def test_filesystem_mirror_basic(monkeypatch):

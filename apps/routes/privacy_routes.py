@@ -10,7 +10,7 @@ from typing import Callable
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from zeus_core.security.privacy_guard import PrivacyGuard
+from nexus_core.security.privacy_guard import PrivacyGuard
 
 
 class ConsentRequest(BaseModel):

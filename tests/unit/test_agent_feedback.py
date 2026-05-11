@@ -1,6 +1,6 @@
 import unittest
 
-from zeus_core.agent import Agent
+from nexus_core.agent import Agent
 
 
 class ScriptedAgent(Agent):

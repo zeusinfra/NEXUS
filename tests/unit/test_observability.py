@@ -3,7 +3,7 @@ import logging
 import unittest
 from types import SimpleNamespace
 
-from zeus_core.observability import (
+from nexus_core.observability import (
     JsonFormatter,
     correlation_id_middleware,
     get_metrics_snapshot,

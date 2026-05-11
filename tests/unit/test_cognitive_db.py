@@ -2,7 +2,7 @@
 
 import pytest
 
-from zeus_core.cognitive.cognitive_db import get_connection, init_cognitive_tables
+from nexus_core.cognitive.cognitive_db import get_connection, init_cognitive_tables
 
 
 @pytest.fixture

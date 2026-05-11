@@ -5,8 +5,8 @@ from types import SimpleNamespace
 
 from fastapi import HTTPException
 
-from zeus_core.cognitive.cognitive_db import init_cognitive_tables
-from zeus_core.cognitive.cognition_service import CognitionService
+from nexus_core.cognitive.cognitive_db import init_cognitive_tables
+from nexus_core.cognitive.cognition_service import CognitionService
 from apps.routes.cognition_routes import CognitionRouteDeps, create_cognition_router
 
 

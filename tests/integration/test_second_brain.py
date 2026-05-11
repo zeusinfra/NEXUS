@@ -5,11 +5,11 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from zeus_core.cognitive.classifier import decide_action
-from zeus_core.cognitive.context_engine import _area_from_tags
-from zeus_core.events.sync_engine import _format_operational_status_for_notion
-from zeus_core.integrations import notion
-from zeus_core.integrations.obsidian import (
+from nexus_core.cognitive.classifier import decide_action
+from nexus_core.cognitive.context_engine import _area_from_tags
+from nexus_core.events.sync_engine import _format_operational_status_for_notion
+from nexus_core.integrations import notion
+from nexus_core.integrations.obsidian import (
     extract_internal_links,
     extract_tags,
     read_note,
@@ -47,8 +47,8 @@ class SecondBrainTests(unittest.TestCase):
         self.assertCountEqual(extract_internal_links("[[A]] e [[B]]"), ["A", "B"])
 
     def test_disabled_integrations_do_not_call_network(self):
-        import zeus_core.integrations.linear as linear
-        import zeus_core.integrations.notion as notion
+        import nexus_core.integrations.linear as linear
+        import nexus_core.integrations.notion as notion
 
         with patch.dict(
             os.environ,

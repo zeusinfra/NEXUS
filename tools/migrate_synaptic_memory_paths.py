@@ -24,8 +24,8 @@ def _backup(path: Path, suffix: str) -> Path:
 def _update_path(p: str) -> str:
     if not isinstance(p, str) or not p:
         return p
-    # core_modules -> zeus_core
-    p = p.replace("/core_modules/", "/zeus_core/")
+    # core_modules -> nexus_core
+    p = p.replace("/core_modules/", "/nexus_core/")
     # antigos entrypoints
     p = p.replace("/web_gui.py", "/apps/web_gui.py")
     p = p.replace("/zeus_v4.py", "/apps/zeus_v4.py")

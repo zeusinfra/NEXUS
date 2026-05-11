@@ -1,4 +1,4 @@
-from zeus_core.conversation.sqlite_conversation_memory import SQLiteConversationMemory
+from nexus_core.conversation.sqlite_conversation_memory import SQLiteConversationMemory
 
 
 def test_conversation_memory_recalls_recent_and_similar(tmp_path):
