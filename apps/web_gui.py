@@ -2491,7 +2491,14 @@ if __name__ == "__main__":
         print(f"🌑 ZEUS em modo HEADLESS operacional em {SERVER_HOST}:{SERVER_PORT}")
         ssl_opts = {}
         if not DISABLE_SSL:
-            if os.path.exists("configs/key.pem") and os.path.exists("configs/cert.pem"):
+            # Bundled test/local keys (fixtures)
+            if os.path.exists("configs/test-key.pem") and os.path.exists("configs/test-cert.pem"):
+                ssl_opts = {
+                    "ssl_keyfile": "configs/test-key.pem",
+                    "ssl_certfile": "configs/test-cert.pem",
+                }
+            # Fallback for user-provided real local keys
+            elif os.path.exists("configs/key.pem") and os.path.exists("configs/cert.pem"):
                 ssl_opts = {
                     "ssl_keyfile": "configs/key.pem",
                     "ssl_certfile": "configs/cert.pem",
@@ -2507,7 +2514,14 @@ if __name__ == "__main__":
         # Modo Web padrão
         ssl_opts = {}
         if not DISABLE_SSL:
-            if os.path.exists("configs/key.pem") and os.path.exists("configs/cert.pem"):
+            # Bundled test/local keys (fixtures)
+            if os.path.exists("configs/test-key.pem") and os.path.exists("configs/test-cert.pem"):
+                ssl_opts = {
+                    "ssl_keyfile": "configs/test-key.pem",
+                    "ssl_certfile": "configs/test-cert.pem",
+                }
+            # Fallback for user-provided real local keys
+            elif os.path.exists("configs/key.pem") and os.path.exists("configs/cert.pem"):
                 ssl_opts = {
                     "ssl_keyfile": "configs/key.pem",
                     "ssl_certfile": "configs/cert.pem",

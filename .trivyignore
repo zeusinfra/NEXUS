@@ -1,13 +1,13 @@
 # Trivy ignore file
 
 # Low-severity buffer overflow risk in PyO3 (0.20.3). 
-# Fixed in 0.24.1, but keeping current version for compatibility.
-# Risk is minimal in our current usage.
+# Temporary: pyo3 low-risk in current local-only Rust bridge usage.
+# Review after upgrading pyo3 to 0.24.1+.
 GHSA-pph8-gcv7-4qj5
 
-# Secrets ignored because they are either legitimate test placeholders
-# or local-only configurations already excluded from git via .gitignore.
-# Gitleaks is also configured to ignore these.
-.env
-configs/key.pem
+# Secrets ignored because they are legitimate test placeholders.
+# Local configurations should be handled via .gitignore and --skip-files flags
+# or specific ignore rules if they persist in CI environments.
+.env.example
+configs/test-key.pem
 tests/unit/test_cognitive_maturity_final.py

@@ -1,7 +1,7 @@
 [allowlist]
-    description = "Allowlist for false positives"
+    description = "Allowlist for false positives and test fixtures"
     paths = [
         "tests/unit/test_cognitive_maturity_final.py",
-        "configs/key.pem",
-        ".env"
+        "configs/test-key.pem",
+        ".env.example"
     ]
