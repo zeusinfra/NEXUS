@@ -8,7 +8,7 @@ name = "zeus_synapse"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = { version = "0.20", features = ["extension-module"] }
+pyo3 = { version = "0.24", features = ["extension-module"] }
 rusqlite = { version = "0.30", features = ["bundled"] }
 chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }

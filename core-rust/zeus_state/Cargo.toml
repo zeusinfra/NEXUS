@@ -8,7 +8,7 @@ name = "zeus_state"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = { version = "0.20", features = ["extension-module"] }
+pyo3 = { version = "0.28", features = ["extension-module"] }
 dashmap = "5.5"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
