@@ -206,8 +206,8 @@ case "$1" in
         ;;
     setup-aliases)
         echo "🔧  Configurando aliases globais em ~/.bashrc..."
-        grep -q "alias zeus-server" ~/.bashrc || echo "alias zeus-server='cd $ROOT_DIR && ./bin/zeus web > zeus_server.log 2>&1 & sleep 1 && tail -f zeus_server.log'" >> ~/.bashrc
-        grep -q "alias zeus-chat" ~/.bashrc || echo "alias zeus-chat='cd $ROOT_DIR && ./bin/zeus-chat'" >> ~/.bashrc
+        grep -q "alias nexus-server" ~/.bashrc || echo "alias nexus-server='cd $ROOT_DIR && ./bin/zeus web > zeus_server.log 2>&1 & sleep 1 && tail -f zeus_server.log'" >> ~/.bashrc
+        grep -q "alias nexus-chat" ~/.bashrc || echo "alias nexus-chat='cd $ROOT_DIR && ./bin/zeus-chat'" >> ~/.bashrc
         echo "✅  Aliases criados: 'zeus-server' e 'zeus-chat'."
         echo "🔄  Execute 'source ~/.bashrc' para ativar."
         ;;
