@@ -77,14 +77,13 @@ LOGO = """
 [bold #00ffcc]╚══════╝[/][#00ddaa]╚══════╝[/][#00bb88] ╚═════╝ [/][#009966]╚══════╝[/]
 """
 
-SUBTITLE = "[dim]Cognitive OS[/dim] [bold #00ffcc]v" + VERSION + "[/]  [dim]// local operator console[/dim]"
+SUBTITLE = "[dim]Cognitive OS[/dim] [bold #00ffcc]v" + VERSION + "[/]"
 
 # ──────────────────────── CSS ────────────────────────
 
 CSS = """
 Screen {
-    background: #080a0f;
-    color: #d7dde8;
+    background: #0c0c0c;
 }
 
 /* ── Greeting ── */
@@ -99,88 +98,77 @@ Screen {
     content-align: center middle;
     text-align: center;
     padding-bottom: 0;
-    color: #00e7c7;
 }
 
 #subtitle {
     content-align: center middle;
     text-align: center;
-    padding-bottom: 1;
-    color: #8f9bad;
+    padding-bottom: 2;
 }
 
 #build-info {
-    color: #5fb3ff;
+    color: #00aaff;
     padding-top: 1;
-    padding-bottom: 1;
     content-align: center middle;
     text-align: center;
-}
-
-#greet-input-label {
-    color: #00d9b8;
-    content-align: center middle;
-    text-align: center;
-    padding-bottom: 1;
 }
 
 #hints {
-    color: #6f7a89;
-    padding-top: 1;
+    color: #444444;
+    padding-top: 0;
     content-align: center middle;
     text-align: center;
 }
 
 #tip {
-    color: #d4a84f;
+    color: #aa7700;
     padding-top: 1;
     content-align: center middle;
     text-align: center;
 }
 
 Input {
-    width: 72;
-    border: round #253244;
-    background: #0f141d;
-    color: #e7edf7;
+    width: 64;
+    border: tall #1a1a1a;
+    background: #111111;
+    color: #cccccc;
     padding: 1 2;
 }
 
 Input:focus {
-    border: round #00d9b8;
-    background: #121b24;
+    border: tall #1e3a2e;
+    background: #141414;
 }
 
 /* ── Chat ── */
 
 #chat-header {
     dock: top;
-    height: 3;
+    height: 1;
     width: 100%;
-    background: #0d121a;
-    color: #cbd5e1;
-    border-bottom: solid #253244;
-    content-align: left middle;
-    text-align: left;
-    padding: 1 2;
+    background: #111111;
+    color: #888888;
+    content-align: center middle;
+    text-align: center;
+    padding: 0 2;
 }
 
 #chat-log {
     height: 1fr;
     border: none;
-    background: #080a0f;
-    padding: 1 3;
-    scrollbar-color: #243044;
+    background: #0c0c0c;
+    padding: 1 2;
+    scrollbar-color: #222222;
     scrollbar-color-active: #00ffcc;
-    scrollbar-color-hover: #5fb3ff;
+    scrollbar-color-hover: #00ddaa;
 }
 
 #chat-footer {
     dock: bottom;
     height: 1;
     width: 100%;
-    background: #0b0f16;
-    color: #7b8494;
+    background: #111111;
+    color: #555555;
     padding: 0 2;
 }
 
@@ -197,28 +185,25 @@ Input:focus {
 #chat-input-bar {
     dock: bottom;
     height: auto;
-    padding: 1 2 0 2;
-    background: #0d121a;
-    border-top: solid #253244;
+    padding: 0 0;
+    background: #0e0e0e;
 }
 
 #input-hint {
     height: 1;
-    color: #6f7a89;
+    color: #555555;
     content-align: left middle;
-    padding: 0 1;
+    padding: 0 2;
 }
 
 #chat-input-bar Input {
     width: 100%;
-    border: round #253244;
-    background: #101722;
-    color: #edf5ff;
+    border: tall #1a1a1a;
+    background: #111111;
 }
 
 #chat-input-bar Input:focus {
-    border: round #00d9b8;
-    background: #121e28;
+    border: tall #1e3a2e;
 }
 """
 
@@ -402,11 +387,10 @@ class GreetingScreen(Screen):
         with Middle(id="greeting-container"):
             yield Static(LOGO, id="logo", markup=True)
             yield Static(SUBTITLE, id="subtitle", markup=True)
-            yield Static("[#00d9b8]Digite uma mensagem, comando local ou /help[/]", id="greet-input-label", markup=True)
-            yield Center(Input(placeholder='Pergunte ao ZEUS ou digite /help', id="greet-input"))
+            yield Center(Input(placeholder='Ask anything... "What is the tech stack of this project?"', id="greet-input"))
             yield Static("[dim]Build · Connecting...[/dim]", id="build-info", markup=True)
-            yield Static("[#6f7a89]Enter[/] envia  [#6f7a89]!cmd[/] shell  [#6f7a89]/status[/] telemetria", id="hints", markup=True)
-            yield Static("[#d4a84f]Ctrl+C[/] sair   [#d4a84f]Ctrl+L[/] limpar", id="tip", markup=True)
+            yield Static("[dim]tab[/dim] agents   [dim]ctrl+p[/dim] commands", id="hints", markup=True)
+            yield Static("● [yellow]Tip[/yellow] Press [bold]Ctrl+C[/bold] when typing to clear the input field", id="tip", markup=True)
 
     def on_mount(self) -> None:
         self.query_one("#greet-input").focus()
@@ -461,11 +445,11 @@ class ChatScreen(Screen):
         self.recent_reply_texts: set[str] = set()
 
     def compose(self) -> ComposeResult:
-        yield Static(f"[bold #00ffcc]ZEUS[/] [#5fb3ff]Cyber TUI[/]  [dim]{SESSION_ID}[/dim]", id="chat-header", markup=True)
+        yield Static(f"ZEUS Ops · {SESSION_ID}", id="chat-header", markup=True)
         yield RichLog(id="chat-log", highlight=True, markup=True, auto_scroll=True, max_lines=5000)
         with Container(id="chat-input-bar"):
-            yield Static("[#d4a84f]!cmd[/] shell  [#8f7cff]/help[/] comandos  [#00d9b8]Enter[/] envia para IA", id="input-hint", markup=True)
-            yield Input(placeholder="Mensagem para ZEUS...", id="chat-input")
+            yield Static("[dim]  !cmd  shell  │  /help  comandos  │  Enter  envia para IA[/dim]", id="input-hint", markup=True)
+            yield Input(placeholder="Message ZEUS...", id="chat-input")
         with Horizontal(id="chat-footer"):
             yield Static(f"[dim]session[/dim] {SESSION_ID}", id="chat-footer-left", markup=True)
             yield Static(f"[dim]cpu[/dim] --%  [dim]ram[/dim] --% ", id="chat-footer-right", markup=True)
@@ -592,9 +576,8 @@ class ChatScreen(Screen):
                 if len(self.recent_reply_texts) > 80:
                     self.recent_reply_texts.clear()
                 self.log_widget.write("")
-                self.log_widget.write("  [bold #00ffcc]╭─ ZEUS[/]")
-                self._write_block(msg.strip(), indent="  │ ")
-                self.log_widget.write("  [#00ffcc]╰─[/]")
+                self.log_widget.write("  [bold #00ffcc]▎ ZEUS[/]")
+                self._write_block(msg.strip())
                 self.log_widget.write("")
             return
 
@@ -603,23 +586,23 @@ class ChatScreen(Screen):
             stage = event.get("stage", "progress")
             text = event.get("text", stage)
             if stage in {"step_started"}:
-                self.log_widget.write(f"  [dim #5fb3ff]◆ {escape(str(text))}[/]")
+                self.log_widget.write(f"  [dim #00bbaa]⟐ {escape(str(text))}[/]")
             elif stage in {"completed", "chat_completed"}:
-                self.log_widget.write(f"  [#00d9b8]✓ {escape(str(text))}[/]")
+                self.log_widget.write(f"  [#00ffcc]✓ {escape(str(text))}[/]")
             else:
-                self.log_widget.write(f"  [#9aa6b7]• {escape(str(text))}[/]")
+                self.log_widget.write(f"  [#00ddaa]● {escape(str(text))}[/]")
         elif evt_type == "TOOL_LOG":
             tool = event.get("tool", "tool")
             stage = str(event.get("stage", "")).replace("_", " ").upper()
             error = event.get("error")
             if error:
-                self.log_widget.write(f"  [red]✗ tool:{escape(str(tool))}[/red] {escape(str(error))}")
+                self.log_widget.write(f"  [red]✗ TOOL {escape(str(tool))}:[/red] {escape(str(error))}")
             else:
                 res = event.get("result") or event.get("args") or stage
                 if isinstance(res, dict):
                     keys = ", ".join(list(res.keys())[:6])
                     res = keys or "ok"
-                self.log_widget.write(f"  [#8f7cff]› {escape(str(tool))}[/] [dim]{escape(stage)}[/dim] {escape(str(res))}")
+                self.log_widget.write(f"  [#bb88ff]› {escape(str(tool))}[/] [dim]{escape(stage)}[/dim] {escape(str(res))}")
         elif evt_type == "SYSTEM_ALERT":
             msg = event.get("message", "Alerta")
             self.log_widget.write(Panel(escape(str(msg)), title="⚠ ALERTA", border_style="red"))
@@ -655,9 +638,8 @@ class ChatScreen(Screen):
         self.sending = True
         self._set_busy_state(True)
         self.log_widget.write("")
-        self.log_widget.write("  [bold #5fb3ff]╭─ VOCE[/]")
-        self._write_block(text, indent="  │ ")
-        self.log_widget.write("  [#5fb3ff]╰─[/]")
+        self.log_widget.write("  [bold blue]▎ VOCE[/]")
+        self._write_block(text)
         self.log_widget.write("")
         self.send_to_backend(text)
 
@@ -769,9 +751,8 @@ class ChatScreen(Screen):
             self.sending = False
             self._set_busy_state(False)
             self.log_widget.write("")
-            self.log_widget.write(f"  [bold #00ffcc]╭─ ZEUS[/] [dim]· {latency_ms}ms[/dim]")
-            self._write_block(reply, indent="  │ ")
-            self.log_widget.write("  [#00ffcc]╰─[/]")
+            self.log_widget.write(f"  [bold #00ffcc]▎ ZEUS[/] [dim]· {latency_ms}ms[/dim]")
+            self._write_block(reply)
             self.log_widget.write("")
 
         self._call_from_thread(_write_reply)
@@ -779,12 +760,12 @@ class ChatScreen(Screen):
     def _set_busy_state(self, busy: bool) -> None:
         try:
             self.input_widget.disabled = False
-            self.input_widget.placeholder = "Comandos locais ativos; aguarde para novo chat..." if busy else "Mensagem para ZEUS..."
+            self.input_widget.placeholder = "Comandos locais ativos; aguarde para novo chat..." if busy else "Message ZEUS..."
             hint = self.query_one("#input-hint", Static)
             if busy:
-                hint.update("[#00d9b8]ZEUS respondendo[/]  [#d4a84f]!cmd[/] e [#8f7cff]/status[/] seguem ativos")
+                hint.update("[dim]  ZEUS respondendo  │  !cmd e /status seguem ativos[/dim]")
             else:
-                hint.update("[#d4a84f]!cmd[/] shell  [#8f7cff]/help[/] comandos  [#00d9b8]Enter[/] envia para IA")
+                hint.update("[dim]  !cmd  shell  │  /help  comandos  │  Enter  envia para IA[/dim]")
             self.input_widget.focus()
         except Exception:
             pass
