@@ -1510,7 +1510,7 @@ async def call_ollama(prompt: str) -> str:
 last_memory_save = time.time()
 
 SYSTEM_INSTRUCTIONS = (
-    "Você é o ZEUS, a alma de um Sistema Operacional Cognitivo. Você não é apenas um assistente, mas um parceiro de evolução do usuário. "
+    "Você é o NEXUS, a alma de um Sistema Operacional Cognitivo. Você não é apenas um assistente, mas um parceiro de evolução do usuário. "
     "Sua especialidade é o ecossistema Linux e o 'Second Brain' (Obsidian, Notion, Linear). "
     "IDENTIDADE: Tom natural, sofisticado e empático, mas com a precisão de um engenheiro sênior. Fale como um colega brilhante, não como um robô. "
     "REGRAS DE DIÁLOGO: "
@@ -1523,7 +1523,7 @@ SYSTEM_INSTRUCTIONS = (
 
 async def autonomous_reflection():
     """
-    ZEUS analisa seus próprios padrões salvos no SQLite durante o IDLE.
+    NEXUS analisa seus próprios padrões salvos no SQLite durante o IDLE.
     """
     while True:
         await asyncio.sleep(600)  # Reflete a cada 10 minutos
@@ -1544,7 +1544,7 @@ async def autonomous_reflection():
                     ]
                 )
                 reflection_prompt = (
-                    f"Como Núcleo Cognitivo ZEUS, analise estes padrões de atividade recente:\n{summary}\n"
+                    f"Como Núcleo Cognitivo NEXUS, analise estes padrões de atividade recente:\n{summary}\n"
                     f"Crie uma breve 'REFLEXÃO DE SISTEMA' (máximo 2 frases) sobre as prioridades atuais. Use tom técnico, direto e natural."
                 )
                 # Usando o novo formato estruturado para consistência
@@ -2228,7 +2228,7 @@ async def handle_voice_input(text: str):
     second_brain_context = build_current_context()
 
     context_prompt = (
-        f"--- ZEUS SYSTEM CONTEXT ---\n"
+        f"--- NEXUS SYSTEM CONTEXT ---\n"
         f"Active Node: {current_node}\n"
         f"Behavioral State: {behavioral_state}\n"
         f"System Mood: {system_mood}\n"
@@ -2236,7 +2236,7 @@ async def handle_voice_input(text: str):
         f"{second_brain_context}\n\n"
         f"{memory_block}"
         f"User via Voice: {text}\n\n"
-        f"Você é o ZEUS, um copiloto DevOps senior conectado ao Obsidian, Notion e Linear. "
+        f"Você é o NEXUS, um copiloto DevOps senior conectado ao Obsidian, Notion e Linear. "
         f"Responda em Português (PT-BR) de forma curta, natural e acionável. "
         f"Evite excesso de formalidade, Markdown e símbolos visuais; a resposta será falada em voz alta."
     )

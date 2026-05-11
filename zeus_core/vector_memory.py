@@ -14,7 +14,7 @@ except ImportError:
 
 class VectorMemory:
     """
-    Memória Vetorial Simplificada para ZEUS.
+    Memória Vetorial Simplificada para NEXUS.
     Utiliza embeddings do Ollama e armazena em JSON para máxima portabilidade.
     """
 
@@ -29,11 +29,11 @@ class VectorMemory:
         self.max_vectors = int(os.getenv("ZEUS_VECTOR_MAX", "5000") or "5000")
 
         if RUST_AVAILABLE:
-            print("🦀 ZEUS: Usando Backend Rust para Memória Vetorial.")
+            print("🦀 NEXUS: Usando Backend Rust para Memória Vetorial.")
             self.rust_mem = VectorMemoryRust(storage_file)
             self.vectors = self.rust_mem.vectors
         else:
-            print("🐍 ZEUS: Usando Backend Python para Memória Vetorial.")
+            print("🐍 NEXUS: Usando Backend Python para Memória Vetorial.")
             self.rust_mem = None
             self.vectors: Dict[str, List[float]] = {}
             self.load()

@@ -104,7 +104,7 @@ def analyze_image_with_llm(path: str, *, question: str) -> dict:
         raise ToolError("Imagem grande demais para enviar ao modelo (truncada).")
 
     system = (
-        "Você é o módulo de visão do ZEUS. Responda em PT-BR.\n"
+        "Você é o módulo de visão do NEXUS. Responda em PT-BR.\n"
         "Analise a imagem fornecida e responda à pergunta com precisão.\n"
         "Se não der para ter certeza, diga o que você consegue inferir e o que falta."
     )
@@ -140,7 +140,7 @@ def analyze_with_ocr_fallback(
         raise ToolError("OCR não retornou texto.")
 
     system = (
-        "Você é o módulo de visão do ZEUS (modo OCR). Responda em PT-BR.\n"
+        "Você é o módulo de visão do NEXUS (modo OCR). Responda em PT-BR.\n"
         "Você NÃO viu a imagem: use apenas o texto OCR como fonte.\n"
         "Se o OCR parecer incompleto, deixe isso claro."
     )

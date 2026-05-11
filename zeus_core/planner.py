@@ -7,7 +7,7 @@ from typing import Any, Dict
 from zeus_core.core_system import call_cloud_llm
 
 
-PLANNER_PROMPT = """Você é o PLANNER do ZEUS.
+PLANNER_PROMPT = """Você é o PLANNER do NEXUS.
 Quebre o objetivo do usuário em uma sequência curta de passos usando APENAS as ferramentas listadas.
 
 REGRAS:
