@@ -52,6 +52,7 @@ from textual.screen import Screen
 from textual.widgets import Input, Static, RichLog
 from textual.binding import Binding
 from textual import work
+from textual.worker import get_current_worker
 from rich.markup import escape
 from rich.panel import Panel
 
@@ -114,6 +115,13 @@ Screen {
     padding-bottom: 1;
     content-align: center middle;
     text-align: center;
+}
+
+#greet-input-label {
+    color: #00d9b8;
+    content-align: center middle;
+    text-align: center;
+    padding-bottom: 1;
 }
 
 #hints {
@@ -394,6 +402,7 @@ class GreetingScreen(Screen):
         with Middle(id="greeting-container"):
             yield Static(LOGO, id="logo", markup=True)
             yield Static(SUBTITLE, id="subtitle", markup=True)
+            yield Static("[#00d9b8]Digite uma mensagem, comando local ou /help[/]", id="greet-input-label", markup=True)
             yield Center(Input(placeholder='Pergunte ao ZEUS ou digite /help', id="greet-input"))
             yield Static("[dim]Build · Connecting...[/dim]", id="build-info", markup=True)
             yield Static("[#6f7a89]Enter[/] envia  [#6f7a89]!cmd[/] shell  [#6f7a89]/status[/] telemetria", id="hints", markup=True)
@@ -403,7 +412,7 @@ class GreetingScreen(Screen):
         self.query_one("#greet-input").focus()
         self.fetch_status()
 
-    @work(thread=True)
+    @work(thread=True, group="greeting_status")
     def fetch_status(self) -> None:
         status = _fetch_status()
         if status["online"]:
@@ -421,6 +430,7 @@ class GreetingScreen(Screen):
     def on_input_submitted(self, event: Input.Submitted) -> None:
         msg = event.value.strip()
         if msg:
+            event.input.value = ""
             chat_screen = ChatScreen(initial_message=msg)
             self.app.push_screen(chat_screen)
 
@@ -444,6 +454,7 @@ class ChatScreen(Screen):
         super().__init__()
         self.initial_message = initial_message
         self.running = False
+        self.sending = False
         self.pending_reply_ids: set[str] = set()
 
     def compose(self) -> ComposeResult:
@@ -468,7 +479,7 @@ class ChatScreen(Screen):
         self.poll_telemetry()
 
         if self.initial_message:
-            self.submit_message(self.initial_message)
+            self.handle_message(self.initial_message)
 
     def action_clear_log(self) -> None:
         self.log_widget.clear()
@@ -484,14 +495,25 @@ class ChatScreen(Screen):
             safe = escape(line)
             self._write_line(f"{indent}[{style}]{safe}[/]" if style else f"{indent}{safe}")
 
+    def _call_from_thread(self, callback, *args) -> bool:
+        try:
+            self.app.call_from_thread(callback, *args)
+            return True
+        except Exception:
+            return False
+
     # ── Telemetry Polling ──
 
-    @work(exclusive=True, thread=True)
+    @work(exclusive=True, thread=True, group="telemetry")
     def poll_telemetry(self) -> None:
         """Atualiza CPU/RAM no footer a cada 3 segundos."""
-        while self.running:
-            time.sleep(3.0)
-            if not self.running:
+        worker = get_current_worker()
+        while self.running and not worker.is_cancelled:
+            for _ in range(30):
+                if not self.running or worker.is_cancelled:
+                    return
+                time.sleep(0.1)
+            if not self.running or worker.is_cancelled:
                 return
             status = _fetch_status()
             if status["online"]:
@@ -500,9 +522,7 @@ class ChatScreen(Screen):
             else:
                 footer_text = "[dim]cpu[/dim] [red]--[/]%  [dim]ram[/dim] [red]--[/]% "
                 header_text = "[bold #00ffcc]ZEUS[/] Ops · [red]Offline[/red]"
-            try:
-                self.app.call_from_thread(self._update_bars, header_text, footer_text)
-            except Exception:
+            if not self._call_from_thread(self._update_bars, header_text, footer_text):
                 return
 
     def _update_bars(self, header: str, footer: str) -> None:
@@ -517,9 +537,13 @@ class ChatScreen(Screen):
     @work(exclusive=True, thread=True, group="events")
     def poll_events(self) -> None:
         """Drena eventos do backend em loop para renderizar progresso de agentes e tools."""
-        while self.running:
-            time.sleep(1.0)
-            if not self.running:
+        worker = get_current_worker()
+        while self.running and not worker.is_cancelled:
+            for _ in range(10):
+                if not self.running or worker.is_cancelled:
+                    return
+                time.sleep(0.1)
+            if not self.running or worker.is_cancelled:
                 return
             try:
                 query = urllib.parse.urlencode({"client_id": CLIENT_ID})
@@ -540,9 +564,7 @@ class ChatScreen(Screen):
                     self.seen_events.add(sig)
                     if len(self.seen_events) > 500:
                         self.seen_events.clear()
-                    try:
-                        self.app.call_from_thread(self._render_event, event)
-                    except Exception:
+                    if not self._call_from_thread(self._render_event, event):
                         return
             except Exception:
                 pass
@@ -598,7 +620,26 @@ class ChatScreen(Screen):
 
     # ── Chat I/O ──
 
+    def handle_message(self, msg: str) -> None:
+        if msg.startswith("!"):
+            shell_cmd = msg[1:].strip()
+            if shell_cmd:
+                self.log_widget.write("")
+                self.log_widget.write(f"  [bold yellow]$ {escape(shell_cmd)}[/]")
+                self.run_shell_command(shell_cmd)
+            return
+
+        if msg.startswith("/"):
+            self._handle_slash(msg)
+            return
+
+        self.submit_message(msg)
+
     def submit_message(self, text: str) -> None:
+        if self.sending:
+            self.log_widget.write("  [yellow]Envio pausado: aguarde a resposta atual terminar.[/yellow]")
+            return
+
         self.log_widget.write("")
         self.log_widget.write("  [bold #5fb3ff]╭─ VOCE[/]")
         self._write_block(text, indent="  │ ")
@@ -611,23 +652,7 @@ class ChatScreen(Screen):
         if not msg:
             return
         self.input_widget.value = ""
-
-        # ── Shell commands (!comando) ──
-        if msg.startswith("!"):
-            shell_cmd = msg[1:].strip()
-            if shell_cmd:
-                self.log_widget.write("")
-                self.log_widget.write(f"  [bold yellow]$ {escape(shell_cmd)}[/]")
-                self.run_shell_command(shell_cmd)
-            return
-
-        # ── Slash commands (/xxx) ──
-        if msg.startswith("/"):
-            self._handle_slash(msg)
-            return
-
-        # ── Normal chat → envia para IA ──
-        self.submit_message(msg)
+        self.handle_message(msg)
 
     def _handle_slash(self, cmd: str) -> None:
         parts = cmd.strip().split(None, 1)
@@ -641,15 +666,7 @@ class ChatScreen(Screen):
         elif base in {"/quit", "/exit"}:
             self.app.exit()
         elif base == "/status":
-            status = _fetch_status()
-            if status["online"]:
-                self.log_widget.write(
-                    f"  [#00ffcc]Backend online[/] {escape(BACKEND)} · "
-                    f"{escape(str(status['model']))} / {escape(str(status['provider']))} · "
-                    f"cpu {escape(str(status['cpu']))}% ram {escape(str(status['ram']))}%"
-                )
-            else:
-                self.log_widget.write(f"  [red]Backend offline[/red] {escape(status.get('error') or '')}")
+            self.fetch_status_command()
         elif base == "/sysinfo":
             self.run_builtin_command(_system_summary)
         elif base == "/services":
@@ -674,16 +691,31 @@ class ChatScreen(Screen):
         else:
             self.log_widget.write(f"  [red]Comando desconhecido:[/red] {escape(base)}  [dim](use /help)[/dim]")
 
-    @work(thread=True)
+    @work(thread=True, group="status_command")
+    def fetch_status_command(self) -> None:
+        status = _fetch_status()
+        self._call_from_thread(self._write_status_result, status)
+
+    def _write_status_result(self, status: dict) -> None:
+        if status["online"]:
+            self.log_widget.write(
+                f"  [#00ffcc]Backend online[/] {escape(BACKEND)} · "
+                f"{escape(str(status['model']))} / {escape(str(status['provider']))} · "
+                f"cpu {escape(str(status['cpu']))}% ram {escape(str(status['ram']))}%"
+            )
+        else:
+            self.log_widget.write(f"  [red]Backend offline[/red] {escape(status.get('error') or '')}")
+
+    @work(thread=True, group="builtin_commands")
     def run_builtin_command(self, fn) -> None:
         code, stdout, stderr = fn()
-        self.app.call_from_thread(self._write_command_result, code, stdout, stderr)
+        self._call_from_thread(self._write_command_result, code, stdout, stderr)
 
-    @work(thread=True)
+    @work(thread=True, group="shell_commands")
     def run_shell_command(self, cmd: str) -> None:
         """Executa comando no shell real e exibe stdout/stderr no log."""
         code, stdout, stderr = _run_user_shell(cmd)
-        self.app.call_from_thread(self._write_command_result, code, stdout, stderr)
+        self._call_from_thread(self._write_command_result, code, stdout, stderr)
 
     def _write_command_result(self, code: int, stdout: str, stderr: str) -> None:
         if stdout.strip():
@@ -694,11 +726,12 @@ class ChatScreen(Screen):
             self.log_widget.write(f"  [dim red]exit code {code}[/dim red]")
         self.log_widget.write("")
 
-    @work(thread=True)
+    @work(thread=True, group="chat_send")
     def send_to_backend(self, text: str) -> None:
         started = time.perf_counter()
         msg_id = str(uuid.uuid4())
         self.pending_reply_ids.add(msg_id)
+        self.sending = True
         payload = {
             "message": text,
             "source": "cyber_tui",
@@ -707,8 +740,8 @@ class ChatScreen(Screen):
             "client_msg_id": msg_id,
         }
 
-        # Mostrar indicador de "pensando"
-        self.app.call_from_thread(self.log_widget.write, "  [dim #00ffcc]◌ ZEUS pensando...[/]")
+        self._call_from_thread(self._set_input_enabled, False)
+        self._call_from_thread(self.log_widget.write, "  [dim #00ffcc]◌ ZEUS pensando...[/]")
 
         data = _post_json("/api/applet/chat", payload, timeout=180.0)
 
@@ -717,13 +750,24 @@ class ChatScreen(Screen):
 
         def _write_reply():
             self.pending_reply_ids.discard(msg_id)
+            self.sending = False
+            self._set_input_enabled(True)
             self.log_widget.write("")
             self.log_widget.write(f"  [bold #00ffcc]╭─ ZEUS[/] [dim]· {latency_ms}ms[/dim]")
             self._write_block(reply, indent="  │ ")
             self.log_widget.write("  [#00ffcc]╰─[/]")
             self.log_widget.write("")
 
-        self.app.call_from_thread(_write_reply)
+        self._call_from_thread(_write_reply)
+
+    def _set_input_enabled(self, enabled: bool) -> None:
+        try:
+            self.input_widget.disabled = not enabled
+            self.input_widget.placeholder = "Aguardando resposta do ZEUS..." if not enabled else "Mensagem para ZEUS..."
+            if enabled:
+                self.input_widget.focus()
+        except Exception:
+            pass
 
 # ──────────────────────── App ────────────────────────
 
