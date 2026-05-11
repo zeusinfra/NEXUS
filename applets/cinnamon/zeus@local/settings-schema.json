@@ -2,6 +2,6 @@
   "backend-url": {
     "type": "entry",
     "default": "http://127.0.0.1:8080",
-    "description": "URL do backend ZEUS"
+    "description": "URL do backend NEXUS"
   }
 }

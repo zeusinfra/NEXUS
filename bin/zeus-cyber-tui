@@ -462,7 +462,7 @@ SLASH_HELP = """
   [bold yellow]/status[/]           Mostra backend, modelo e telemetria
   [bold yellow]/sysinfo[/]          Info do sistema (hostname, kernel, uptime, disco)
   [bold yellow]/services[/]         Lista serviços systemd ativos
-  [bold yellow]/logs[/]             Últimas 30 linhas do journal do ZEUS
+  [bold yellow]/logs[/]             Últimas 30 linhas do journal do NEXUS
   [bold yellow]/logs N[/]           Últimas N linhas do journal
   [bold yellow]/procs[/]            Top 10 processos por uso de CPU
   [bold yellow]/net[/]              Interfaces de rede e IPs
@@ -567,7 +567,7 @@ class ChatScreen(Screen):
         self.recent_reply_texts: set[str] = set()
 
     def compose(self) -> ComposeResult:
-        yield Static(f"ZEUS Ops · {SESSION_ID}", id="chat-header", markup=True)
+        yield Static(f"NEXUS Ops · {SESSION_ID}", id="chat-header", markup=True)
         yield RichLog(
             id="chat-log",
             highlight=True,
@@ -582,7 +582,7 @@ class ChatScreen(Screen):
                 yield Static("[dim]ready[/dim]", id="chat-status", markup=True)
                 yield Static("[dim]cpu[/dim] --%  [dim]ram[/dim] --%", id="chat-telemetry", markup=True)
             yield Static("[dim]  !cmd  shell  │  /help  comandos  │  Enter  envia para IA[/dim]", id="input-hint", markup=True)
-            yield Input(placeholder="Message ZEUS...", id="chat-input")
+            yield Input(placeholder="Message NEXUS...", id="chat-input")
 
     def on_mount(self) -> None:
         self.log_widget = self.query_one("#chat-log", RichLog)
@@ -648,10 +648,10 @@ class ChatScreen(Screen):
             status = _fetch_status()
             if status["online"]:
                 footer_text = f"[dim]cpu[/dim] {escape(str(status['cpu']))}%  [dim]ram[/dim] {escape(str(status['ram']))}% "
-                header_text = f"[bold #00ffcc]ZEUS[/] Ops · {escape(str(status['model']))} · [dim]{escape(str(status['provider']))}[/dim]"
+                header_text = f"[bold #00ffcc]NEXUS[/] Ops · {escape(str(status['model']))} · [dim]{escape(str(status['provider']))}[/dim]"
             else:
                 footer_text = f"[dim]cpu[/dim] {escape(str(status['cpu']))}%  [dim]ram[/dim] {escape(str(status['ram']))}% "
-                header_text = "[bold #00ffcc]ZEUS[/] Ops · [red]Offline[/red]"
+                header_text = "[bold #00ffcc]NEXUS[/] Ops · [red]Offline[/red]"
             if not self._call_from_thread(self._update_bars, header_text, footer_text):
                 return
             for _ in range(30):
@@ -728,7 +728,7 @@ class ChatScreen(Screen):
                 if len(self.recent_reply_texts) > 80:
                     self.recent_reply_texts.clear()
                 self.log_widget.write("")
-                self.log_widget.write("  [bold #00ffcc]▎ ZEUS[/]")
+                self.log_widget.write("  [bold #00ffcc]▎ NEXUS[/]")
                 self._write_block(msg.strip())
                 self.log_widget.write("")
                 self._set_status("[dim]resposta recebida[/dim]")
@@ -809,7 +809,7 @@ class ChatScreen(Screen):
             return
         text = event.value
         if not text:
-            self._set_status("[dim]ready[/dim]" if not self.sending else "[dim]ZEUS respondendo[/dim]")
+            self._set_status("[dim]ready[/dim]" if not self.sending else "[dim]NEXUS respondendo[/dim]")
             return
         preview = escape(_preview_text(text))
         if text.startswith("!"):
@@ -932,8 +932,8 @@ class ChatScreen(Screen):
             "client_msg_id": msg_id,
         }
 
-        self._call_from_thread(self._set_status, "[dim #00ffcc]ZEUS pensando...[/]")
-        self._call_from_thread(self.log_widget.write, "  [dim #00ffcc]◌ ZEUS pensando...[/]")
+        self._call_from_thread(self._set_status, "[dim #00ffcc]NEXUS pensando...[/]")
+        self._call_from_thread(self.log_widget.write, "  [dim #00ffcc]◌ NEXUS pensando...[/]")
 
         data = _post_json("/api/applet/chat", payload, timeout=180.0)
 
@@ -949,7 +949,7 @@ class ChatScreen(Screen):
             self._set_busy_state(False)
             self._set_status(f"[#00ffcc]resposta recebida[/] · {latency_ms}ms")
             self.log_widget.write("")
-            self.log_widget.write(f"  [bold #00ffcc]▎ ZEUS[/] [dim]· {latency_ms}ms[/dim]")
+            self.log_widget.write(f"  [bold #00ffcc]▎ NEXUS[/] [dim]· {latency_ms}ms[/dim]")
             self._write_block(reply)
             self.log_widget.write("")
 
@@ -958,10 +958,10 @@ class ChatScreen(Screen):
     def _set_busy_state(self, busy: bool) -> None:
         try:
             self.input_widget.disabled = False
-            self.input_widget.placeholder = "Comandos locais ativos; aguarde para novo chat..." if busy else "Message ZEUS..."
+            self.input_widget.placeholder = "Comandos locais ativos; aguarde para novo chat..." if busy else "Message NEXUS..."
             hint = self.query_one("#input-hint", Static)
             if busy:
-                hint.update("[dim]  ZEUS respondendo  │  !cmd e /status seguem ativos[/dim]")
+                hint.update("[dim]  NEXUS respondendo  │  !cmd e /status seguem ativos[/dim]")
             else:
                 hint.update("[dim]  !cmd  shell  │  /help  comandos  │  Enter  envia para IA[/dim]")
             self.input_widget.focus()
@@ -973,7 +973,7 @@ class ChatScreen(Screen):
 class ZeusCyberApp(App):
     """ZEUS Cognitive TUI — Full-Screen Modern Interface."""
 
-    TITLE = "ZEUS"
+    TITLE = "NEXUS"
     CSS = CSS
 
     def on_mount(self) -> None:

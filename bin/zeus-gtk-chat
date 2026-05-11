@@ -152,7 +152,7 @@ class ZeusGtkChat(Adw.Application):
         
         # Logo / Branding
         brand_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-        brand_title = Gtk.Label(label="ZEUS")
+        brand_title = Gtk.Label(label="NEXUS")
         brand_title.add_css_class("sidebar-brand")
         brand_title.set_halign(Gtk.Align.START)
         brand_sub = Gtk.Label(label="Cognitive OS v3.1")
@@ -287,7 +287,7 @@ class ZeusGtkChat(Adw.Application):
         header = Adw.HeaderBar()
         self.chat_area.append(header)
 
-        self.window_title = Adw.WindowTitle(title="ZEUS Ops", subtitle="Inicializando...")
+        self.window_title = Adw.WindowTitle(title="NEXUS Ops", subtitle="Inicializando...")
         header.set_title_widget(self.window_title)
 
         sidebar_button = Gtk.Button(icon_name="sidebar-show-symbolic")
@@ -315,7 +315,7 @@ class ZeusGtkChat(Adw.Application):
         header.pack_end(hud_button)
 
         diag_button = Gtk.Button(icon_name="dialog-information-symbolic")
-        diag_button.set_tooltip_text("Diagnóstico do ZEUS")
+        diag_button.set_tooltip_text("Diagnóstico do NEXUS")
         diag_button.connect("clicked", self._show_diagnostic)
         header.pack_start(diag_button)
 
@@ -327,7 +327,7 @@ class ZeusGtkChat(Adw.Application):
 
         # Banner for Offline status
         self.banner = Adw.Banner()
-        self.banner.set_title("Backend ZEUS offline. Verifique se o serviço está ativo.")
+        self.banner.set_title("Backend NEXUS offline. Verifique se o serviço está ativo.")
         self.banner.set_button_label("Tentar novamente")
         self.banner.connect("button-clicked", lambda _: self._check_status())
         self.chat_area.append(self.banner)
@@ -356,7 +356,7 @@ class ZeusGtkChat(Adw.Application):
         # Empty State
         self.status_page = Adw.StatusPage()
         self.status_page.set_icon_name("system-run-symbolic")
-        self.status_page.set_title("ZEUS pronto")
+        self.status_page.set_title("NEXUS pronto")
         self.status_page.set_description("Digite uma mensagem para iniciar.")
         self.status_page.add_css_class("empty-state")
         
@@ -934,7 +934,7 @@ class ZeusGtkChat(Adw.Application):
             content_box.add_css_class("message-bubble")
             content_box.add_css_class("message-bubble-assistant")
 
-            header = Gtk.Label(label=f"ZEUS · {timestamp}")
+            header = Gtk.Label(label=f"NEXUS · {timestamp}")
             header.add_css_class("message-header")
             header.set_halign(Gtk.Align.START)
             content_box.append(header)

@@ -37,8 +37,8 @@ class ZeusApplet extends Applet.TextIconApplet {
         this._settings = null;
 
         this.set_applet_icon_symbolic_name('network-offline-symbolic');
-        this.set_applet_label('ZEUS');
-        this.set_applet_tooltip('ZEUS ' + APPLET_VERSION + ': verificando backend...');
+        this.set_applet_label('NEXUS');
+        this.set_applet_tooltip('NEXUS ' + APPLET_VERSION + ': verificando backend...');
 
         this._initSettings(instanceId);
 
@@ -130,8 +130,8 @@ class ZeusApplet extends Applet.TextIconApplet {
             if (!ok) {
                 this._online = false;
                 this.set_applet_icon_symbolic_name('network-offline-symbolic');
-                this.set_applet_label('ZEUS');
-                this.set_applet_tooltip('ZEUS ' + APPLET_VERSION + ' offline. Clique para iniciar backend. ' + _truncate(stderr || '', 90));
+                this.set_applet_label('NEXUS');
+                this.set_applet_tooltip('NEXUS ' + APPLET_VERSION + ' offline. Clique para iniciar backend. ' + _truncate(stderr || '', 90));
                 return;
             }
 
@@ -143,12 +143,12 @@ class ZeusApplet extends Applet.TextIconApplet {
                 const configured = !!llm.configured;
                 this._online = true;
                 this.set_applet_icon_symbolic_name(configured ? 'network-server-symbolic' : 'dialog-warning-symbolic');
-                this.set_applet_label('ZEUS');
-                this.set_applet_tooltip('ZEUS ' + APPLET_VERSION + ' online: ' + provider + ' / ' + model + '. Clique para abrir chat.');
+                this.set_applet_label('NEXUS');
+                this.set_applet_tooltip('NEXUS ' + APPLET_VERSION + ' online: ' + provider + ' / ' + model + '. Clique para abrir chat.');
             } catch (e) {
                 this._online = false;
                 this.set_applet_icon_symbolic_name('dialog-warning-symbolic');
-                this.set_applet_tooltip('ZEUS ' + APPLET_VERSION + ': resposta invalida do backend.');
+                this.set_applet_tooltip('NEXUS ' + APPLET_VERSION + ': resposta invalida do backend.');
             }
         });
     }
@@ -170,7 +170,7 @@ class ZeusApplet extends Applet.TextIconApplet {
             );
         } catch (e) {
             this.set_applet_icon_symbolic_name('dialog-error-symbolic');
-            this.set_applet_tooltip('ZEUS ' + APPLET_VERSION + ': erro ao abrir chat: ' + _truncate(String(e), 120));
+            this.set_applet_tooltip('NEXUS ' + APPLET_VERSION + ': erro ao abrir chat: ' + _truncate(String(e), 120));
         }
     }
 
@@ -185,10 +185,10 @@ class ZeusApplet extends Applet.TextIconApplet {
                 GLib.SpawnFlags.SEARCH_PATH,
                 null
             );
-            this.set_applet_tooltip('ZEUS ' + APPLET_VERSION + ': iniciando backend...');
+            this.set_applet_tooltip('NEXUS ' + APPLET_VERSION + ': iniciando backend...');
         } catch (e) {
             this.set_applet_icon_symbolic_name('dialog-error-symbolic');
-            this.set_applet_tooltip('ZEUS ' + APPLET_VERSION + ': erro ao iniciar backend: ' + _truncate(String(e), 120));
+            this.set_applet_tooltip('NEXUS ' + APPLET_VERSION + ': erro ao iniciar backend: ' + _truncate(String(e), 120));
         }
         Mainloop.timeout_add_seconds(4, () => {
             this._refreshStatus();
