@@ -9,6 +9,15 @@ from nexus_core.executor import PlanExecutor
 from nexus_core.tools import ToolError
 from nexus_core.actions import get_actions
 from nexus_core.security.privacy_guard import PrivacyGuard
+from nexus_core.execution_protocol import (
+    ActionState,
+    ApprovalScope,
+    create_command_proposal,
+    execute_approved_command,
+    guard_agent_claim,
+    read_execution_result,
+    request_user_approval,
+)
 
 privacy_guard = PrivacyGuard()
 
@@ -83,6 +92,10 @@ def _summarize_tool_result(result: dict) -> dict:
         "exit_code": result.get("exit_code"),
         "category": result.get("category"),
         "requires_confirmation": result.get("requires_confirmation"),
+        "requires_approval": result.get("requires_approval"),
+        "proposal_id": result.get("proposal_id"),
+        "approval_id": result.get("approval_id"),
+        "verified_by_executor": result.get("verified_by_executor"),
         "error": result.get("error"),
     }
     stdout = result.get("stdout")
@@ -147,6 +160,13 @@ Antes de agir, sempre avalie:
 NUNCA execute ações administrativas diretamente. Toda ação com sudo ou root DEVE ser enviada ao SudoBroker via ferramenta apropriada se você tivesse uma. No momento, você pode propor o comando e o sistema/usuário autorizará.
 Toda ação de self-improvement (melhoria do próprio NEXUS) deve passar pelo SelfImprovementPipeline.
 
+PROTOCOLO ANTI-EXECUÇÃO FALSA:
+- Você não pode afirmar que executou uma ação, alterou arquivo, rodou comando ou corrigiu algo sem consultar o Execution Ledger.
+- Se não houver execução registrada, responda exatamente: "Ainda não executei. Preciso criar uma proposta de comando para aprovação."
+- Nunca diga "estou fazendo", "vou executar", "corrigi", "apliquei", "feito" ou "concluído" sem evidência no Execution Ledger.
+- Para comandos, use sempre cmd_control; o sistema criará proposal_id, approval_id, execução real e leitura de resultado.
+- Só considere sucesso quando status=SUCCEEDED, exit_code=0 e verified_by_executor=true.
+
 ====================================================================
 IDENTIDADE DO NEXUS
 ====================================================================
@@ -180,7 +200,7 @@ Você opera em modo ReAct: Reasoning + Acting.
 Você pode:
 1. entender o pedido;
 2. decidir se precisa usar ferramenta;
-3. executar uma ação;
+3. propor uma ação;
 4. aguardar o resultado;
 5. continuar com base no resultado;
 6. responder ao usuário.
@@ -764,7 +784,6 @@ Se não precisar agir, responda normalmente em PT-BR.
         token_callback: Optional[Callable[[str], Awaitable[None]]] = None,
     ):
         self._current_broadcast = broadcast
-        mode = _tool_mode()
 
         if _is_confirmation_message(user_prompt):
             pending = _PENDING_CONFIRMATIONS.pop(client_key, None)
@@ -772,7 +791,7 @@ Se não precisar agir, responda normalmente em PT-BR.
                 await self._progress(
                     broadcast,
                     "confirmed",
-                    text=f"Confirmação recebida. Executando {pending.get('name')}.",
+                    text=f"Aprovação recebida para {pending.get('name')}.",
                     tool=pending.get("name"),
                 )
                 await self._broadcast(
@@ -784,11 +803,49 @@ Se não precisar agir, responda normalmente em PT-BR.
                         "args": pending.get("args"),
                     },
                 )
-                tool_out = await self._execute_pending(pending, broadcast=broadcast)
+                if pending.get("name") == "cmd_control":
+                    approval = request_user_approval(
+                        pending["proposal_id"],
+                        approved_by=client_key,
+                        approval_scope=ApprovalScope.ONCE,
+                    )
+
+                    async def on_execution_event(payload: dict) -> None:
+                        await self._broadcast(
+                            broadcast,
+                            {
+                                "type": "EXECUTION_UPDATE",
+                                "proposal_id": pending["proposal_id"],
+                                "approval_id": approval["approval_id"],
+                                "payload": payload,
+                            },
+                        )
+
+                    await self._broadcast(
+                        broadcast,
+                        {
+                            "type": "EXECUTION_UPDATE",
+                            "stage": "approved",
+                            "proposal_id": pending["proposal_id"],
+                            "approval_id": approval["approval_id"],
+                            "command": pending["args"].get("command"),
+                        },
+                    )
+                    execution = await execute_approved_command(
+                        pending["proposal_id"],
+                        approval["approval_id"],
+                        timeout_s=int(pending["args"].get("timeout_s") or 30),
+                        on_event=on_execution_event,
+                    )
+                    tool_out = read_execution_result(pending["proposal_id"])
+                    tool_out["approval_id"] = approval["approval_id"]
+                    tool_out["execution"] = execution
+                else:
+                    tool_out = await self._execute_pending(pending, broadcast=broadcast)
                 await self._progress(
                     broadcast,
                     "tool_done",
-                    text=f"{pending.get('name')} concluído. Sintetizando resultado.",
+                    text=f"Resultado recebido de {pending.get('name')}.",
                     tool=pending.get("name"),
                     details=_summarize_tool_result(tool_out),
                 )
@@ -809,7 +866,12 @@ Se não precisar agir, responda normalmente em PT-BR.
                         "content": f"Tool output ({pending['name']}): {json.dumps(tool_out, ensure_ascii=False)}",
                     },
                 ]
+                proposal_id = pending.get("proposal_id")
+                final_text = ""
                 async for chunk in self._call_llm_stream(messages):
+                    final_text += chunk
+                final_text = guard_agent_claim(final_text, proposal_id=proposal_id)
+                for chunk in [final_text]:
                     if token_callback:
                         await token_callback(chunk)
                     yield chunk
@@ -825,7 +887,7 @@ Se não precisar agir, responda normalmente em PT-BR.
         await self._progress(
             broadcast,
             "started",
-            text="Análise iniciada. Vou verificar dados reais antes de concluir.",
+            text="Análise iniciada. Verificação de dados reais habilitada.",
             total_steps=dynamic_steps,
         )
         for step_index in range(dynamic_steps):
@@ -846,6 +908,7 @@ Se não precisar agir, responda normalmente em PT-BR.
 
             tool_payload, remaining = _extract_tool_call(full_assistant)
             if not tool_payload:
+                full_assistant = guard_agent_claim(full_assistant)
                 if token_callback:
                     await token_callback(full_assistant)
                 await self._broadcast(
@@ -855,7 +918,7 @@ Se não precisar agir, responda normalmente em PT-BR.
                 await self._progress(
                     broadcast,
                     "completed",
-                    text="Análise concluída. Resposta entregue ao usuário.",
+                    text="Resposta entregue ao usuário.",
                     step=step_no,
                     total_steps=dynamic_steps,
                 )
@@ -881,39 +944,66 @@ Se não precisar agir, responda normalmente em PT-BR.
                 )
                 continue
 
-            if mode == "confirm" and name in {"cmd_control"}:
+            if name in {"cmd_control"}:
+                cmd = (args.get("command") or "").strip()
+                proposal = create_command_proposal(
+                    cmd,
+                    reason="Agent requested command execution.",
+                )
+                if proposal.get("status") == ActionState.BLOCKED.value:
+                    messages.append({"role": "assistant", "content": full_assistant})
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": f"Command proposal was blocked by policy: {json.dumps(proposal, ensure_ascii=False)}",
+                        }
+                    )
+                    continue
                 _PENDING_CONFIRMATIONS[client_key] = {
                     "name": name,
                     "args": args,
+                    "proposal_id": proposal["proposal_id"],
                     "created_at": _dt.datetime.now().isoformat(timespec="seconds"),
                     "original_prompt": user_prompt,
                 }
-                cmd = (args.get("command") or "").strip()
                 await self._progress(
                     broadcast,
                     "awaiting_confirmation",
-                    text=f"{name} requer confirmação antes de executar: {cmd}",
+                    text=f"{name} requer aprovação antes da execução: {cmd}",
                     step=step_no,
                     total_steps=dynamic_steps,
                     tool=name,
-                    details={"command": cmd},
+                    details={
+                        "command": cmd,
+                        "proposal_id": proposal["proposal_id"],
+                        "risk_level": proposal["risk_level"],
+                    },
                 )
                 await self._broadcast(
                     broadcast,
                     {
-                        "type": "TOOL_LOG",
-                        "stage": "awaiting_confirmation",
-                        "tool": name,
-                        "args": {"command": cmd},
+                        "type": "EXECUTION_PENDING_APPROVAL",
+                        "stage": "pending_approval",
+                        "proposal_id": proposal["proposal_id"],
+                        "command": cmd,
+                        "cwd": proposal["cwd"],
+                        "risk_level": proposal["risk_level"],
+                        "reason": proposal.get("summary", ""),
                     },
                 )
-                yield f"\n[Trava de segurança ativa]\nConfirme com 'Sim' para eu executar este comando:\n`{cmd}`"
+                yield (
+                    "\n[Execução pendente de aprovação]\n"
+                    f"proposal_id: `{proposal['proposal_id']}`\n"
+                    f"comando: `{cmd}`\n"
+                    f"risco: `{proposal['risk_level']}`\n"
+                    "Confirme com 'Sim' para aprovar esta execução."
+                )
                 return
 
             await self._progress(
                 broadcast,
                 "tool_running",
-                text=f"Executando ferramenta {name}.",
+                text=f"Ferramenta {name}: chamada iniciada.",
                 step=step_no,
                 total_steps=dynamic_steps,
                 tool=name,
@@ -933,7 +1023,7 @@ Se não precisar agir, responda normalmente em PT-BR.
             await self._progress(
                 broadcast,
                 "tool_done",
-                text=f"Ferramenta {name} finalizada. Resultado recebido.",
+                text=f"Ferramenta {name}: resultado recebido.",
                 step=step_no,
                 total_steps=dynamic_steps,
                 tool=name,

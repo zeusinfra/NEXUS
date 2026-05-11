@@ -159,6 +159,13 @@ body::after {
     <div id="neural-labels-container" style="position:absolute; inset:0; pointer-events:none; z-index:10; overflow:hidden"></div>
   </main>
 
+  <aside id="execution-panel" style="border-left: 1px solid var(--border); background: rgba(10,10,12,0.58); padding: 20px; overflow: auto;">
+    <div style="font-size: 0.72rem; font-weight: 800; color: var(--text-dim); margin-bottom: 12px; letter-spacing: 1px;">EXECUTION LEDGER</div>
+    <div id="execution-list" style="display: flex; flex-direction: column; gap: 10px;">
+      <div style="font-size: 0.82rem; color: var(--text-dim); line-height: 1.45;">Nenhuma execução pendente.</div>
+    </div>
+  </aside>
+
 
 </div>
 
@@ -1059,6 +1066,88 @@ addLog({title:'Memoria sinaptica montada',detail:'Persistencia pronta para novas
 // Chat, Voice and Vision UI removed — audio is handled natively via local Whisper + Ollama + Edge-TTS
 const Zeus = window.Zeus || (window.Zeus = {});
 Zeus.capabilities = Zeus.capabilities || {asrBackend:false, ocr:false};
+const executionCards = new Map();
+function normalizeExecutionPayload(d){
+  const payload = d && d.payload ? d.payload : d;
+  return {event:d || {}, payload:payload || {}};
+}
+function renderExecutionCard(proposalId, patch){
+  const list = document.getElementById('execution-list');
+  if(!list || !proposalId) return;
+  const current = Object.assign({}, executionCards.get(proposalId) || {}, patch || {});
+  executionCards.set(proposalId, current);
+  list.innerHTML = '';
+  executionCards.forEach((item, id) => {
+    const status = item.status || item.stage || 'PENDING_APPROVAL';
+    const command = item.command || '';
+    const risk = item.risk_level || item.risk || '--';
+    const pid = item.pid ? `PID ${item.pid}` : 'PID --';
+    const exitCode = item.exit_code !== undefined && item.exit_code !== null ? `exit_code ${item.exit_code}` : 'exit_code --';
+    const duration = item.started_at && item.finished_at ? `${new Date(item.started_at).toLocaleTimeString('pt-BR',{hour12:false})} -> ${new Date(item.finished_at).toLocaleTimeString('pt-BR',{hour12:false})}` : 'duracao --';
+    const logPath = item.stdout_path || item.stderr_path || item.log_path || '';
+    const stdout = (item.stdout || '').slice(-800);
+    const stderr = (item.stderr || '').slice(-800);
+    const el = document.createElement('div');
+    el.style.cssText = 'border:1px solid var(--border); border-radius:8px; background:rgba(0,0,0,0.28); padding:12px; font-family:var(--font-mono); font-size:0.76rem; line-height:1.45;';
+    el.innerHTML = `
+      <div style="display:flex; justify-content:space-between; gap:8px; margin-bottom:8px;">
+        <strong style="color:var(--accent);">${escapeHtml(status)}</strong>
+        <span style="color:var(--text-dim);">${escapeHtml(risk)}</span>
+      </div>
+      <div style="color:var(--text-dim); margin-bottom:6px;">proposal_id: ${escapeHtml(id)}</div>
+      <div style="word-break:break-word; margin-bottom:8px;">${escapeHtml(command)}</div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; color:var(--text-dim); margin-bottom:8px;">
+        <span>${escapeHtml(pid)}</span><span>${escapeHtml(exitCode)}</span><span>${escapeHtml(duration)}</span>
+      </div>
+      ${status === 'PROPOSED' || status === 'PENDING_APPROVAL' ? `<div style="display:flex; gap:8px; margin-bottom:8px;"><button data-exec-action="approve" data-proposal-id="${escapeHtml(id)}" style="padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:rgba(0,255,136,.08);color:var(--accent);cursor:pointer;">Aprovar</button><button data-exec-action="cancel" data-proposal-id="${escapeHtml(id)}" style="padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:rgba(255,80,80,.08);color:#ff8080;cursor:pointer;">Rejeitar</button></div>` : ''}
+      ${status === 'RUNNING' ? `<button data-exec-action="cancel" data-proposal-id="${escapeHtml(id)}" style="padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:rgba(255,80,80,.08);color:#ff8080;margin-bottom:8px;cursor:pointer;">Cancelar</button>` : ''}
+      ${stdout ? `<pre style="white-space:pre-wrap; max-height:120px; overflow:auto; color:var(--accent); margin-bottom:6px;">${escapeHtml(stdout)}</pre>` : ''}
+      ${stderr ? `<pre style="white-space:pre-wrap; max-height:120px; overflow:auto; color:#ff8080; margin-bottom:6px;">${escapeHtml(stderr)}</pre>` : ''}
+      ${logPath ? `<div style="word-break:break-word; color:var(--text-dim);">log: ${escapeHtml(logPath)}</div>` : ''}
+    `;
+    list.appendChild(el);
+  });
+}
+async function approveExecution(proposalId){
+  const approvalRes = await fetch(`/api/executions/${encodeURIComponent(proposalId)}/approve`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({approved_by:'web_gui',approval_scope:'ONCE',ttl_seconds:600})
+  });
+  if(!approvalRes.ok) throw new Error(await approvalRes.text());
+  const approvalBody = await approvalRes.json();
+  const approvalId = approvalBody.approval && approvalBody.approval.approval_id;
+  renderExecutionCard(proposalId, {status:'APPROVED', approval_id:approvalId});
+  const runRes = await fetch(`/api/executions/${encodeURIComponent(proposalId)}/execute`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({approval_id:approvalId,timeout_s:30})
+  });
+  if(!runRes.ok) throw new Error(await runRes.text());
+  const runBody = await runRes.json();
+  renderExecutionCard(proposalId, runBody.execution || {});
+}
+async function cancelExecution(proposalId){
+  const res = await fetch(`/api/executions/${encodeURIComponent(proposalId)}/cancel`, {method:'POST'});
+  if(!res.ok) throw new Error(await res.text());
+  const body = await res.json();
+  renderExecutionCard(proposalId, body.execution || {status:'CANCELLED'});
+}
+document.addEventListener('click', async event => {
+  const btn = event.target.closest('[data-exec-action]');
+  if(!btn) return;
+  const proposalId = btn.getAttribute('data-proposal-id');
+  const action = btn.getAttribute('data-exec-action');
+  btn.disabled = true;
+  try {
+    if(action === 'approve') await approveExecution(proposalId);
+    if(action === 'cancel') await cancelExecution(proposalId);
+  } catch (err) {
+    addLog({title:'EXECUTION ERROR', detail:String(err).slice(0,180)}, 'a');
+  } finally {
+    btn.disabled = false;
+  }
+});
 // Stub for addMsg (used by WS events CHAT_USER / CHAT_AI)
 function addMsg(role, text){
   const prefix = role==='user' ? '[USER]' : '[ZEUS]';
@@ -1186,6 +1275,39 @@ function connectRealtime() {
       else if(d.result && typeof d.result === 'object') detail = `resultado: ${Object.keys(d.result).slice(0, 5).join(', ')}`;
       else if(d.args && typeof d.args === 'object') detail = `args: ${Object.keys(d.args).slice(0, 5).join(', ')}`;
       addLog({title: `TOOL ${stage} · ${tool}`, detail}, d.stage === 'step_failed' ? 'e' : 'a');
+    } else if(d.type === 'EXECUTION_PENDING_APPROVAL') {
+      renderExecutionCard(d.proposal_id, {
+        status: 'PROPOSED',
+        command: d.command,
+        cwd: d.cwd,
+        risk_level: d.risk_level,
+        summary: d.reason || d.summary || ''
+      });
+      addLog({title: 'EXECUTION PENDING', detail: `${d.risk_level || '--'} · ${String(d.command || '').slice(0, 120)}`}, 'a');
+      setCoreStatus('Execução aguardando aprovação · Ledger ativo');
+    } else if(d.type === 'EXECUTION_APPROVED') {
+      renderExecutionCard(d.proposal_id, {
+        status: 'APPROVED',
+        approval_id: d.approval_id,
+        approval_scope: d.approval_scope,
+        expires_at: d.expires_at
+      });
+      addLog({title: 'EXECUTION APPROVED', detail: d.approval_id || ''}, 'l');
+    } else if(d.type === 'EXECUTION_UPDATE') {
+      const normalized = normalizeExecutionPayload(d);
+      const payload = normalized.payload;
+      const proposalId = d.proposal_id || payload.proposal_id;
+      if(payload.type === 'EXECUTION_OUTPUT') {
+        const current = executionCards.get(proposalId) || {};
+        const key = payload.stream === 'stderr' ? 'stderr' : 'stdout';
+        renderExecutionCard(proposalId, Object.assign({}, current, {[key]: (current[key] || '') + (payload.chunk || '')}));
+      } else {
+        renderExecutionCard(proposalId, Object.assign({}, payload, {
+          status: payload.status || d.stage || 'RUNNING',
+          command: payload.command || d.command
+        }));
+      }
+      addLog({title: 'EXECUTION UPDATE', detail: `${proposalId || '--'} · ${(payload.status || d.stage || 'RUNNING')}`}, payload.status === 'FAILED' ? 'a' : 'l');
     } else if(d.type === 'SYSTEM_ALERT') {
       addLog({title: d.title || 'SYSTEM ALERT', detail: String(d.message || '').slice(0, 180)}, 'e');
     } else if(d.type === 'SYSTEM_EVENT') {

@@ -5,6 +5,10 @@ from unittest.mock import patch
 
 from nexus_core.actions import cmd_control
 from nexus_core.command_policy import RUST_POLICY_AVAILABLE, validate_command
+from nexus_core.execution_protocol import (
+    create_command_proposal,
+    request_user_approval,
+)
 from nexus_core.tools import ToolError
 
 
@@ -21,13 +25,15 @@ class CommandPolicyTests(unittest.TestCase):
             env = {
                 "NEXUS_PROJECT_ROOT": tmp,
                 "NEXUS_CMD_ALLOWLIST": "python3",
+                "NEXUS_EXECUTION_LEDGER_PATH": os.path.join(tmp, "ledger.jsonl"),
+                "NEXUS_EXECUTION_ARTIFACT_DIR": os.path.join(tmp, "executions"),
             }
             with patch.dict(os.environ, env, clear=False):
                 result = cmd_control({"command": "python3 --version", "timeout_s": 5})
 
-        self.assertEqual(result["exit_code"], 0)
-        self.assertEqual(result["category"], "read")
-        self.assertIn("Python", result["stdout"] or result["stderr"])
+        self.assertTrue(result["requires_approval"])
+        self.assertEqual(result["status"], "PROPOSED")
+        self.assertIn("proposal_id", result)
 
     def test_cmd_control_rejects_command_outside_allowlist(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -36,8 +42,11 @@ class CommandPolicyTests(unittest.TestCase):
                 "NEXUS_CMD_ALLOWLIST": "python3",
             }
             with patch.dict(os.environ, env, clear=False):
-                with self.assertRaisesRegex(ToolError, "allowlist"):
-                    cmd_control({"command": "git status"})
+                result = cmd_control({"command": "git status"})
+
+        self.assertFalse(result["requires_approval"])
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertIn("allowlist", result["message"])
 
     def test_cmd_control_blocks_rm_even_if_allowlisted(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -46,8 +55,11 @@ class CommandPolicyTests(unittest.TestCase):
                 "NEXUS_CMD_ALLOWLIST": "rm",
             }
             with patch.dict(os.environ, env, clear=False):
-                with self.assertRaisesRegex(ToolError, "bloqueado"):
-                    cmd_control({"command": "rm something"})
+                result = cmd_control({"command": "rm something"})
+
+        self.assertFalse(result["requires_approval"])
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertIn("bloqueado", result["message"])
 
     def test_cmd_control_rejects_shell_control_tokens(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -56,31 +68,50 @@ class CommandPolicyTests(unittest.TestCase):
                 "NEXUS_CMD_ALLOWLIST": "python3",
             }
             with patch.dict(os.environ, env, clear=False):
-                with self.assertRaisesRegex(ToolError, "shell bloqueado"):
-                    cmd_control({"command": "python3 --version && git status"})
+                result = cmd_control({"command": "python3 --version && git status"})
+
+        self.assertFalse(result["requires_approval"])
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertIn("shell bloqueado", result["message"])
 
     def test_write_command_requires_confirmation(self):
         with tempfile.TemporaryDirectory() as tmp:
             env = {
                 "NEXUS_PROJECT_ROOT": tmp,
                 "NEXUS_CMD_ALLOWLIST": "mkdir",
+                "NEXUS_EXECUTION_LEDGER_PATH": os.path.join(tmp, "ledger.jsonl"),
+                "NEXUS_EXECUTION_ARTIFACT_DIR": os.path.join(tmp, "executions"),
             }
             with patch.dict(os.environ, env, clear=False):
-                with self.assertRaisesRegex(ToolError, "confirmação"):
-                    cmd_control({"command": "mkdir out"})
+                result = cmd_control({"command": "mkdir out"})
 
-    def test_write_command_runs_when_confirmed(self):
+        self.assertTrue(result["requires_approval"])
+        self.assertEqual(result["status"], "PROPOSED")
+
+    def test_command_runs_only_with_bound_approval(self):
         with tempfile.TemporaryDirectory() as tmp:
             env = {
                 "NEXUS_PROJECT_ROOT": tmp,
                 "NEXUS_CMD_ALLOWLIST": "mkdir",
+                "NEXUS_EXECUTION_LEDGER_PATH": os.path.join(tmp, "ledger.jsonl"),
+                "NEXUS_EXECUTION_ARTIFACT_DIR": os.path.join(tmp, "executions"),
             }
             with patch.dict(os.environ, env, clear=False):
-                result = cmd_control({"command": "mkdir out", "confirmed": True})
+                proposal = create_command_proposal("mkdir out", cwd=tmp)
+                approval = request_user_approval(
+                    proposal["proposal_id"], approved_by="test"
+                )
+                result = cmd_control(
+                    {
+                        "command": "mkdir out",
+                        "proposal_id": proposal["proposal_id"],
+                        "approval_id": approval["approval_id"],
+                    }
+                )
 
         self.assertEqual(result["exit_code"], 0)
-        self.assertEqual(result["category"], "write")
-        self.assertTrue(result["requires_confirmation"])
+        self.assertEqual(result["status"], "SUCCEEDED")
+        self.assertTrue(result["verified_by_executor"])
 
     def test_command_policy_audits_allowed_and_rejected_decisions(self):
         self._log_patcher.stop()

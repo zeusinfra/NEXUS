@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 import fnmatch
+import asyncio
 import os
 import re
-import shlex
 import shutil
-import subprocess
 from pathlib import Path
 from typing import Any, Dict
 
-from nexus_core.command_policy import validate_command
+from nexus_core.execution_protocol import (
+    create_command_proposal,
+    execute_approved_command,
+    read_execution_result,
+)
 from nexus_core.tools import ToolError, get_time, read_file, write_file
 from nexus_core.vision import (
     analyze_image_with_llm,
@@ -55,39 +58,56 @@ def _resolve_project_path(path: str) -> Path:
 def cmd_control(parameters: dict) -> dict:
     command = (parameters or {}).get("command") or (parameters or {}).get("task") or ""
     timeout_s = int((parameters or {}).get("timeout_s") or 30)
-    confirmed = bool((parameters or {}).get("confirmed"))
+    proposal_id = (parameters or {}).get("proposal_id")
+    approval_id = (parameters or {}).get("approval_id")
     command = str(command).strip()
     if not command:
         raise ToolError("cmd_control requer 'command' (ou 'task').")
 
-    tokens = shlex.split(command)
-    decision = validate_command(command, tokens, confirmed=confirmed)
-
     root = _project_root()
-    try:
-        completed = subprocess.run(
-            tokens,
+    if not approval_id:
+        proposal = create_command_proposal(
+            command,
             cwd=str(root),
-            capture_output=True,
-            text=True,
-            timeout=timeout_s,
-            check=False,
+            reason="cmd_control requires explicit approval before execution.",
         )
-    except FileNotFoundError as e:
-        raise ToolError(
-            f"Comando não encontrado: {tokens[0] if tokens else command}"
-        ) from e
-    except subprocess.TimeoutExpired as e:
-        raise ToolError(f"Timeout ao executar comando após {timeout_s}s.") from e
+        return {
+            "ok": False,
+            "requires_approval": proposal["status"] == "PROPOSED",
+            "proposal_id": proposal["proposal_id"],
+            "status": proposal["status"],
+            "command": command,
+            "cwd": str(root),
+            "risk_level": proposal["risk_level"],
+            "message": (
+                "Ainda não executei. Preciso de aprovação para executar este comando."
+                if proposal["status"] == "PROPOSED"
+                else proposal["summary"]
+            ),
+        }
+    if not proposal_id:
+        raise ToolError("cmd_control requer proposal_id junto com approval_id.")
 
+    execution = asyncio.run(
+        execute_approved_command(
+            str(proposal_id), str(approval_id), timeout_s=timeout_s
+        )
+    )
+    result = read_execution_result(str(proposal_id))
     return {
+        "ok": execution.get("status") == "SUCCEEDED",
         "command": command,
-        "category": decision.category,
-        "requires_confirmation": decision.requires_confirmation,
+        "proposal_id": proposal_id,
+        "approval_id": approval_id,
+        "status": execution.get("status"),
         "cwd": str(root),
-        "exit_code": completed.returncode,
-        "stdout": (completed.stdout or "")[:50_000],
-        "stderr": (completed.stderr or "")[:50_000],
+        "pid": execution.get("pid"),
+        "exit_code": execution.get("exit_code"),
+        "stdout": result.get("stdout", ""),
+        "stderr": result.get("stderr", ""),
+        "stdout_path": execution.get("stdout_path"),
+        "stderr_path": execution.get("stderr_path"),
+        "verified_by_executor": execution.get("verified_by_executor"),
     }
 
 

@@ -61,6 +61,7 @@ from nexus_core.llm_service import LLMService
 from nexus_core.memory_manager import MemoryManager
 from nexus_core.path_filters import is_runtime_noise_path
 from nexus_core.response_text import display_text, speech_text
+from nexus_core.tools import ToolError
 from nexus_core.rust_sensors import (
     RUST_SENSORS_AVAILABLE,
     get_os_snapshot as get_rust_os_snapshot,
@@ -88,6 +89,15 @@ from nexus_core.observability import (
     get_metrics_snapshot,
     log_event,
     setup_logging,
+)
+from nexus_core.execution_protocol import (
+    ApprovalScope,
+    cancel_execution,
+    create_command_proposal,
+    execute_approved_command,
+    get_execution_status,
+    read_execution_result,
+    request_user_approval,
 )
 from nexus_core.security_guard import (
     extract_bearer_token,
@@ -1387,6 +1397,23 @@ class AdminActionReq(BaseModel):
     expected_outcome: str | None = ""
 
 
+class ExecutionProposalReq(BaseModel):
+    command: str
+    cwd: str | None = None
+    reason: str | None = ""
+
+
+class ExecutionApprovalReq(BaseModel):
+    approved_by: str | None = "web_gui"
+    approval_scope: str | None = "ONCE"
+    ttl_seconds: int | None = 600
+
+
+class ExecutionRunReq(BaseModel):
+    approval_id: str
+    timeout_s: int | None = 30
+
+
 ADMIN_ACTIONS: dict[str, dict] = {}
 
 
@@ -1886,6 +1913,126 @@ async def api_admin_propose(req: AdminActionReq, request: Request):
         }
     )
     return {"admin_action": _admin_action_public(ADMIN_ACTIONS[action_id])}
+
+
+def _require_trusted_api(request: Request) -> None:
+    if not _is_trusted_request(request):
+        raise HTTPException(
+            status_code=403, detail="Only trusted (local/LAN) requests are allowed."
+        )
+    _require_lan_token_for_request(request)
+
+
+@app.post("/api/executions/proposals")
+async def api_execution_propose(req: ExecutionProposalReq, request: Request):
+    _require_trusted_api(request)
+    proposal = create_command_proposal(
+        req.command,
+        cwd=req.cwd,
+        reason=req.reason or "Web UI command proposal.",
+    )
+    await broadcast_message(
+        {
+            "type": "EXECUTION_PENDING_APPROVAL",
+            "proposal_id": proposal["proposal_id"],
+            "command": proposal["command"],
+            "cwd": proposal["cwd"],
+            "risk_level": proposal["risk_level"],
+            "summary": proposal["summary"],
+        }
+    )
+    return {"proposal": proposal}
+
+
+@app.get("/api/executions/{proposal_id}")
+async def api_execution_status(proposal_id: str, request: Request):
+    _require_trusted_api(request)
+    status = get_execution_status(proposal_id)
+    if not status:
+        raise HTTPException(status_code=404, detail="execution proposal not found")
+    return {"execution": status}
+
+
+@app.get("/api/executions/{proposal_id}/result")
+async def api_execution_result(proposal_id: str, request: Request):
+    _require_trusted_api(request)
+    try:
+        return {"execution": read_execution_result(proposal_id)}
+    except ToolError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/api/executions/{proposal_id}/approve")
+async def api_execution_approve(
+    proposal_id: str, req: ExecutionApprovalReq, request: Request
+):
+    _require_trusted_api(request)
+    try:
+        scope = ApprovalScope(req.approval_scope or ApprovalScope.ONCE.value)
+        approval = request_user_approval(
+            proposal_id,
+            approved_by=req.approved_by or "web_gui",
+            approval_scope=scope,
+            ttl_seconds=int(req.ttl_seconds or 600),
+        )
+    except (ToolError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    await broadcast_message(
+        {
+            "type": "EXECUTION_APPROVED",
+            "proposal_id": proposal_id,
+            "approval_id": approval["approval_id"],
+            "approval_scope": approval["approval_scope"],
+            "expires_at": approval["expires_at"],
+        }
+    )
+    return {"approval": approval}
+
+
+@app.post("/api/executions/{proposal_id}/execute")
+async def api_execution_run(proposal_id: str, req: ExecutionRunReq, request: Request):
+    _require_trusted_api(request)
+
+    async def emit(payload: dict) -> None:
+        await broadcast_message(
+            {
+                "type": "EXECUTION_UPDATE",
+                "proposal_id": proposal_id,
+                "approval_id": req.approval_id,
+                "payload": payload,
+            }
+        )
+
+    try:
+        execution = await execute_approved_command(
+            proposal_id,
+            req.approval_id,
+            timeout_s=int(req.timeout_s or 30),
+            on_event=emit,
+        )
+    except ToolError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"execution": execution}
+
+
+@app.post("/api/executions/{proposal_id}/cancel")
+async def api_execution_cancel(proposal_id: str, request: Request):
+    _require_trusted_api(request)
+    try:
+        execution = await cancel_execution(
+            proposal_id,
+            reason="Cancelled from Web UI.",
+        )
+    except ToolError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    await broadcast_message(
+        {
+            "type": "EXECUTION_UPDATE",
+            "proposal_id": proposal_id,
+            "payload": execution,
+        }
+    )
+    return {"execution": execution}
 
 
 @app.post("/api/admin/actions/{action_id}/deny")
