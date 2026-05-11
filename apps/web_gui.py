@@ -74,7 +74,9 @@ from nexus_core.events.sync_engine import (
     sync_insights_to_linear,
 )
 from nexus_core.cognitive.context_engine import build_current_context
-from nexus_core.memory.sqlite_memory import get_connection as get_second_brain_connection
+from nexus_core.memory.sqlite_memory import (
+    get_connection as get_second_brain_connection,
+)
 from nexus_core.health_status import (
     build_external_watcher_status,
     build_runtime_health,
@@ -133,7 +135,9 @@ ENABLE_AUTONOMOUS_TASKS = _env_flag("NEXUS_ENABLE_AUTONOMOUS_TASKS", "0")
 ENABLE_BOOT_GREETING = _env_flag("NEXUS_ENABLE_BOOT_GREETING", "0")
 ENABLE_RESOURCE_MONITOR = _env_flag("NEXUS_ENABLE_RESOURCE_MONITOR", "0")
 ENABLE_SECOND_BRAIN = _env_flag("NEXUS_ENABLE_SECOND_BRAIN", "0")
-ENABLE_SECOND_BRAIN_SYNC_ENGINE = _env_flag("NEXUS_ENABLE_SECOND_BRAIN_SYNC_ENGINE", "0")
+ENABLE_SECOND_BRAIN_SYNC_ENGINE = _env_flag(
+    "NEXUS_ENABLE_SECOND_BRAIN_SYNC_ENGINE", "0"
+)
 ENABLE_OBSIDIAN_AUTO_SYNC = _env_flag("NEXUS_ENABLE_OBSIDIAN_AUTO_SYNC", "0")
 ENABLE_NOTION_AUTO_SYNC = _env_flag("NEXUS_ENABLE_NOTION_AUTO_SYNC", "0")
 ENABLE_LINEAR_AUTO_SYNC = _env_flag("NEXUS_ENABLE_LINEAR_AUTO_SYNC", "0")
@@ -171,7 +175,9 @@ MEMORY_SAVE_INTERVAL_SECONDS = 12
 MEMORY_SAVE_EVENT_DELTA = 20
 MEMORY_DECAY_FACTOR = 0.98  # Fator de "esquecimento" aplicado em cada ciclo de limpeza
 MAX_SYNAPTIC_PATHS = int(os.getenv("NEXUS_MAX_SYNAPTIC_PATHS", "20000") or "20000")
-MAX_CONNECTIONS_PER_NODE = int(os.getenv("NEXUS_MAX_CONNECTIONS_PER_NODE", "25") or "25")
+MAX_CONNECTIONS_PER_NODE = int(
+    os.getenv("NEXUS_MAX_CONNECTIONS_PER_NODE", "25") or "25"
+)
 SYNAPTIC_PRUNE_INTERVAL_SECONDS = float(
     os.getenv("NEXUS_SYNAPTIC_PRUNE_INTERVAL_SECONDS", "60") or "60"
 )
@@ -179,7 +185,9 @@ EVENT_QUEUE_MAXSIZE = int(os.getenv("NEXUS_EVENT_QUEUE_MAXSIZE", "2000") or "200
 MAX_CHAT_MESSAGE_CHARS = int(
     os.getenv("NEXUS_MAX_CHAT_MESSAGE_CHARS", "16000") or "16000"
 )
-MAX_WEB_CONTEXT_CHARS = int(os.getenv("NEXUS_MAX_WEB_CONTEXT_CHARS", "50000") or "50000")
+MAX_WEB_CONTEXT_CHARS = int(
+    os.getenv("NEXUS_MAX_WEB_CONTEXT_CHARS", "50000") or "50000"
+)
 MAX_VISION_IMAGE_BYTES = int(
     os.getenv("NEXUS_MAX_VISION_IMAGE_BYTES", str(6 * 1024 * 1024))
     or str(6 * 1024 * 1024)
@@ -240,7 +248,9 @@ _watcher_task = None
 _sync_worker_task = None
 _sync_engine_tasks = []
 MEMORY_FILE = os.path.join(BASE_DIR, "data", "synaptic_memory.json")
-memory_manager = MemoryManager(db_path=os.path.join(BASE_DIR, "data", "nexus_memory.db"))
+memory_manager = MemoryManager(
+    db_path=os.path.join(BASE_DIR, "data", "nexus_memory.db")
+)
 pattern_engine = PatternEngine(MEMORY_FILE)
 brain = NexusBrain()  # The Cognitive Core
 vector_memory = VectorMemory(

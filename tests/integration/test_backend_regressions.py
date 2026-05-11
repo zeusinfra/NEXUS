@@ -88,7 +88,9 @@ class BackendRegressionTests(unittest.TestCase):
         with patch(
             "nexus_core.health_status.psutil.process_iter", return_value=[Proc()]
         ):
-            with patch("nexus_core.health_status._watcher_port_open", return_value=True):
+            with patch(
+                "nexus_core.health_status._watcher_port_open", return_value=True
+            ):
                 status = build_external_watcher_status("/repo", port=8081)
 
         self.assertEqual(status["status"], "online")

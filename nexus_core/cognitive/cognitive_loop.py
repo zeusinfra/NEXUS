@@ -145,7 +145,9 @@ class CognitiveLoop:
                 base_interval = int(os.getenv("NEXUS_COGNITIVE_INTERVAL_DEFAULT", "20"))
                 mode = cognitive_state_manager.state.mode
                 if mode == "idle":
-                    base_interval = int(os.getenv("NEXUS_COGNITIVE_INTERVAL_IDLE", "60"))
+                    base_interval = int(
+                        os.getenv("NEXUS_COGNITIVE_INTERVAL_IDLE", "60")
+                    )
                 elif mode == "active":
                     base_interval = int(
                         os.getenv("NEXUS_COGNITIVE_INTERVAL_ACTIVE", "10")

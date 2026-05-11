@@ -85,7 +85,9 @@ class CommandPolicyTests(unittest.TestCase):
     def test_command_policy_audits_allowed_and_rejected_decisions(self):
         self._log_patcher.stop()
         with patch("nexus_core.command_policy.log_event") as log_event:
-            with patch.dict(os.environ, {"NEXUS_CMD_ALLOWLIST": "python3"}, clear=False):
+            with patch.dict(
+                os.environ, {"NEXUS_CMD_ALLOWLIST": "python3"}, clear=False
+            ):
                 validate_command(
                     "python3 --version", ["python3", "--version"], confirmed=False
                 )

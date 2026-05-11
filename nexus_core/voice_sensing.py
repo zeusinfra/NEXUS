@@ -243,7 +243,9 @@ class VoiceSensing:
                             f"[NEXUS LOCAL] 🎙️ Microfone selecionado por nome: [{match}] {names[match]}"
                         )
                 except Exception as e:
-                    print(f"[NEXUS LOCAL] ⚠️ Falha ao selecionar microfone por nome: {e}")
+                    print(
+                        f"[NEXUS LOCAL] ⚠️ Falha ao selecionar microfone por nome: {e}"
+                    )
             elif device_index is not None and str(device_index).strip() != "":
                 try:
                     mic_kwargs["device_index"] = int(str(device_index).strip())

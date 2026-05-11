@@ -87,7 +87,9 @@ class PrivacyGuard:
             logger.info("🦀 NEXUS: Privacy Guard operando com motor Rust otimizado.")
         else:
             self.rust_engine = None
-            logger.warning("🐍 NEXUS: Privacy Guard operando em modo Python (fallback).")
+            logger.warning(
+                "🐍 NEXUS: Privacy Guard operando em modo Python (fallback)."
+            )
 
     def classify_content(self, content: str) -> PrivacyLevel:
         """Analyze content and return its highest privacy level."""

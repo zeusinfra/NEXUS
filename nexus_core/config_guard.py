@@ -66,7 +66,9 @@ def validate_lan_security(config: LanSecurityConfig) -> None:
     if not remote_auth_required(allow_lan=config.allow_lan, bind_host=config.bind_host):
         return
     if not config.lan_auth_enabled:
-        raise RuntimeError("NEXUS_LAN_AUTH=1 is required when remote access is enabled.")
+        raise RuntimeError(
+            "NEXUS_LAN_AUTH=1 is required when remote access is enabled."
+        )
     if not config.lan_token or len(config.lan_token) < 16:
         raise RuntimeError(
             "NEXUS_LAN_TOKEN must be set (>=16 chars) when remote access is enabled."

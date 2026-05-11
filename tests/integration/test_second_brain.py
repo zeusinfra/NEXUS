@@ -106,7 +106,9 @@ class SecondBrainTests(unittest.TestCase):
         }
 
         with patch.object(notion, "_get_database_properties", return_value=schema):
-            properties = notion._build_page_properties("NEXUS", ["#memory"], "memory.md")
+            properties = notion._build_page_properties(
+                "NEXUS", ["#memory"], "memory.md"
+            )
 
         self.assertIn("Title", properties)
         self.assertIn("Tags", properties)
