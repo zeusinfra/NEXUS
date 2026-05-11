@@ -1,2 +1,0 @@
-# GTK chat uses system packages on Linux Mint/Debian:
-#   sudo apt install python3-gi gir1.2-gtk-3.0
