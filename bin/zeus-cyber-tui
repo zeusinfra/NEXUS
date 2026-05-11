@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import asyncio
 import json
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -14,6 +14,7 @@ import urllib.request
 import uuid
 from datetime import datetime
 from pathlib import Path
+from socket import gethostname
 
 def _ensure_tui_deps() -> None:
     try:
@@ -46,23 +47,23 @@ def _ensure_tui_deps() -> None:
 _ensure_tui_deps()
 
 from textual.app import App, ComposeResult
-from textual.containers import Container, Center, Middle, Vertical, Horizontal
+from textual.containers import Container, Center, Middle, Horizontal
 from textual.screen import Screen
-from textual.widgets import Input, Static, RichLog, Header, Footer
+from textual.widgets import Input, Static, RichLog
 from textual.binding import Binding
-from textual.worker import Worker, WorkerState
 from textual import work
+from rich.markup import escape
 from rich.panel import Panel
-from rich.text import Text
-from rich.markdown import Markdown
 
 # ──────────────────────── Config ────────────────────────
 
+ROOT_DIR = Path(__file__).resolve().parents[1]
 BACKEND = (sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("--") else os.getenv("ZEUS_BACKEND_URL", "http://127.0.0.1:8080")).rstrip("/")
 CLIENT_ID = os.getenv("ZEUS_TUI_CLIENT_ID", "zeus_cyber_tui").strip() or "zeus_cyber_tui"
 SESSION_ID = os.getenv("ZEUS_TUI_SESSION_ID") or datetime.now().strftime("tui-%Y%m%d-%H%M%S")
 VERSION = "1.14.46"
 SHELL_TIMEOUT = 30  # segundos max por comando shell
+OUTPUT_LIMIT = 16_000
 
 # ──────────────────────── ASCII Logo ────────────────────────
 
@@ -204,15 +205,29 @@ def _json_request(method: str, path: str, payload: dict | None = None, timeout: 
     body = None
     headers = {"X-Zeus-Client-Id": CLIENT_ID}
     if payload is not None:
-        body = json.dumps(payload).encode("utf-8")
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         headers["Content-Type"] = "application/json"
     req = urllib.request.Request(BACKEND + path, data=body, headers=headers, method=method)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as response:
             raw = response.read().decode("utf-8")
-        return json.loads(raw or "{}")
+        try:
+            data = json.loads(raw or "{}")
+        except json.JSONDecodeError:
+            return {"ok": False, "error": "Resposta HTTP nao era JSON.", "raw": raw[:1000]}
+        if isinstance(data, dict):
+            data.setdefault("ok", True)
+            return data
+        return {"ok": True, "data": data}
+    except urllib.error.HTTPError as exc:
+        try:
+            raw = exc.read().decode("utf-8", errors="replace")
+            detail = json.loads(raw).get("detail", raw)
+        except Exception:
+            detail = str(exc)
+        return {"ok": False, "status": exc.code, "error": str(detail)}
     except Exception as e:
-        return {"error": str(e)}
+        return {"ok": False, "error": str(e)}
 
 def _get_json(path: str, timeout: float = 5.0) -> dict:
     return _json_request("GET", path, timeout=timeout)
@@ -222,37 +237,113 @@ def _post_json(path: str, payload: dict, timeout: float = 120.0) -> dict:
 
 def _fetch_status() -> dict:
     """Fetch backend status once. Returns a dict with model/provider/cpu/ram."""
-    try:
-        data = _get_json("/api/applet/status", timeout=2.5)
-        llm = data.get("llm") or {}
-        perception = data.get("perception") or {}
-        system = perception.get("system") or {}
-        return {
-            "model": llm.get("model", "unknown"),
-            "provider": str(llm.get("provider", "unknown")).capitalize(),
-            "cpu": system.get("cpu_percent", 0),
-            "ram": system.get("ram_percent", 0),
-            "online": True,
-        }
-    except Exception:
-        return {"model": "unknown", "provider": "Offline", "cpu": 0, "ram": 0, "online": False}
+    data = _get_json("/api/applet/status", timeout=2.5)
+    if data.get("error"):
+        return {"model": "unknown", "provider": "Offline", "cpu": 0, "ram": 0, "online": False, "error": data["error"]}
+    llm = data.get("llm") or {}
+    perception = data.get("perception") or {}
+    system = perception.get("system") or {}
+    return {
+        "model": llm.get("model", "unknown"),
+        "provider": str(llm.get("provider", "unknown")).capitalize(),
+        "cpu": system.get("cpu_percent", 0),
+        "ram": system.get("ram_percent", 0),
+        "online": True,
+        "error": "",
+    }
 
-def _run_shell(cmd: str, timeout: int = SHELL_TIMEOUT) -> tuple[int, str, str]:
-    """Executa um comando shell e retorna (returncode, stdout, stderr)."""
+def _clip(text: str, limit: int = OUTPUT_LIMIT) -> str:
+    if len(text) <= limit:
+        return text
+    return text[:limit] + f"\n...[saida truncada em {limit} caracteres]"
+
+def _run_process(args: list[str], timeout: int = SHELL_TIMEOUT) -> tuple[int, str, str]:
+    """Run a command without shell expansion and return returncode/stdout/stderr."""
     try:
         proc = subprocess.run(
-            cmd,
-            shell=True,
+            args,
             capture_output=True,
             text=True,
             timeout=timeout,
-            cwd=str(Path.home()),
+            cwd=str(ROOT_DIR),
         )
-        return proc.returncode, proc.stdout, proc.stderr
+        return proc.returncode, _clip(proc.stdout), _clip(proc.stderr)
     except subprocess.TimeoutExpired:
         return -1, "", f"Timeout ({timeout}s)"
+    except FileNotFoundError:
+        return 127, "", f"Comando nao encontrado: {args[0]}"
     except Exception as e:
         return -1, "", str(e)
+
+def _run_user_shell(cmd: str, timeout: int = SHELL_TIMEOUT) -> tuple[int, str, str]:
+    """Run an explicit user shell command from !cmd."""
+    shell = os.environ.get("SHELL") or "/bin/sh"
+    return _run_process([shell, "-lc", cmd], timeout=timeout)
+
+def _first_available(*names: str) -> str | None:
+    for name in names:
+        if shutil.which(name):
+            return name
+    return None
+
+def _limit_lines(text: str, count: int) -> str:
+    return "\n".join(text.splitlines()[:count])
+
+def _system_summary() -> tuple[int, str, str]:
+    lines = [
+        f"Hostname: {gethostname()}",
+        f"Kernel:   {platform.release()}",
+        f"Arch:     {platform.machine()}",
+        f"Python:   {platform.python_version()}",
+        f"Backend:  {BACKEND}",
+    ]
+    uptime_path = Path("/proc/uptime")
+    if uptime_path.exists():
+        try:
+            seconds = int(float(uptime_path.read_text().split()[0]))
+            days, rem = divmod(seconds, 86400)
+            hours, rem = divmod(rem, 3600)
+            minutes, _ = divmod(rem, 60)
+            lines.insert(2, f"Uptime:   {days}d {hours}h {minutes}m")
+        except Exception:
+            pass
+    return 0, "\n".join(lines), ""
+
+def _journal_lines(count: int) -> tuple[int, str, str]:
+    count = max(1, min(count, 300))
+    for args in (
+        ["journalctl", "--user", "-u", "zeus", "-n", str(count), "--no-pager"],
+        ["journalctl", "-u", "zeus", "-n", str(count), "--no-pager"],
+    ):
+        code, stdout, stderr = _run_process(args)
+        if code == 0 and stdout.strip():
+            return code, stdout, stderr
+    return 1, "zeus.service nao encontrado no journal", ""
+
+def _service_lines() -> tuple[int, str, str]:
+    code, stdout, stderr = _run_process(["systemctl", "list-units", "--type=service", "--state=running", "--no-pager", "--no-legend"])
+    return code, _limit_lines(stdout, 25), stderr
+
+def _process_lines() -> tuple[int, str, str]:
+    code, stdout, stderr = _run_process(["ps", "aux", "--sort=-%cpu"])
+    return code, _limit_lines(stdout, 11), stderr
+
+def _network_lines() -> tuple[int, str, str]:
+    ip = _first_available("ip")
+    if ip:
+        return _run_process([ip, "-br", "addr", "show"])
+    ifconfig = _first_available("ifconfig")
+    if ifconfig:
+        return _run_process([ifconfig])
+    return 127, "", "Sem comando de rede disponivel: ip/ifconfig"
+
+def _disk_lines() -> tuple[int, str, str]:
+    return _run_process(["df", "-h"])
+
+def _who_lines() -> tuple[int, str, str]:
+    code, stdout, stderr = _run_process(["who"])
+    code_w, stdout_w, stderr_w = _run_process(["w"])
+    return max(code, code_w), "\n\n".join(part for part in [stdout, stdout_w] if part.strip()), "\n".join(part for part in [stderr, stderr_w] if part.strip())
 
 
 SLASH_HELP = """
@@ -260,6 +351,7 @@ SLASH_HELP = """
 
   [bold yellow]!comando[/]          Executa comando shell direto (ex: [dim]!ls -la[/dim])
   [bold yellow]/help[/]             Mostra esta ajuda
+  [bold yellow]/status[/]           Mostra backend, modelo e telemetria
   [bold yellow]/sysinfo[/]          Info do sistema (hostname, kernel, uptime, disco)
   [bold yellow]/services[/]         Lista serviços systemd ativos
   [bold yellow]/logs[/]             Últimas 30 linhas do journal do ZEUS
@@ -317,6 +409,12 @@ class GreetingScreen(Screen):
             chat_screen = ChatScreen(initial_message=msg)
             self.app.push_screen(chat_screen)
 
+    def action_clear(self) -> None:
+        try:
+            self.query_one("#greet-input", Input).value = ""
+        except Exception:
+            pass
+
 # ──────────────────────── Chat Screen ────────────────────────
 
 class ChatScreen(Screen):
@@ -330,6 +428,8 @@ class ChatScreen(Screen):
     def __init__(self, initial_message: str = "") -> None:
         super().__init__()
         self.initial_message = initial_message
+        self.running = False
+        self.pending_reply_ids: set[str] = set()
 
     def compose(self) -> ComposeResult:
         yield Static(f"ZEUS Ops · {SESSION_ID}", id="chat-header", markup=True)
@@ -346,6 +446,7 @@ class ChatScreen(Screen):
         self.input_widget = self.query_one("#chat-input", Input)
         self.input_widget.focus()
         self.seen_events: set[str] = set()
+        self.running = True
 
         # Start background workers
         self.poll_events()
@@ -357,21 +458,37 @@ class ChatScreen(Screen):
     def action_clear_log(self) -> None:
         self.log_widget.clear()
 
+    def on_unmount(self) -> None:
+        self.running = False
+
+    def _write_line(self, text: str = "") -> None:
+        self.log_widget.write(text)
+
+    def _write_block(self, text: str, style: str = "") -> None:
+        for line in text.splitlines() or [""]:
+            safe = escape(line)
+            self._write_line(f"  [{style}]{safe}[/]" if style else f"  {safe}")
+
     # ── Telemetry Polling ──
 
     @work(exclusive=True, thread=True)
     def poll_telemetry(self) -> None:
         """Atualiza CPU/RAM no footer a cada 3 segundos."""
-        while True:
+        while self.running:
             time.sleep(3.0)
+            if not self.running:
+                return
             status = _fetch_status()
             if status["online"]:
-                footer_text = f"[dim]cpu[/dim] {status['cpu']}%  [dim]ram[/dim] {status['ram']}% "
-                header_text = f"[bold #00ffcc]ZEUS[/] Ops · {status['model']} · [dim]{status['provider']}[/dim]"
+                footer_text = f"[dim]cpu[/dim] {escape(str(status['cpu']))}%  [dim]ram[/dim] {escape(str(status['ram']))}% "
+                header_text = f"[bold #00ffcc]ZEUS[/] Ops · {escape(str(status['model']))} · [dim]{escape(str(status['provider']))}[/dim]"
             else:
                 footer_text = "[dim]cpu[/dim] [red]--[/]%  [dim]ram[/dim] [red]--[/]% "
-                header_text = f"[bold #00ffcc]ZEUS[/] Ops · [red]Offline[/red]"
-            self.app.call_from_thread(self._update_bars, header_text, footer_text)
+                header_text = "[bold #00ffcc]ZEUS[/] Ops · [red]Offline[/red]"
+            try:
+                self.app.call_from_thread(self._update_bars, header_text, footer_text)
+            except Exception:
+                return
 
     def _update_bars(self, header: str, footer: str) -> None:
         try:
@@ -385,8 +502,10 @@ class ChatScreen(Screen):
     @work(exclusive=True, thread=True, group="events")
     def poll_events(self) -> None:
         """Drena eventos do backend em loop para renderizar progresso de agentes e tools."""
-        while True:
+        while self.running:
             time.sleep(1.0)
+            if not self.running:
+                return
             try:
                 query = urllib.parse.urlencode({"client_id": CLIENT_ID})
                 data = _get_json(f"/api/events/drain?{query}", timeout=2.0)
@@ -406,7 +525,10 @@ class ChatScreen(Screen):
                     self.seen_events.add(sig)
                     if len(self.seen_events) > 500:
                         self.seen_events.clear()
-                    self.app.call_from_thread(self._render_event, event)
+                    try:
+                        self.app.call_from_thread(self._render_event, event)
+                    except Exception:
+                        return
             except Exception:
                 pass
 
@@ -415,12 +537,14 @@ class ChatScreen(Screen):
 
         # ── Respostas da IA que chegam via evento (streaming) ──
         if evt_type == "CHAT_AI":
+            event_id = str(event.get("id") or (event.get("details") or {}).get("id") or "")
+            if event_id and event_id in self.pending_reply_ids:
+                return
             msg = event.get("message") or event.get("text") or ""
             if msg.strip():
                 self.log_widget.write("")
-                self.log_widget.write(f"  [bold #00ffcc]▎ ZEUS[/]")
-                for line in msg.strip().split("\n"):
-                    self.log_widget.write(f"  {line}")
+                self.log_widget.write("  [bold #00ffcc]▎ ZEUS[/]")
+                self._write_block(msg.strip())
                 self.log_widget.write("")
             return
 
@@ -429,39 +553,39 @@ class ChatScreen(Screen):
             stage = event.get("stage", "progress")
             text = event.get("text", stage)
             if stage in {"step_started"}:
-                self.log_widget.write(f"  [dim #00bbaa]⟐ {text}[/]")
+                self.log_widget.write(f"  [dim #00bbaa]⟐ {escape(str(text))}[/]")
             elif stage in {"completed", "chat_completed"}:
-                self.log_widget.write(f"  [#00ffcc]✓ {text}[/]")
+                self.log_widget.write(f"  [#00ffcc]✓ {escape(str(text))}[/]")
             else:
-                self.log_widget.write(f"  [#00ddaa]● {text}[/]")
+                self.log_widget.write(f"  [#00ddaa]● {escape(str(text))}[/]")
         elif evt_type == "TOOL_LOG":
             tool = event.get("tool", "tool")
             stage = str(event.get("stage", "")).replace("_", " ").upper()
             error = event.get("error")
             if error:
-                self.log_widget.write(f"  [red]✗ TOOL {tool}:[/red] {error}")
+                self.log_widget.write(f"  [red]✗ TOOL {escape(str(tool))}:[/red] {escape(str(error))}")
             else:
                 res = event.get("result") or event.get("args") or stage
                 if isinstance(res, dict):
                     keys = ", ".join(list(res.keys())[:6])
                     res = keys or "ok"
-                self.log_widget.write(f"  [#bb88ff]› {tool}[/] [dim]{stage}[/dim] {res}")
+                self.log_widget.write(f"  [#bb88ff]› {escape(str(tool))}[/] [dim]{escape(stage)}[/dim] {escape(str(res))}")
         elif evt_type == "SYSTEM_ALERT":
             msg = event.get("message", "Alerta")
-            self.log_widget.write(Panel(msg, title="⚠ ALERTA", border_style="red"))
+            self.log_widget.write(Panel(escape(str(msg)), title="⚠ ALERTA", border_style="red"))
 
         # ── Qualquer outro evento desconhecido — mostra para não perder info ──
         else:
             text = event.get("text") or event.get("message") or ""
             if text.strip():
-                self.log_widget.write(f"  [dim]{evt_type}: {text.strip()[:200]}[/dim]")
+                self.log_widget.write(f"  [dim]{escape(str(evt_type))}: {escape(text.strip()[:200])}[/dim]")
 
     # ── Chat I/O ──
 
     def submit_message(self, text: str) -> None:
         self.log_widget.write("")
-        self.log_widget.write(f"  [bold blue]▎ VOCE[/]")
-        self.log_widget.write(f"  {text}")
+        self.log_widget.write("  [bold blue]▎ VOCE[/]")
+        self._write_block(text)
         self.log_widget.write("")
         self.send_to_backend(text)
 
@@ -476,7 +600,7 @@ class ChatScreen(Screen):
             shell_cmd = msg[1:].strip()
             if shell_cmd:
                 self.log_widget.write("")
-                self.log_widget.write(f"  [bold yellow]$ {shell_cmd}[/]")
+                self.log_widget.write(f"  [bold yellow]$ {escape(shell_cmd)}[/]")
                 self.run_shell_command(shell_cmd)
             return
 
@@ -499,56 +623,65 @@ class ChatScreen(Screen):
             self.log_widget.clear()
         elif base in {"/quit", "/exit"}:
             self.app.exit()
+        elif base == "/status":
+            status = _fetch_status()
+            if status["online"]:
+                self.log_widget.write(
+                    f"  [#00ffcc]Backend online[/] {escape(BACKEND)} · "
+                    f"{escape(str(status['model']))} / {escape(str(status['provider']))} · "
+                    f"cpu {escape(str(status['cpu']))}% ram {escape(str(status['ram']))}%"
+                )
+            else:
+                self.log_widget.write(f"  [red]Backend offline[/red] {escape(status.get('error') or '')}")
         elif base == "/sysinfo":
-            self.run_shell_command(
-                'echo "Hostname: $(hostname)" && '
-                'echo "Kernel:   $(uname -r)" && '
-                'echo "Uptime:  $(uptime -p)" && '
-                'echo "Arch:     $(uname -m)" && '
-                'echo "" && lsb_release -ds 2>/dev/null || cat /etc/os-release 2>/dev/null | head -2'
-            )
+            self.run_builtin_command(_system_summary)
         elif base == "/services":
-            self.run_shell_command("systemctl list-units --type=service --state=running --no-pager --no-legend | head -25")
+            self.run_builtin_command(_service_lines)
         elif base == "/logs":
             n = arg.strip() if arg.strip().isdigit() else "30"
-            self.run_shell_command(f"journalctl --user -u zeus -n {n} --no-pager 2>/dev/null || journalctl -u zeus -n {n} --no-pager 2>/dev/null || echo 'zeus.service not found in journal'")
+            self.run_builtin_command(lambda: _journal_lines(int(n)))
         elif base == "/procs":
-            self.run_shell_command("ps aux --sort=-%cpu | head -11")
+            self.run_builtin_command(_process_lines)
         elif base == "/net":
-            self.run_shell_command("ip -br addr show 2>/dev/null || ifconfig 2>/dev/null || echo 'Sem informacao de rede'")
+            self.run_builtin_command(_network_lines)
         elif base == "/disk":
-            self.run_shell_command("df -h --type=ext4 --type=btrfs --type=xfs --type=vfat 2>/dev/null || df -h | grep -E '^/dev'")
+            self.run_builtin_command(_disk_lines)
         elif base == "/who":
-            self.run_shell_command("who && echo '' && w")
+            self.run_builtin_command(_who_lines)
         elif base == "/env":
             if arg:
-                val = os.environ.get(arg.strip(), "[red]não definida[/red]")
-                self.log_widget.write(f"  [dim]{arg}[/dim] = {val}")
+                val = os.environ.get(arg.strip(), "nao definida")
+                self.log_widget.write(f"  [dim]{escape(arg.strip())}[/dim] = {escape(val)}")
             else:
                 self.log_widget.write("  [yellow]Uso: /env NOME_VARIAVEL[/yellow]")
         else:
-            self.log_widget.write(f"  [red]Comando desconhecido:[/red] {base}  [dim](use /help)[/dim]")
+            self.log_widget.write(f"  [red]Comando desconhecido:[/red] {escape(base)}  [dim](use /help)[/dim]")
+
+    @work(thread=True)
+    def run_builtin_command(self, fn) -> None:
+        code, stdout, stderr = fn()
+        self.app.call_from_thread(self._write_command_result, code, stdout, stderr)
 
     @work(thread=True)
     def run_shell_command(self, cmd: str) -> None:
         """Executa comando no shell real e exibe stdout/stderr no log."""
-        code, stdout, stderr = _run_shell(cmd)
-        def _write():
-            if stdout.strip():
-                for line in stdout.strip().split("\n"):
-                    self.log_widget.write(f"  {line}")
-            if stderr.strip():
-                for line in stderr.strip().split("\n"):
-                    self.log_widget.write(f"  [red]{line}[/red]")
-            if code != 0:
-                self.log_widget.write(f"  [dim red]exit code {code}[/dim red]")
-            self.log_widget.write("")
-        self.app.call_from_thread(_write)
+        code, stdout, stderr = _run_user_shell(cmd)
+        self.app.call_from_thread(self._write_command_result, code, stdout, stderr)
+
+    def _write_command_result(self, code: int, stdout: str, stderr: str) -> None:
+        if stdout.strip():
+            self._write_block(stdout.strip())
+        if stderr.strip():
+            self._write_block(stderr.strip(), "red")
+        if code != 0:
+            self.log_widget.write(f"  [dim red]exit code {code}[/dim red]")
+        self.log_widget.write("")
 
     @work(thread=True)
     def send_to_backend(self, text: str) -> None:
         started = time.perf_counter()
         msg_id = str(uuid.uuid4())
+        self.pending_reply_ids.add(msg_id)
         payload = {
             "message": text,
             "source": "cyber_tui",
@@ -566,11 +699,10 @@ class ChatScreen(Screen):
         latency_ms = data.get("latency_ms") or round((time.perf_counter() - started) * 1000)
 
         def _write_reply():
+            self.pending_reply_ids.discard(msg_id)
             self.log_widget.write("")
             self.log_widget.write(f"  [bold #00ffcc]▎ ZEUS[/] [dim]· {latency_ms}ms[/dim]")
-            # Renderizar resposta com quebra de linha para linhas longas
-            for line in reply.split("\n"):
-                self.log_widget.write(f"  {line}")
+            self._write_block(reply)
             self.log_widget.write("")
 
         self.app.call_from_thread(_write_reply)
