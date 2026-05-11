@@ -11,3 +11,5 @@ GHSA-pph8-gcv7-4qj5
 .env.example
 configs/test-key.pem
 tests/unit/test_cognitive_maturity_final.py
+tests/unit/test_privacy_guard.py
+tests/integration/test_backend_regressions.py

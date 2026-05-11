@@ -22,14 +22,17 @@ if ROOT_DIR not in sys.path:
 
 from zeus_core.response_text import pango_markup, speech_text
 
-import gi
-gi.require_version("Gdk", "4.0")
-gi.require_version("Gtk", "4.0")
-gi.require_version("Adw", "1")
-from gi.repository import Gdk, Gio, GLib, Gtk, Pango, Adw
-
-# Inicializar Libadwaita
-Adw.init()
+try:
+    import gi
+    gi.require_version("Gdk", "4.0")
+    gi.require_version("Gtk", "4.0")
+    gi.require_version("Adw", "1")
+    from gi.repository import Gdk, Gio, GLib, Gtk, Pango, Adw
+    # Inicializar Libadwaita
+    Adw.init()
+except (ImportError, ValueError):
+    print("Erro: GTK4/Adwaita não encontrado. Este chat requer ambiente gráfico Linux.")
+    sys.exit(1)
 
 from zeus_core.security.approval_listener import start_approval_listener_glib
 

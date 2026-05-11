@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import threading
 import tempfile
@@ -16,10 +18,45 @@ try:
 except Exception:
     sr = None
 
+if sr is None:
+    # Mock para evitar crashes em ambiente CI sem dependências de áudio
+    class _Mock:
+        class AudioData:
+            pass
+
+        class WaitTimeoutError(Exception):
+            pass
+
+        class Recognizer:
+            def __init__(self):
+                self.dynamic_energy_threshold = True
+
+            def listen(self, *a, **k):
+                pass
+
+        class Microphone:
+            @staticmethod
+            def list_microphone_names():
+                return []
+
+    sr = _Mock()
+
 try:
     import edge_tts
 except Exception:
     edge_tts = None
+
+if edge_tts is None:
+
+    class _Mock:
+        class Communicate:
+            def __init__(self, *a, **k):
+                pass
+
+            async def save(self, *a, **k):
+                pass
+
+    edge_tts = _Mock()
 
 
 def _suppress_alsa_errors():

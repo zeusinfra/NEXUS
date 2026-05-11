@@ -19,14 +19,27 @@ import json
 import sys
 from typing import Callable
 
-import gi
+try:
+    import gi
 
-gi.require_version("Gdk", "4.0")
-gi.require_version("Gtk", "4.0")
-gi.require_version("Adw", "1")
-from gi.repository import Gdk, GLib, Gio, Gtk, Adw
+    gi.require_version("Gdk", "4.0")
+    gi.require_version("Gtk", "4.0")
+    gi.require_version("Adw", "1")
+    from gi.repository import Gdk, GLib, Gio, Gtk, Adw
 
-Adw.init()
+    _GUI_AVAILABLE = True
+except (ImportError, ValueError):
+    _GUI_AVAILABLE = False
+
+    # Fallback placeholders for typing
+    class _Mock:
+        def __getattr__(self, name):
+            return None
+
+    Gdk = GLib = Gio = Gtk = Adw = _Mock()
+
+if _GUI_AVAILABLE:
+    Adw.init()
 
 APP_ID = "local.zeus.ApprovalDialog"
 TIMEOUT_SECONDS = 60
