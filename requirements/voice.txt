@@ -1,8 +1,8 @@
-SpeechRecognition>=3.10,<4.0
+SpeechRecognition>=3.16.1,<4.0
 PyAudio>=0.2.14,<1.0
-edge-tts>=7.0,<8.0
-faster-whisper>=1.0,<2.0
-soundfile>=0.12,<1.0
-sounddevice>=0.4,<1.0
-mss>=9.0,<11.0
-pillow>=10.3.0,<13.0
+edge-tts>=7.2.8,<8.0
+faster-whisper>=1.2.1,<2.0
+soundfile>=0.13.1,<1.0
+sounddevice>=0.5.5,<1.0
+mss>=10.2.0,<11.0
+pillow>=12.2.0,<13.0
