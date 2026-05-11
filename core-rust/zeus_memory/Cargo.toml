@@ -12,7 +12,7 @@ name = "memory_service"
 path = "src/main.rs"
 
 [dependencies]
-pyo3 = { version = "0.20", features = ["auto-initialize"] }
+pyo3 = { version = "0.24", features = ["auto-initialize"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1.1", features = ["full"] }
