@@ -1,119 +1,190 @@
 # NEXUS by ZEUS Protocol
 
-> A local-first cognitive operating layer for Linux.
+> Local-first cognitive operations for Linux desktops.
 
-<div align="center">
-  <!-- TODO: Substituir por um GIF real da interface GTK4 -->
-  <img src="https://raw.githubusercontent.com/zeusinfra/ZEUS_NEXUS/main/docs/assets/nexus-demo.png?v=2" alt="NEXUS GTK4 Interface Demo" width="800"/>
-</div>
+NEXUS is an autonomous cognitive operating layer that helps a Linux operator
+observe, reason about, and act on a local workstation. It combines a FastAPI
+backend, GTK and terminal interfaces, SQLite memory, Rust system components,
+voice/vision hooks, peripheral monitoring, and a guarded privileged-action
+path through RootDaemon.
 
-## What is NEXUS?
+The project is designed around a simple principle: local context and system
+control should stay local by default, and risky actions should be explicit,
+auditable, and reversible.
 
-NEXUS is an autonomous, privacy-first cognitive layer that acts as an intelligent supervisor for your Linux desktop environment. It seamlessly combines a FastAPI backend, local/cloud Ollama routing, realtime HUD telemetry, GTK4 desktop operations, voice and vision tools, Rust-based file watching, and a bi-directional "Second Brain" connecting Obsidian, Notion, and Linear.
+## What NEXUS Does
 
-Unlike standard LLM wrappers, NEXUS features a **RootDaemon** and **SudoBroker** architecture, allowing it to safely perform privileged system actions under explicit, tokenized human approval via a premium GTK interface.
+- Provides a desktop operator console through GTK4 and a Cyber TUI fallback.
+- Runs a local backend for chat, telemetry, cognition, events, and health.
+- Routes LLM work through configurable local or hosted providers.
+- Persists conversation, cognitive, and operational state in SQLite-backed
+  stores.
+- Watches USB, Bluetooth, filesystem, and runtime signals for useful context.
+- Integrates with Second Brain workflows across Obsidian, Notion, and Linear.
+- Gates privileged commands through policy checks, approval records, audit
+  logs, and RootDaemon isolation.
 
-## Quick Start
+## Repository Layout
 
-### 1. System Requirements
+| Path | Purpose |
+| --- | --- |
+| `apps/` | FastAPI app, routes, web GUI, cognitive entrypoints |
+| `zeus_core/` | Core orchestration, security, cognition, memory, integrations |
+| `bin/` | Launchers for backend, GTK chat, TUI, and local helpers |
+| `core-rust/` | Rust workspace for memory, sensors, policy, state, and bridges |
+| `watcher_rs/` | Rust watcher service |
+| `applets/` | Cinnamon desktop applet |
+| `requirements/` | Python dependency profiles |
+| `tests/` | Unit, integration, and system tests |
+| `.github/workflows/` | CI for Python, Rust, CodeQL, and security scanning |
 
-NEXUS runs best on Debian, Ubuntu, or Linux Mint. You'll need Python 3.10+, Rust (`cargo`), and system dependencies for GTK4.
+## Requirements
+
+NEXUS targets Debian, Ubuntu, and Linux Mint style systems.
+
+- Python 3.10 or 3.12
+- Rust stable with `cargo`
+- `python3-venv`, `python3-dev`, `build-essential`
+- `libudev-dev` for device monitoring tests and integrations
+- GTK4/Libadwaita packages for the desktop chat
+- Optional: Ollama for local model routing
+
+Example system packages:
 
 ```bash
 sudo apt update
-sudo apt install python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 libadwaita-1-0 python3-dev build-essential
+sudo apt install -y \
+  python3-venv python3-dev build-essential libudev-dev \
+  python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 libadwaita-1-0
 ```
 
-### 2. Installation
+## Quick Start
 
 ```bash
-git clone https://github.com/zeusinfra/ZEUS_NEXUS.git
-cd ZEUS_NEXUS
+git clone https://github.com/zeusinfra/NEXUS.git
+cd NEXUS
 
-# Setup Python Environment
-python3 -m venv .venv
+./scripts/bootstrap.sh
 source .venv/bin/activate
-pip install -r requirements-base.txt
-pip install -r requirements.txt
 
-# Setup Rust Components
-cargo build --manifest-path core-rust/Cargo.toml
+cp .env.example .env
 ```
 
-### 3. Launch
+Run the default terminal operator surface:
 
-To start the primary GTK4/Libadwaita operator console:
 ```bash
-./bin/zeus chat
+./bin/zeus
 ```
-*(For a terminal fallback with live progress/tool output, use `./bin/zeus tui`)*
 
----
+Run specific surfaces:
 
-## Features
+```bash
+./bin/zeus tui
+./bin/zeus chat
+./bin/zeus server
+./bin/zeus ensure-server
+```
 
-- **GTK4 Ops Chat**: The primary operator console with a multiline composer, command palette, sidebar telemetry, and graphical action approvals.
-- **Local-First AI**: Designed to default to local models via Ollama, ensuring zero data leakage for your desktop queries and system state.
-- **RootDaemon Hardening**: A `0660` Unix socket handles privileged requests. High-risk AI intentions are intercepted, evaluated, and paused for explicit human UI approval.
-- **Peripheral Sentinels**: Silently watches `udev` and `bluetoothctl` for USB/Bluetooth events, classifying hardware risks (e.g., BadUSB detection) and speaking local voice alerts.
-- **Second Brain Orchestration**: Seamlessly connects your thoughts, tasks, and system events to Obsidian, Notion, and Linear.
-- **Conversation Recall**: `SQLiteConversationMemory` persists contextual sessions natively for persistent agent memory.
+Build the Rust workspaces:
+
+```bash
+cargo build --manifest-path core-rust/Cargo.toml
+cargo build --manifest-path watcher_rs/Cargo.toml
+```
+
+## Common Commands
+
+| Command | Description |
+| --- | --- |
+| `make bootstrap` | Create `.venv` and install development dependencies |
+| `make lint` | Run Python lint checks |
+| `make test` | Run the Python test suite |
+| `make rust` | Run Rust format, clippy, and tests |
+| `make ci` | Run the main local CI gate |
+| `./bin/zeus help` | Show launcher commands |
+| `./bin/install-cinnamon-applet.sh` | Install the Cinnamon applet locally |
+
+## Configuration
+
+Copy `.env.example` to `.env` and enable only the integrations you need.
+
+Important settings:
+
+- `ZEUS_LLM_PROVIDER`: `ollama`, `openai`, `gemini`, or local defaults
+- `ZEUS_LLM_URL`: hosted or local LLM endpoint
+- `ZEUS_DB_PATH`: SQLite event and cognition database path
+- `ZEUS_VAULT_PATH`: local knowledge vault path
+- `ZEUS_AUTONOMY_LEVEL`: guarded execution mode
+- `ZEUS_ENABLE_SECOND_BRAIN`: enable Second Brain workers
+- `ZEUS_ENABLE_VOICE_SENSING`: enable voice sensing
+- `ZEUS_ENABLE_BROWSER_SENSING`: enable browser sensing
+
+Secrets belong in local environment files or secret managers. Do not commit
+real API keys, tokens, private keys, database dumps, or personal vault content.
 
 ## Architecture
 
-NEXUS is built on a hybrid Python/Rust stack to guarantee both high-level cognitive orchestration and low-level system safety.
-
 ```mermaid
 flowchart TD
-    Operator[Operator] --> Applet[Cinnamon Applet]
-    Operator --> GTK[GTK4 Ops Chat]
+    Operator[Operator] --> GTK[GTK4 Chat]
     Operator --> TUI[Cyber TUI]
+    Operator --> Applet[Cinnamon Applet]
 
-    Applet --> API[FastAPI Backend]
-    GTK --> API
+    GTK --> API[FastAPI Backend]
     TUI --> API
+    Applet --> API
 
     API --> LLM[LLM Router]
-    API --> Memory[SQLite / Vector Memory]
+    API --> Memory[SQLite Memory]
     API --> Events[Event Bus]
-    API --> Security[SudoBroker / RootDaemon]
-    API --> Peripherals[USB + Bluetooth Sentinels]
+    API --> Cognition[Cognitive Loop]
+    API --> Security[RootDaemon + Policy]
+    API --> Peripherals[USB + Bluetooth]
+    API --> Watcher[Rust Watcher]
 
+    Events --> Obsidian[Obsidian Vault]
     Events --> Notion[Notion]
-    Events --> Cognition[Cognitive Loop]
-    LLM --> Ollama[Ollama Local / Cloud]
+    Events --> Linear[Linear]
+    LLM --> Local[Local Models]
+    LLM --> Hosted[Hosted Providers]
 ```
 
----
+## Security Model
 
-## Advanced Configuration & Internals
+NEXUS assumes local-first operation and treats system-level execution as a
+security boundary.
 
-### Security Model
+- RootDaemon communicates over a restricted Unix socket.
+- Privileged actions are classified before execution.
+- Dangerous command patterns are blocked by policy.
+- Higher-risk actions require explicit approval context.
+- Audit logs record command, caller, risk, reason, and outcome.
+- Tests isolate runtime paths to avoid touching developer state.
 
-ZEUS defaults to local-only operation and treats privileged actions as explicit, auditable workflows.
-- **HTTP access**: Trusted local/LAN checks only.
-- **Privilege escalation**: Managed strictly by `RootDaemon`. No raw privileged commands from the client are allowed without human authorization.
-- **Admin UI**: Approval by `action_id`.
-- **Self-healing**: Command policy validation blocks high-risk shells (no `shell=True`).
+Read [SECURITY.md](SECURITY.md) before changing command policy, RootDaemon,
+authentication, token handling, network exposure, or filesystem boundaries.
 
-### Environment Profile
-Copy `.env.example` to `.env` to configure your instance.
-- **Ollama / OpenAI**: `ZEUS_LLM_PROVIDER`, `OLLAMA_API_KEY`, `OPENAI_API_KEY`
-- **Second Brain**: `NOTION_TOKEN`, `LINEAR_API_KEY`
-- **Resource Governance**: Configurable RAM/Swap constraints via `ZEUS_RAM_HARD_LIMIT`.
+## Testing
 
-### Testing Matrix
-To verify the system integrity:
 ```bash
-# Python suite
-pytest tests/ -v
-
-# Rust workspace
-cargo test --manifest-path core-rust/Cargo.toml
+python -m ruff check .
+python -m ruff format --check .
+python -m pytest
+cd core-rust && cargo test --all-targets
+cd ../watcher_rs && cargo test --all-targets
 ```
 
-### Desktop Applet Integration (Cinnamon)
-```bash
-./bin/install-cinnamon-applet.sh
-```
-Enable **ZEUS Cognitive AI** in Cinnamon Applets. Clicking the applet will bring up the GTK chat if online, or automatically bootstrap the server if offline.
+CI currently covers Python 3.10 and 3.12, Rust checks, CodeQL analysis, secret
+scanning, and Trivy filesystem scanning.
+
+## Contributing
+
+Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md), and
+follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+Security-sensitive reports should not be opened as public issues. Use the
+process in [SECURITY.md](SECURITY.md).
+
+## License
+
+NEXUS is released under the [MIT License](LICENSE).
