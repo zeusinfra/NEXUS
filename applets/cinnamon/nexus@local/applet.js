@@ -6,7 +6,7 @@ const Settings = imports.ui.settings;
 const Soup = imports.gi.Soup;
 const ByteArray = imports.byteArray;
 
-const APPLET_UUID = 'zeus@local';
+const APPLET_UUID = 'nexus@local';
 const APPLET_VERSION = '1.0.4';
 const DEFAULT_BACKEND = 'http://127.0.0.1:8080';
 const PROJECT_ROOT = '__ZEUS_PROJECT_ROOT__';

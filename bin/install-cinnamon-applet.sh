@@ -3,7 +3,7 @@ set -euo pipefail
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(dirname "$DIR")"
-UUID="zeus@local"
+UUID="nexus@local"
 SRC_DIR="$ROOT_DIR/applets/cinnamon/$UUID"
 DEST_DIR="$HOME/.local/share/cinnamon/applets/$UUID"
 
