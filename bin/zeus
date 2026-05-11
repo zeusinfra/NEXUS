@@ -136,6 +136,26 @@ export LANG=C.UTF-8
 export ALSA_CARD=0
 export SDL_AUDIODRIVER=pulseaudio
 
+# Help rápido: ./zeus help
+if [[ "$1" == "help" || "$1" == "-h" || "$1" == "--help" ]]; then
+    echo "╔════════════════════════════════════╗"
+    echo "║     ZEUS — Command Launcher        ║"
+    echo "╚════════════════════════════════════╝"
+    echo ""
+    echo "  ./zeus               → Cyber TUI (padrão)"
+    echo "  ./zeus tui            → Cyber TUI (explícito)"
+    echo "  ./zeus chat           → Abrir chat GTK (desktop)"
+    echo "  ./zeus web            → Iniciar Servidor (Browser)"
+    echo "  ./zeus server         → Backend headless"
+    echo "  ./zeus ensure-server  → Garantir backend online"
+    echo "  ./zeus logs           → Ver logs em tempo real"
+    echo "  ./zeus v4             → Core v4 (loop contínuo)"
+    echo "  ./zeus evolve         → Motor de Evolução"
+    echo "  ./zeus setup-aliases  → Instalar aliases"
+    echo ""
+    exit 0
+fi
+
 case "$1" in
     sphere|gui|3d|web)
         echo "🧠 Iniciando ZEUS Command Center (Browser)..."
@@ -176,8 +196,9 @@ case "$1" in
         tail -f zeus_server.log
         ;;
     tui|console|ops)
-        echo "📟  Iniciando Console de Operações TUI (standby)..."
-        "$ROOT_DIR/bin/zeus-hermes-tui"
+        echo "📟  Iniciando ZEUS Cyber TUI..."
+        ensure_server_background
+        "$PY" "$ROOT_DIR/bin/zeus-cyber-tui"
         ;;
     chat)
         echo "💬  Abrindo chat ZEUS GTK..."
@@ -191,18 +212,9 @@ case "$1" in
         echo "🔄  Execute 'source ~/.bashrc' para ativar."
         ;;
     *)
-        echo "╔════════════════════════════════════╗"
-        echo "║     ZEUS — Command Launcher        ║"
-        echo "╚════════════════════════════════════╝"
-        echo ""
-        echo "  ./zeus web           → Iniciar Servidor (Browser)"
-        echo "  ./zeus ensure-server → Garantir backend headless online"
-        echo "  ./zeus logs          → Ver logs em tempo real"
-        echo "  ./zeus chat          → Abrir chat GTK padrão"
-        echo "  ./zeus tui           → Iniciar Console TUI standby"
-        echo "  ./zeus setup-aliases → Instalar aliases zeus-server/zeus-chat"
-        echo "  ./zeus v4            → Core v4 (loop contínuo)"
-        echo "  ./zeus evolve        → Motor de Evolução"
-        echo ""
+        # Padrão: inicia o Cyber TUI com backend
+        echo "🧠 ZEUS — Iniciando..."
+        ensure_server_background
+        "$PY" "$ROOT_DIR/bin/zeus-cyber-tui"
         ;;
 esac
