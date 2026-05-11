@@ -38,7 +38,7 @@ class StatusRoutesTests(unittest.IsolatedAsyncioTestCase):
                 },
                 llm_service=LLMService(
                     get_status=lambda: {"provider": "test", "configured": True},
-                    call_llm=lambda messages: "ZEUS LLM OK",
+                    call_llm=lambda messages: "NEXUS LLM OK",
                 ),
             )
         )
@@ -87,7 +87,7 @@ class StatusRoutesTests(unittest.IsolatedAsyncioTestCase):
             result = await endpoint(SimpleNamespace())
 
         self.assertTrue(result["ok"])
-        self.assertEqual(result["reply"], "ZEUS LLM OK")
+        self.assertEqual(result["reply"], "NEXUS LLM OK")
 
     async def test_untrusted_request_is_rejected(self):
         router, _ = self._router(trusted=False)

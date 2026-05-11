@@ -13,7 +13,7 @@ class ResourceGovernor:
         self.ram_limit = float(os.getenv("NEXUS_RAM_SOFT_LIMIT", "75"))
         self.swap_limit = float(os.getenv("NEXUS_SWAP_SOFT_LIMIT", "50"))
         self.disk_min_free = float(os.getenv("NEXUS_DISK_MIN_FREE_PERCENT", "10"))
-        self.zeus_mode = os.getenv("NEXUS_MODE", "BALANCED").upper()
+        self.nexus_mode = os.getenv("NEXUS_MODE", "BALANCED").upper()
 
         self.is_low_resource_mode = False
         self.high_cpu_consecutive_checks = 0
@@ -62,7 +62,7 @@ class ResourceGovernor:
             await event_bus.publish_async(EventType.DISK_PRESSURE, {"free": disk_free})
 
         was_low = self.is_low_resource_mode
-        if self.zeus_mode == "AGGRESSIVE":
+        if self.nexus_mode == "AGGRESSIVE":
             self.is_low_resource_mode = False
         else:
             self.is_low_resource_mode = len(issues) > 0

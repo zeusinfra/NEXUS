@@ -93,7 +93,7 @@ class TestReflectionEngine:
             lessons_learned=["Lesson 1"],
         )
         md = engine._render_markdown(ref, "2026-01-01")
-        assert "# ZEUS Reflection" in md
+        assert "# NEXUS Reflection" in md
         assert "## Resumo" in md
         assert "## Falhas" in md
         assert "Failure 1" in md

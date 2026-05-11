@@ -8,7 +8,7 @@ from nexus_core.events.event_bus import event_bus, EventType
 from nexus_core.observability import get_logger
 from nexus_core.security.daemon_client import daemon_client
 
-logger = get_logger("zeus.self_improvement.pipeline")
+logger = get_logger("nexus.self_improvement.pipeline")
 
 
 class SelfImprovementPipeline:
@@ -28,7 +28,7 @@ class SelfImprovementPipeline:
         problems = []
         try:
             # 1. Busca Tracebacks reais (mais preciso que apenas ERROR)
-            log_path = "/home/zeus/Documentos/NEXUS_SYSTEM/nexus_core.log"
+            log_path = "/home/zeus/Documentos/ZEUS_SYSTEM/nexus_core.log"
             if os.path.exists(log_path):
                 result = await daemon_client.execute(
                     f"tail -n 200 {log_path}",

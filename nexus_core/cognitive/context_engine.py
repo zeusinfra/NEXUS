@@ -43,14 +43,14 @@ def _area_from_tags(tags: str | None) -> str:
         return "tarefa/operação"
     if "to-notion" in t or "project" in t or "docs" in t:
         return "documentação"
-    if "zeus" in t or "memory" in t:
+    if "nexus" in t or "memory" in t:
         return "memória"
     return "memória local"
 
 
 def build_current_context() -> str:
     """
-    Constrói um resumo do contexto atual do usuário para injetar no LLM do agente ZEUS.
+    Constrói um resumo do contexto atual do usuário para injetar no LLM do agente NEXUS.
     """
     context_lines = ["Contexto operacional atual:"]
 

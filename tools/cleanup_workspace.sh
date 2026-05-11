@@ -7,8 +7,8 @@ cd "$ROOT_DIR"
 echo "[cleanup] Removing Python caches..."
 rm -rf \
   __pycache__ \
-  zeus_core/__pycache__ \
-  zeus_core/v4/__pycache__ \
+  nexus_core/__pycache__ \
+  nexus_core/v4/__pycache__ \
   cognitive-python/__pycache__ \
   communication/__pycache__ \
   scratch/__pycache__ \
@@ -16,6 +16,6 @@ rm -rf \
   .ruff_cache || true
 
 echo "[cleanup] Removing Rust build artifacts..."
-rm -rf watcher_rs/target core-rust/target core-rust/zeus_memory/target core-rust/zeus_synapse/target || true
+rm -rf watcher_rs/target core-rust/target core-rust/nexus_memory/target core-rust/nexus_synapse/target || true
 
 echo "[cleanup] Done."

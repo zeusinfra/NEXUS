@@ -9,7 +9,7 @@ from nexus_core.core_system import call_cloud_llm
 from nexus_core.v4.types import Goal, Plan, PlanStep, RiskLevel
 
 
-_PROMPT = """Você é o PLANNER do ZEUS v4.0 (SO cognitivo).
+_PROMPT = """Você é o PLANNER do NEXUS v4.0 (SO cognitivo).
 Crie um plano multi-step para um objetivo contínuo.
 
 Requisitos:

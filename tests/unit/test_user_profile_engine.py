@@ -19,7 +19,7 @@ def engine(tmp_path):
 class TestUserProfileEngine:
     def test_record_interaction(self, engine):
         db = engine.db_path
-        iid = record_interaction("chat", "Hello Zeus", "direct", db_path=db)
+        iid = record_interaction("chat", "Hello Nexus", "direct", db_path=db)
         assert iid is not None
 
         stats = engine.get_interaction_stats()

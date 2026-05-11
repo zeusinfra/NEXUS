@@ -1,5 +1,5 @@
 """
-ZEUS DaemonClient — Abstração de comunicação com o RootDaemon.
+NEXUS DaemonClient — Abstração de comunicação com o RootDaemon.
 
 Usado por todos os módulos que precisam executar comandos no sistema.
 Comunica via Unix socket com o RootDaemon.
@@ -115,7 +115,7 @@ class DaemonClient:
         )
 
     async def service_control(self, service: str, action: str) -> dict:
-        """Reinicia, para ou inicia serviços do ZEUS."""
+        """Reinicia, para ou inicia serviços do NEXUS."""
         return await self._send(
             {"action": "service_control", "service": service, "service_action": action}
         )

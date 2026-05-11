@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Compile gRPC definitions for ZEUS OS.
+Compile gRPC definitions for NEXUS OS.
 Bridges Rust Core with Python Cognitive Engine.
 """
 

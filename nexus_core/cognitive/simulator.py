@@ -1,5 +1,5 @@
 """
-ZEUS Cognitive Core — Simulator.
+NEXUS Cognitive Core — Simulator.
 
 Risk assessment engine that evaluates plans against safety policies.
 Does NOT execute anything — pure analysis of command patterns and action types.
@@ -12,7 +12,7 @@ from dataclasses import dataclass, field, asdict
 
 from nexus_core.observability import get_logger, log_event
 
-logger = get_logger("zeus.cognitive.simulator")
+logger = get_logger("nexus.cognitive.simulator")
 
 
 # Dangerous command patterns that must ALWAYS be blocked

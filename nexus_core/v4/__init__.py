@@ -1,1 +1,1 @@
-"""ZEUS Cognitive OS v4 — continuous core."""
+"""NEXUS Cognitive OS v4 — continuous core."""

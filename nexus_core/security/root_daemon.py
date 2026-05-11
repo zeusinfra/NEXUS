@@ -849,5 +849,5 @@ async def main():
 
 
 if __name__ == "__main__":
-    print("[RootDaemon] Iniciando ZEUS RootDaemon...")
+    print("[RootDaemon] Iniciando NEXUS RootDaemon...")
     asyncio.run(main())

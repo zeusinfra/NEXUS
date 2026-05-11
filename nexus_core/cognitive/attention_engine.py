@@ -1,5 +1,5 @@
 """
-ZEUS Cognitive Core — Attention Engine.
+NEXUS Cognitive Core — Attention Engine.
 
 Determines the system's "Attention State" by analyzing user activity,
 active windows, and system pressure.
@@ -19,7 +19,7 @@ import psutil
 from nexus_core.cognitive.cognitive_db import get_connection
 from nexus_core.observability import get_logger, log_event
 
-logger = get_logger("zeus.cognitive.attention")
+logger = get_logger("nexus.cognitive.attention")
 
 # ------------------------------------------------------------------
 # Models
@@ -203,7 +203,7 @@ class AttentionEngine:
             ).decode()
             for line in out_list.splitlines():
                 if win_id.lower() in line.lower():
-                    # Format: 0x04600004  0 707095 zeus TITLE...
+                    # Format: 0x04600004  0 707095 nexus TITLE...
                     parts = line.split(None, 4)
                     if len(parts) >= 5:
                         return parts[4]

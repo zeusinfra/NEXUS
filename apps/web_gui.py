@@ -155,7 +155,7 @@ SERVER_PORT = int(os.getenv("NEXUS_PORT", "8080"))
 PROJECT_COLORS = {
     "NEXUS_BRAIN": "#00f0ff",
     "GateStack": "#8c3cff",
-    "NEXUS_SYSTEM": "#00ffcc",
+    "NEXUS": "#00ffcc",
     "nexus-rb": "#00ffcc",
     "nexus-portfolio": "#ff9628",
     "bot": "#ff3c50",
@@ -751,7 +751,7 @@ def get_project(path):
     # Tenta identificar o projeto baseado no caminho absoluto
     for wd in WATCH_DIRS:
         if path.startswith(wd):
-            root_name = os.path.basename(wd.rstrip(os.sep)) or "NEXUS_SYSTEM"
+            root_name = os.path.basename(wd.rstrip(os.sep)) or "NEXUS"
             rel = os.path.relpath(path, wd)
             parts = rel.split(os.sep)
             if "NEXUS_BRAIN" in wd:
@@ -1022,7 +1022,7 @@ async def get_status(request: Request):
         "disk": disk,
         "total_events": total_events,
         "mood": system_mood,
-        "active_path": nodes_data[-1]["rel"] if nodes_data else "NEXUS_SYSTEM / IDLE",
+        "active_path": nodes_data[-1]["rel"] if nodes_data else "NEXUS / IDLE",
         "project_activity": build_project_activity(),
         "messages": pending_msgs,
     }
@@ -1451,7 +1451,7 @@ def _build_operational_capabilities() -> dict:
         item.strip()
         for item in os.getenv(
             "NEXUS_ALLOWED_EDIT_PATHS",
-            "/home/zeus/Documentos/ZEUS_SYSTEM,/home/zeus/Documentos/Brain,/tmp/nexus_",
+            "/home/zeus/Documentos/NEXUS,/home/zeus/Documentos/Brain,/tmp/nexus_",
         ).split(",")
         if item.strip()
     ]

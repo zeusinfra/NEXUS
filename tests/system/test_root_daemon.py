@@ -37,7 +37,7 @@ async def test_service_name_rejects_shell_payload(root_daemon_instance, monkeypa
     monkeypatch.setattr("asyncio.to_thread", mock_to_thread)
 
     result = await root_daemon_instance.handle_service_control(
-        {"service": "zeus;reboot", "service_action": "status"}
+        {"service": "nexus;reboot", "service_action": "status"}
     )
 
     assert result["status"] == "blocked"
@@ -74,8 +74,8 @@ async def test_execute_safe_command_allows_tokenized_read_only_command(
 
     # "systemctl status ..." is a read-only command according to classify_risk
     result = await root_daemon_instance.handle_execute(
-        {"command": "systemctl status zeus-core.service"}
+        {"command": "systemctl status nexus-core.service"}
     )
 
     assert result["status"] == "success"
-    assert calls == ["systemctl status zeus-core.service"]
+    assert calls == ["systemctl status nexus-core.service"]

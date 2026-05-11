@@ -24,7 +24,7 @@ GLOBAL_ANNOUNCE_COOLDOWN_SEC = float(
     os.getenv("NEXUS_USB_GLOBAL_COOLDOWN_SEC", "4.0") or "4.0"
 )
 
-logger = get_logger("zeus.peripherals.usb_monitor")
+logger = get_logger("nexus.peripherals.usb_monitor")
 
 
 @dataclass(frozen=True)

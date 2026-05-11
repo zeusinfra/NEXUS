@@ -4,7 +4,7 @@ import sqlite3
 import datetime
 from nexus_core.observability import get_logger
 
-logger = get_logger("zeus.self_improvement.audit")
+logger = get_logger("nexus.self_improvement.audit")
 
 
 class AuditLog:

@@ -35,7 +35,7 @@ def _env_mode() -> AutonomyMode:
     )
 
 
-class ZeusCognitiveCoreV4:
+class NexusCognitiveCoreV4:
     def __init__(self):
         self.mode = _env_mode()
         self.short = ShortTermMemory()
@@ -72,7 +72,7 @@ class ZeusCognitiveCoreV4:
         max_cycles = int(max_cycles_env) if max_cycles_env.isdigit() else None
         cycle = 0
 
-        self._debug("CORE", f"ZEUS v4 online mode={self.mode.value}")
+        self._debug("CORE", f"NEXUS v4 online mode={self.mode.value}")
         while True:
             cycle += 1
             await self._cycle(cycle)

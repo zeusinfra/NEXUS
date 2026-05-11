@@ -1,7 +1,7 @@
 """
-ZEUS Approval Listener — Monitora aprovações pendentes do RootDaemon e mostra GTK dialog.
+NEXUS Approval Listener — Monitora aprovações pendentes do RootDaemon e mostra GTK dialog.
 
-Roda como thread/task dentro do zeus-gtk-chat ou como processo standalone.
+Roda como thread/task dentro do nexus-gtk-chat ou como processo standalone.
 Faz polling no daemon a cada 2s por aprovações pendentes.
 Quando encontra uma, mostra o ApprovalDialog e envia a resolução de volta ao daemon.
 """
@@ -136,14 +136,14 @@ approval_listener = ApprovalListener()
 
 
 # ---------------------------------------------------------------------------
-# GLib integration (para usar dentro do zeus-gtk-chat)
+# GLib integration (para usar dentro do nexus-gtk-chat)
 # ---------------------------------------------------------------------------
 
 
 def start_approval_listener_glib(on_pending_callback=None):
     """
     Inicia o listener de aprovações integrado ao GLib main loop.
-    Usado pelo zeus-gtk-chat para mostrar dialogs inline.
+    Usado pelo nexus-gtk-chat para mostrar dialogs inline.
 
     on_pending_callback: chamado com (approval_data) quando há aprovação pendente.
                          Se None, usa subprocess para mostrar dialog.

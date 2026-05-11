@@ -243,7 +243,7 @@ Input:focus {
 
 def _json_request(method: str, path: str, payload: dict | None = None, timeout: float = 30.0) -> dict:
     body = None
-    headers = {"X-Zeus-Client-Id": CLIENT_ID}
+    headers = {"X-Nexus-Client-Id": CLIENT_ID}
     if payload is not None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         headers["Content-Type"] = "application/json"
@@ -421,9 +421,9 @@ def _journal_lines(count: int) -> tuple[int, str, str]:
     count = max(1, min(count, 300))
     for args in (
         ["journalctl", "--user", "-u", "nexus", "-n", str(count), "--no-pager"],
-        ["journalctl", "--user", "-u", "zeus", "-n", str(count), "--no-pager"],
+        ["journalctl", "--user", "-u", "nexus", "-n", str(count), "--no-pager"],
         ["journalctl", "-u", "nexus", "-n", str(count), "--no-pager"],
-        ["journalctl", "-u", "zeus", "-n", str(count), "--no-pager"],
+        ["journalctl", "-u", "nexus", "-n", str(count), "--no-pager"],
     ):
         code, stdout, stderr = _run_process(args)
         if code == 0 and stdout.strip():

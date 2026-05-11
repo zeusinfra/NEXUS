@@ -1,5 +1,5 @@
 """
-ZEUS Cognitive Core — Learning Engine.
+NEXUS Cognitive Core — Learning Engine.
 
 Learns from execution results, stores operational lessons,
 detects repeated failures, and adjusts goal priorities.
@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from nexus_core.cognitive.cognitive_db import get_connection
 from nexus_core.observability import get_logger, log_event
 
-logger = get_logger("zeus.cognitive.learning")
+logger = get_logger("nexus.cognitive.learning")
 
 
 def _now_iso() -> str:

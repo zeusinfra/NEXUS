@@ -1,5 +1,5 @@
 """
-ZEUS Cognitive Core — Privacy Guard.
+NEXUS Cognitive Core — Privacy Guard.
 
 Manages data classification, user consent, and export filtering.
 Ensures no sensitive data (tokens, .env, private habits) is exported
@@ -19,7 +19,7 @@ from typing import Any
 from nexus_core.cognitive.cognitive_db import get_connection
 from nexus_core.observability import get_logger, log_event
 
-logger = get_logger("zeus.security.privacy")
+logger = get_logger("nexus.security.privacy")
 
 # ------------------------------------------------------------------
 # Models
@@ -58,7 +58,7 @@ SENSITIVE_PATHS = [
     r"\.env",
     r"\.aws/",
     r"config/.*secret",
-    r"zeus_events\.db",
+    r"nexus_events\.db",
 ]
 
 # ------------------------------------------------------------------
@@ -66,7 +66,7 @@ SENSITIVE_PATHS = [
 # ------------------------------------------------------------------
 
 try:
-    from zeus_security import PrivacyEngineRust
+    from nexus_security import PrivacyEngineRust
 
     RUST_SECURITY_AVAILABLE = True
 except ImportError:
@@ -84,10 +84,10 @@ class PrivacyGuard:
 
         if RUST_SECURITY_AVAILABLE:
             self.rust_engine = PrivacyEngineRust()
-            logger.info("🦀 ZEUS: Privacy Guard operando com motor Rust otimizado.")
+            logger.info("🦀 NEXUS: Privacy Guard operando com motor Rust otimizado.")
         else:
             self.rust_engine = None
-            logger.warning("🐍 ZEUS: Privacy Guard operando em modo Python (fallback).")
+            logger.warning("🐍 NEXUS: Privacy Guard operando em modo Python (fallback).")
 
     def classify_content(self, content: str) -> PrivacyLevel:
         """Analyze content and return its highest privacy level."""

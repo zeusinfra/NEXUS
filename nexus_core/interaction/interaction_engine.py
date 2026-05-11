@@ -31,7 +31,7 @@ class InteractionEngine:
             return InteractionMode.SUDO_REVIEW_MODE
 
         if (
-            "melhorar zeus" in intent
+            "melhorar nexus" in intent
             or "patch" in intent
             or "refatorar si mesmo" in intent
         ):

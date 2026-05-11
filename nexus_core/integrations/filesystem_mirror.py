@@ -9,7 +9,7 @@ from nexus_core.memory_manager import MemoryManager
 
 class FilesystemMirror:
     """
-    ZEUS Filesystem Mirror
+    NEXUS Filesystem Mirror
     Maps OS directories and files into Obsidian markdown notes with hierarchical and synaptic links.
     """
 
@@ -110,7 +110,7 @@ class FilesystemMirror:
             weight = self._get_synaptic_weight(str(path))
             if weight > 1:
                 content.append("")
-                content.append("## Inteligência ZEUS")
+                content.append("## Inteligência NEXUS")
                 content.append(f"- **Peso Sináptico:** `{weight}`")
 
                 related = self.memory_manager.get_working_context(str(path), limit=5)
@@ -157,7 +157,7 @@ class FilesystemMirror:
             weight = self._get_synaptic_weight(str(path))
             if weight > 1:
                 content.append("")
-                content.append("## Inteligência ZEUS")
+                content.append("## Inteligência NEXUS")
                 content.append(f"- **Peso Sináptico:** `{weight}`")
 
                 related = self.memory_manager.get_working_context(str(path), limit=5)

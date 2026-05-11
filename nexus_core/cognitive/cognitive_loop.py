@@ -1,5 +1,5 @@
 """
-ZEUS Cognitive Core — Main Cognitive Loop.
+NEXUS Cognitive Core — Main Cognitive Loop.
 
 The autonomous brain loop that continuously:
   perceive → update_memory → analyze → generate_goals →
@@ -34,16 +34,16 @@ from nexus_core.cognitive.priority_orchestrator import PriorityOrchestrator
 from nexus_core.cognitive.predictive_engine import PredictiveEngine
 from nexus_core.observability import get_logger, log_event, correlation_id_var
 
-logger = get_logger("zeus.cognitive.loop")
+logger = get_logger("nexus.cognitive.loop")
 
 # Configuration
 from nexus_core.runtime.resource_governor import resource_governor
 
-DB_PATH = os.getenv("NEXUS_DB_PATH", "./zeus_events.db")
+DB_PATH = os.getenv("NEXUS_DB_PATH", "./nexus_events.db")
 MEMORY_DB_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
     "data",
-    "zeus_memory.db",
+    "nexus_memory.db",
 )
 
 

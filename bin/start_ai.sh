@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script para iniciar o ZEUS Neural Command Center
+# Script para iniciar o NEXUS Neural Command Center
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/.."
 
@@ -12,6 +12,6 @@ else
     exit 1
 fi
 
-echo "⚡ Sincronizando ZEUS Neural Command Center na porta ${NEXUS_PORT:-8080}..."
+echo "⚡ Sincronizando NEXUS Neural Command Center na porta ${NEXUS_PORT:-8080}..."
 export NEXUS_BIND_HOST="0.0.0.0"
 python -m apps.web_gui "$@"

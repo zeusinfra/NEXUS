@@ -1,5 +1,5 @@
 [Unit]
-Description=ZEUS Cognitive OS - Headless Backend
+Description=NEXUS Cognitive OS - Headless Backend
 After=network.target
 
 [Service]

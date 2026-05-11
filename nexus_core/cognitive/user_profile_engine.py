@@ -1,5 +1,5 @@
 """
-ZEUS Cognitive Core — User Profile Engine.
+NEXUS Cognitive Core — User Profile Engine.
 
 Tracks user behavior, synthesizes habits, detects workflows,
 and builds temporal context for cognitive loop awareness.
@@ -18,7 +18,7 @@ from pathlib import Path
 from nexus_core.cognitive.cognitive_db import get_connection
 from nexus_core.observability import get_logger, log_event
 
-logger = get_logger("zeus.cognitive.profile")
+logger = get_logger("nexus.cognitive.profile")
 
 SESSION_GAP_MINUTES = 5
 VAULT_PATH = os.getenv("NEXUS_VAULT_PATH", "")
@@ -473,7 +473,7 @@ class UserProfileEngine:
         if not vault.exists():
             return
 
-        profile_dir = vault / "ZEUS" / "Profile"
+        profile_dir = vault / "NEXUS" / "Profile"
         profile_dir.mkdir(parents=True, exist_ok=True)
 
         temporal = self.build_temporal_context()
@@ -483,7 +483,7 @@ class UserProfileEngine:
         today = date.today().isoformat()
 
         lines = [
-            f"# ZEUS User Profile — {today}",
+            f"# NEXUS User Profile — {today}",
             "",
             "## Contexto Temporal",
             f"- **Período**: {temporal.period_label}",

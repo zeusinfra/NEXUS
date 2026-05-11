@@ -19,7 +19,7 @@ class TestAttentionEngine:
         # Mock xprop output
         mock_cmd.side_effect = [
             b"window id # 0x12345",  # xprop
-            b"0x12345  0 1234 zeus MyProject - Visual Studio Code",  # wmctrl
+            b"0x12345  0 1234 nexus MyProject - Visual Studio Code",  # wmctrl
         ]
         title = engine._get_active_window_title()
         assert "Visual Studio Code" in title

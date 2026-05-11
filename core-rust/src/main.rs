@@ -12,18 +12,18 @@ pub mod nexus_core {
     tonic::include_proto!("nexus_core");
 }
 
-use nexus_core::nexus_core_server::{ZeusCore, ZeusCoreServer};
+use nexus_core::nexus_core_server::{NexusCore, NexusCoreServer};
 use nexus_core::{
     ActionRequest, ActionResponse, ModeRequest, ModeResponse, SimulationRequest, SimulationResponse,
     ProcessInfo, TelemetryRequest, TelemetryUpdate,
 };
 
-struct ZeusCoreService {
+struct NexusCoreService {
     system: Arc<Mutex<System>>,
     mode: Arc<Mutex<String>>,
 }
 
-impl ZeusCoreService {
+impl NexusCoreService {
     fn new() -> Self {
         Self {
             system: Arc::new(Mutex::new(System::new_all())),
@@ -56,7 +56,7 @@ impl ZeusCoreService {
 }
 
 #[tonic::async_trait]
-impl ZeusCore for ZeusCoreService {
+impl NexusCore for NexusCoreService {
     async fn execute_action(
         &self,
         request: Request<ActionRequest>,
@@ -76,7 +76,7 @@ impl ZeusCore for ZeusCoreService {
             }));
         }
 
-        let Some(args) = ZeusCoreService::safe_command_args(&cmd) else {
+        let Some(args) = NexusCoreService::safe_command_args(&cmd) else {
             return Ok(Response::new(ActionResponse {
                 success: false,
                 output: "".into(),
@@ -194,36 +194,36 @@ impl ZeusCore for ZeusCoreService {
 
 #[cfg(test)]
 mod tests {
-    use super::ZeusCoreService;
+    use super::NexusCoreService;
 
     #[test]
     fn safe_command_args_accepts_simple_allowlisted_commands() {
-        let args = ZeusCoreService::safe_command_args("echo hello").unwrap();
+        let args = NexusCoreService::safe_command_args("echo hello").unwrap();
         assert_eq!(args, vec!["echo".to_string(), "hello".to_string()]);
     }
 
     #[test]
     fn safe_command_args_rejects_shell_control() {
-        assert!(ZeusCoreService::safe_command_args("echo ok && rm file").is_none());
-        assert!(ZeusCoreService::safe_command_args("cat file > out").is_none());
+        assert!(NexusCoreService::safe_command_args("echo ok && rm file").is_none());
+        assert!(NexusCoreService::safe_command_args("cat file > out").is_none());
     }
 
     #[test]
     fn safe_command_args_rejects_non_allowlisted_commands() {
-        assert!(ZeusCoreService::safe_command_args("python3 -c print(1)").is_none());
+        assert!(NexusCoreService::safe_command_args("python3 -c print(1)").is_none());
     }
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = "[::1]:50051".parse()?;
-    let nexus_service = ZeusCoreService::new();
+    let nexus_service = NexusCoreService::new();
 
     println!("🚀 NEXUS CORE (Rust) started on {}", addr);
     println!("🛡️ Guardian Active. Mode: SAFE");
 
     Server::builder()
-        .add_service(ZeusCoreServer::new(nexus_service))
+        .add_service(NexusCoreServer::new(nexus_service))
         .serve(addr)
         .await?;
 

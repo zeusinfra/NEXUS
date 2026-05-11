@@ -86,12 +86,12 @@ def require_lan_token_for_request(request: Request, *, lan: LanSecurityConfig) -
 
     header_token = extract_bearer_token(request.headers.get("authorization"))
     header_token = header_token or extract_bearer_token(
-        request.headers.get("x-zeus-token")
+        request.headers.get("x-nexus-token")
     )
     query_token = extract_bearer_token(request.query_params.get("token"))
     if (header_token or query_token) != lan.lan_token:
         raise HTTPException(
-            status_code=401, detail="Invalid or missing ZEUS LAN token."
+            status_code=401, detail="Invalid or missing NEXUS LAN token."
         )
 
 

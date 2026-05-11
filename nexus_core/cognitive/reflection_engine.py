@@ -1,5 +1,5 @@
 """
-ZEUS Cognitive Core — Reflection Engine.
+NEXUS Cognitive Core — Reflection Engine.
 
 Generates structured reflections at different depths:
   - cycle_reflection:  lightweight, runs every loop cycle
@@ -23,7 +23,7 @@ from pathlib import Path
 from nexus_core.cognitive.cognitive_db import get_connection
 from nexus_core.observability import get_logger, log_event
 
-logger = get_logger("zeus.cognitive.reflection")
+logger = get_logger("nexus.cognitive.reflection")
 
 VAULT_PATH = os.getenv("NEXUS_VAULT_PATH", "")
 OBSIDIAN_SYNC = os.getenv("NEXUS_ENABLE_OBSIDIAN_AUTO_SYNC", "0").strip().lower() in {
@@ -217,7 +217,7 @@ class ReflectionEngine:
         if not vault.exists():
             return
 
-        reflections_dir = vault / "ZEUS" / "Reflections"
+        reflections_dir = vault / "NEXUS" / "Reflections"
         reflections_dir.mkdir(parents=True, exist_ok=True)
 
         today = date.today().isoformat()
@@ -234,7 +234,7 @@ class ReflectionEngine:
     @staticmethod
     def _render_markdown(reflection: Reflection, date_str: str) -> str:
         lines = [
-            f"# ZEUS Reflection — {date_str}",
+            f"# NEXUS Reflection — {date_str}",
             "",
             "## Resumo",
             reflection.summary or "Sem resumo disponível.",
@@ -271,7 +271,7 @@ class ReflectionEngine:
             lines.append("")
 
         lines.append(
-            f"---\n*Gerado automaticamente pelo ZEUS Cognitive Core em {reflection.created_at}*\n"
+            f"---\n*Gerado automaticamente pelo NEXUS Cognitive Core em {reflection.created_at}*\n"
         )
         return "\n".join(lines)
 
@@ -331,11 +331,11 @@ class ReflectionEngine:
         if not vault.exists():
             return
 
-        goals_dir = vault / "ZEUS" / "Goals"
+        goals_dir = vault / "NEXUS" / "Goals"
         goals_dir.mkdir(parents=True, exist_ok=True)
         filepath = goals_dir / "active_goals.md"
 
-        lines = ["# ZEUS Active Goals", "", f"*Atualizado: {_now_iso()}*", ""]
+        lines = ["# NEXUS Active Goals", "", f"*Atualizado: {_now_iso()}*", ""]
         for g in goals:
             d = (
                 g

@@ -1,5 +1,5 @@
 """
-ZEUS Sync Engine — Real-Time Memory Synchronization
+NEXUS Sync Engine — Real-Time Memory Synchronization
 
 Orchestrates 3 independent async workers:
 1. Synaptic Memory → Obsidian (every 60s)
@@ -103,7 +103,7 @@ async def sync_longterm_to_notion(interval: float = 300.0):
             memory = load_long_term_memory()
 
             # Sync profile when long-term memory exists; otherwise publish an operational status page
-            # so the Notion workspace receives visible ZEUS data immediately.
+            # so the Notion workspace receives visible NEXUS data immediately.
             has_content = any(
                 isinstance(memory.get(section), dict) and memory[section]
                 for section in [
@@ -117,15 +117,15 @@ async def sync_longterm_to_notion(interval: float = 300.0):
             )
 
             if has_content:
-                title = "ZEUS — Perfil Cognitivo"
+                title = "NEXUS — Perfil Cognitivo"
                 content = _format_memory_for_notion(memory)
-                tags = ["zeus-memory", "auto-sync", "cognitive-profile"]
+                tags = ["nexus-memory", "auto-sync", "cognitive-profile"]
                 source_path = "long_term_memory.json"
             else:
-                title = "ZEUS — Estado Operacional"
+                title = "NEXUS — Estado Operacional"
                 content = _format_operational_status_for_notion(get_sync_status())
-                tags = ["zeus-memory", "auto-sync", "operational-status"]
-                source_path = "zeus_events.db"
+                tags = ["nexus-memory", "auto-sync", "operational-status"]
+                source_path = "nexus_events.db"
 
             result = await asyncio.to_thread(
                 upsert_notion_page,
@@ -237,7 +237,7 @@ async def sync_insights_to_linear(memory_manager, interval: float = 300.0):
 def _format_neural_map(snapshot: dict) -> str:
     """Formats a synaptic snapshot into a readable Obsidian markdown note."""
     lines = [
-        f"# Mapa Neural ZEUS",
+        f"# Mapa Neural NEXUS",
         f"",
         f"> Snapshot gerado em {snapshot['timestamp']}",
         f"",
@@ -295,7 +295,7 @@ def _format_neural_map(snapshot: dict) -> str:
 def _format_memory_for_notion(memory: dict) -> str:
     """Formats long-term memory into structured text for Notion page content."""
     lines = [
-        f"# ZEUS — Perfil Cognitivo",
+        f"# NEXUS — Perfil Cognitivo",
         f"",
         f"> Última sincronização: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         f"",
@@ -335,7 +335,7 @@ def _format_operational_status_for_notion(sync_status: dict) -> str:
     generated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     return "\n".join(
         [
-            "# ZEUS — Estado Operacional",
+            "# NEXUS — Estado Operacional",
             "",
             f"> Última sincronização: {generated_at}",
             "",
@@ -350,6 +350,6 @@ def _format_operational_status_for_notion(sync_status: dict) -> str:
             "",
             "## Observação",
             "",
-            "A memória longa ainda não possui perfil cognitivo persistido. Esta página confirma que o ZEUS já está conectado ao Notion e pronto para sincronizar dados conforme a memória for sendo construída.",
+            "A memória longa ainda não possui perfil cognitivo persistido. Esta página confirma que o NEXUS já está conectado ao Notion e pronto para sincronizar dados conforme a memória for sendo construída.",
         ]
     )

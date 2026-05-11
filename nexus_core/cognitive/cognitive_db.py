@@ -1,5 +1,5 @@
 """
-ZEUS Cognitive Core — Database Layer.
+NEXUS Cognitive Core — Database Layer.
 
 Manages the cognitive tables inside the shared nexus_events.db:
   - cognitive_goals

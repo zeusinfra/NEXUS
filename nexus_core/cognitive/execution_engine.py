@@ -1,5 +1,5 @@
 """
-ZEUS Cognitive Core — Execution Engine.
+NEXUS Cognitive Core — Execution Engine.
 
 Policy-gated executor with full SQLite audit trail.
 Only executes actions approved by the simulator; high-risk actions
@@ -19,7 +19,7 @@ from nexus_core.command_policy import validate_command
 from nexus_core.observability import get_logger, log_event
 from nexus_core.tools import ToolError
 
-logger = get_logger("zeus.cognitive.execution")
+logger = get_logger("nexus.cognitive.execution")
 
 
 def _now_iso() -> str:

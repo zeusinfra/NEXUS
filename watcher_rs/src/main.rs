@@ -13,7 +13,7 @@ use tower_http::cors::CorsLayer;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "type")]
-enum ZeusEvent {
+enum NexusEvent {
     #[serde(rename = "file_event")]
     File {
         event_kind: String,
@@ -29,7 +29,7 @@ enum ZeusEvent {
 }
 
 struct AppState {
-    tx: broadcast::Sender<ZeusEvent>,
+    tx: broadcast::Sender<NexusEvent>,
 }
 
 #[tokio::main]
@@ -37,7 +37,7 @@ async fn main() {
     dotenv::dotenv().ok();
 
     // Configurações
-    let port = std::env::var("ZEUS_WATCHER_PORT").unwrap_or_else(|_| "8081".to_string());
+    let port = std::env::var("NEXUS_WATCHER_PORT").unwrap_or_else(|_| "8081".to_string());
     let (tx, _rx) = broadcast::channel(100);
     let app_state = Arc::new(AppState { tx: tx.clone() });
 
@@ -49,7 +49,7 @@ async fn main() {
             sys.refresh_cpu();
             sys.refresh_memory();
 
-            let event = ZeusEvent::Telemetry {
+            let event = NexusEvent::Telemetry {
                 cpu_usage: sys.global_cpu_info().cpu_usage(),
                 ram_usage: (sys.used_memory() as f32 / sys.total_memory() as f32) * 100.0,
                 disk_usage: 0.0, // Simplificado
@@ -75,7 +75,7 @@ async fn main() {
 
         let watch_dirs = vec![
             std::env::var("HOME").unwrap_or_else(|_| "/home/zeus".to_string())
-                + "/Documentos/ZEUS_BRAIN",
+                + "/Documentos/NEXUS_BRAIN",
             std::env::var("HOME").unwrap_or_else(|_| "/home/zeus".to_string())
                 + "/Documentos/ZEUS_SYSTEM",
         ];
@@ -90,7 +90,7 @@ async fn main() {
             if let Ok(event) = res {
                 for path in event.paths {
                     if !is_ignored(&path) {
-                        let ev = ZeusEvent::File {
+                        let ev = NexusEvent::File {
                             event_kind: format!("{:?}", event.kind),
                             path: path.to_string_lossy().into_owned(),
                             project: get_project(&path),
@@ -113,7 +113,7 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port))
         .await
         .unwrap();
-    println!("🧠 ZEUS Watcher Hub rodando em ws://0.0.0.0:{}/ws", port);
+    println!("🧠 NEXUS Watcher Hub rodando em ws://0.0.0.0:{}/ws", port);
     axum::serve(listener, app).await.unwrap();
 }
 
@@ -137,8 +137,8 @@ async fn handle_socket(mut socket: WebSocket, state: axum::extract::State<Arc<Ap
 
 fn get_project(path: &Path) -> String {
     let path_str = path.to_string_lossy();
-    if path_str.contains("ZEUS_BRAIN") {
-        "ZEUS_BRAIN".to_string()
+    if path_str.contains("NEXUS_BRAIN") {
+        "NEXUS_BRAIN".to_string()
     } else if path_str.contains("ZEUS_SYSTEM") {
         "ZEUS_SYSTEM".to_string()
     } else {
@@ -172,12 +172,12 @@ fn is_ignored(path: &Path) -> bool {
         return false;
     };
     let runtime_files = [
-        "zeus_events.db",
-        "zeus_events.db-journal",
-        "zeus_events.db-wal",
-        "zeus_events.db-shm",
-        "zeus_core.log",
-        "zeus_server.log",
+        "nexus_events.db",
+        "nexus_events.db-journal",
+        "nexus_events.db-wal",
+        "nexus_events.db-shm",
+        "nexus_core.log",
+        "nexus_server.log",
     ];
     if runtime_files.contains(&name) {
         return true;
@@ -215,8 +215,8 @@ mod tests {
     #[test]
     fn get_project_classifies_known_roots() {
         assert_eq!(
-            get_project(Path::new("/home/zeus/Documentos/ZEUS_BRAIN/a.md")),
-            "ZEUS_BRAIN"
+            get_project(Path::new("/home/zeus/Documentos/NEXUS_BRAIN/a.md")),
+            "NEXUS_BRAIN"
         );
         assert_eq!(
             get_project(Path::new("/home/zeus/Documentos/ZEUS_SYSTEM/a.md")),
@@ -229,9 +229,9 @@ mod tests {
     fn is_ignored_blocks_runtime_and_hidden_paths() {
         assert!(is_ignored(Path::new("/repo/.git/config")));
         assert!(is_ignored(Path::new("/repo/logs/app.log")));
-        assert!(is_ignored(Path::new("/repo/data/zeus_memory.db")));
-        assert!(is_ignored(Path::new("/repo/zeus_events.db-journal")));
-        assert!(is_ignored(Path::new("/repo/zeus_core.log")));
+        assert!(is_ignored(Path::new("/repo/data/nexus_memory.db")));
+        assert!(is_ignored(Path::new("/repo/nexus_events.db-journal")));
+        assert!(is_ignored(Path::new("/repo/nexus_core.log")));
         assert!(is_ignored(Path::new("/repo/target/debug/app")));
         assert!(!is_ignored(Path::new("/repo/apps/web_gui.py")));
     }

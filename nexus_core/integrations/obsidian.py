@@ -52,7 +52,7 @@ def read_note(path: str) -> dict:
 
 
 def write_obsidian_insight(title: str, content: str, folder: str = "Insights") -> str:
-    """Escreve uma reflexão ou insight gerado pelo ZEUS diretamente no Obsidian."""
+    """Escreve uma reflexão ou insight gerado pelo NEXUS diretamente no Obsidian."""
     folder_path = os.path.join(VAULT_PATH, folder)
     os.makedirs(folder_path, exist_ok=True)
 
@@ -61,7 +61,7 @@ def write_obsidian_insight(title: str, content: str, folder: str = "Insights") -
     file_path = os.path.join(folder_path, f"{safe_title}.md")
 
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    header = f"---\ntags: [zeus-insight, auto-generated]\ndate: {timestamp}\n---\n\n"
+    header = f"---\ntags: [nexus-insight, auto-generated]\ndate: {timestamp}\n---\n\n"
 
     with open(file_path, "w", encoding="utf-8") as f:
         f.write(header + content)
@@ -84,7 +84,7 @@ def write_sync_note(subfolder: str, filename: str, content: str) -> str:
     file_path = os.path.join(sync_folder, safe_name)
 
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    header = f"---\ntags: [zeus-sync, auto-generated]\ndate: {timestamp}\n---\n\n"
+    header = f"---\ntags: [nexus-sync, auto-generated]\ndate: {timestamp}\n---\n\n"
 
     with open(file_path, "w", encoding="utf-8") as f:
         f.write(header + content)
@@ -109,7 +109,7 @@ def update_daily_log(entries: list[str], date_str: str = None) -> str:
         with open(file_path, "r", encoding="utf-8") as f:
             existing = f.read()
     else:
-        existing = f"---\ntags: [zeus-daily, auto-generated]\ndate: {date_str}\n---\n\n# ZEUS Daily Log — {date_str}\n\n"
+        existing = f"---\ntags: [nexus-daily, auto-generated]\ndate: {date_str}\n---\n\n# NEXUS Daily Log — {date_str}\n\n"
 
     timestamp = datetime.now().strftime("%H:%M:%S")
     new_block = f"\n## {timestamp}\n\n"

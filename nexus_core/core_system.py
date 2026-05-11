@@ -95,7 +95,7 @@ def _extract_message_content(data):
 
 
 try:
-    from zeus_state import BlackboardRust
+    from nexus_state import BlackboardRust
 
     RUST_STATE_AVAILABLE = True
 except ImportError:
@@ -551,7 +551,7 @@ class StrategistAgent(CloudAgent):
 
     def plan(self, blackboard, user_input):
         system_prompt = (
-            "Você é o STRATEGIST do ZEUS. Analise o contexto e crie um plano técnico MULTI-ETAPAS detalhado.\n"
+            "Você é o STRATEGIST do NEXUS. Analise o contexto e crie um plano técnico MULTI-ETAPAS detalhado.\n"
             "Seu plano DEVE conter as seguintes seções:\n"
             "1. Objetivo e Diagnóstico\n"
             "2. Arquivos Envolvidos\n"
@@ -592,7 +592,7 @@ class OperatorAgent(CloudAgent):
 
     def execute(self, blackboard):
         system_prompt = (
-            "Você é o OPERATOR do ZEUS. Transforme o plano estratégico em ações ou comandos seguros.\n"
+            "Você é o OPERATOR do NEXUS. Transforme o plano estratégico em ações ou comandos seguros.\n"
             "REGRAS OBRIGATÓRIAS:\n"
             "1. Prefira comandos idempotentes.\n"
             "2. Exija backup antes de alterações.\n"
@@ -622,12 +622,12 @@ class CriticAgent(CloudAgent):
 
     def analyze(self, blackboard):
         system_prompt = (
-            "Você é o CRITIC do ZEUS. Analise a proposta de execução e o plano.\n"
+            "Você é o CRITIC do NEXUS. Analise a proposta de execução e o plano.\n"
             "Você DEVE BLOQUEAR a execução se:\n"
             "- A ação usa sudo ou shell como root diretamente (sem SudoBroker).\n"
             "- Modifica /etc sem backup.\n"
             "- Remove arquivos críticos.\n"
-            "- Modifica código do próprio ZEUS sem rollback.\n"
+            "- Modifica código do próprio NEXUS sem rollback.\n"
             "- A resposta agrupa contextos muito antigos (concatenação indevida).\n\n"
             "Responda EXATAMENTE com uma das palavras-chave na primeira linha: SUCCESS, REVISE, BLOCK ou NEED_USER_CONFIRMATION, seguida da sua justificativa."
         )

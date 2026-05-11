@@ -2,7 +2,7 @@ import os
 import difflib
 from nexus_core.observability import get_logger
 
-logger = get_logger("zeus.self_improvement.patch")
+logger = get_logger("nexus.self_improvement.patch")
 
 
 class PatchManager:

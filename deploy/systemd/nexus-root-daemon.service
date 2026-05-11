@@ -1,12 +1,12 @@
 [Unit]
-Description=ZEUS RootDaemon - Secure Command Executor
+Description=NEXUS RootDaemon - Secure Command Executor
 After=network.target
 
 [Service]
 Type=simple
 WorkingDirectory=/home/zeus/Documentos/ZEUS_SYSTEM
 ExecStartPre=/usr/bin/mkdir -p /tmp/nexus
-ExecStart=/home/zeus/Documentos/ZEUS_SYSTEM/.venv/bin/python3 -m zeus_core.security.root_daemon
+ExecStart=/home/zeus/Documentos/ZEUS_SYSTEM/.venv/bin/python3 -m nexus_core.security.root_daemon
 Restart=always
 RestartSec=3
 StandardOutput=append:/home/zeus/Documentos/ZEUS_SYSTEM/logs/root_daemon.log

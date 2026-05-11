@@ -20,7 +20,7 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
-from zeus_core.response_text import pango_markup, speech_text
+from nexus_core.response_text import pango_markup, speech_text
 
 try:
     import gi
@@ -34,7 +34,7 @@ except (ImportError, ValueError):
     print("Erro: GTK4/Adwaita não encontrado. Este chat requer ambiente gráfico Linux.")
     sys.exit(1)
 
-from zeus_core.security.approval_listener import start_approval_listener_glib
+from nexus_core.security.approval_listener import start_approval_listener_glib
 
 # Se o primeiro argumento não começar com '--', assumimos que é a URL do backend.
 _backend_arg = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("--") else None

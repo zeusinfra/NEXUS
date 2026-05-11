@@ -1,5 +1,5 @@
 """
-ZEUS Approval Dialog — GTK4/Adwaita dialog para aprovação de comandos de alto risco.
+NEXUS Approval Dialog — GTK4/Adwaita dialog para aprovação de comandos de alto risco.
 
 Mostra:
   - Comando/Ação
@@ -41,7 +41,7 @@ except (ImportError, ValueError):
 if _GUI_AVAILABLE:
     Adw.init()
 
-APP_ID = "local.zeus.ApprovalDialog"
+APP_ID = "local.nexus.ApprovalDialog"
 TIMEOUT_SECONDS = 60
 
 
@@ -72,7 +72,7 @@ RISK_LABELS = {
 
 
 class ApprovalDialog(Adw.ApplicationWindow):
-    """Janela de aprovação para ações administrativas do ZEUS."""
+    """Janela de aprovação para ações administrativas do NEXUS."""
 
     def __init__(
         self,
@@ -94,7 +94,7 @@ class ApprovalDialog(Adw.ApplicationWindow):
         self._timeout_id: int | None = None
         self._remaining = TIMEOUT_SECONDS
 
-        self.set_title("ZEUS — Aprovação Requerida")
+        self.set_title("NEXUS — Aprovação Requerida")
         self.set_default_size(560, -1)
         self.set_resizable(False)
         self.add_css_class("approval-window")
@@ -225,7 +225,7 @@ class ApprovalDialog(Adw.ApplicationWindow):
         # Header
         header = Adw.HeaderBar()
         title = Adw.WindowTitle(
-            title="⚠ Aprovação Requerida", subtitle="ZEUS RootDaemon"
+            title="⚠ Aprovação Requerida", subtitle="NEXUS RootDaemon"
         )
         header.set_title_widget(title)
 
@@ -242,7 +242,7 @@ class ApprovalDialog(Adw.ApplicationWindow):
 
         # Title row
         title_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        title_label = Gtk.Label(label="ZEUS PRECISA DE APROVAÇÃO")
+        title_label = Gtk.Label(label="NEXUS PRECISA DE APROVAÇÃO")
         title_label.add_css_class("approval-title")
         title_label.set_halign(Gtk.Align.START)
         title_row.append(title_label)

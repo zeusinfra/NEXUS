@@ -9,11 +9,11 @@ if [ -x ".venv/bin/python" ]; then
   PYTHON_BIN=".venv/bin/python"
 fi
 
-export ZEUS_TESTING=1
-export ZEUS_SKIP_DOTENV=1
+export NEXUS_TESTING=1
+export NEXUS_SKIP_DOTENV=1
 
-"$PYTHON_BIN" -m ruff check zeus_core apps communication tests
-"$PYTHON_BIN" -m flake8 zeus_core apps communication tests --count --select=E9,F63,F7,F82 --show-source --statistics
+"$PYTHON_BIN" -m ruff check nexus_core apps communication tests
+"$PYTHON_BIN" -m flake8 nexus_core apps communication tests --count --select=E9,F63,F7,F82 --show-source --statistics
 "$PYTHON_BIN" -m pytest
 
 for crate in core-rust watcher_rs; do

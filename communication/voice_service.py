@@ -8,7 +8,7 @@ try:
 except ImportError:
     edge_tts = None
 
-# Configuração da voz do ZEUS
+# Configuração da voz do NEXUS
 # Sugestão: pt-BR-AntonioNeural (Masculino, Profundo, Autoritário)
 VOICE = "pt-BR-AntonioNeural"
 

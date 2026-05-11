@@ -8,12 +8,12 @@ from typing import Any
 from nexus_core.observability import get_logger, log_event
 
 
-logger = get_logger("zeus.rust_sensors")
+logger = get_logger("nexus.rust_sensors")
 
 
 def _load_sensor_engine():
     try:
-        from zeus_sensors import SensorEngineRust
+        from nexus_sensors import SensorEngineRust
 
         engine = SensorEngineRust()
         if hasattr(engine, "os_snapshot_json"):
@@ -28,13 +28,13 @@ def _load_sensor_engine():
         / "core-rust"
         / "target"
         / "release"
-        / "libzeus_sensors.so"
+        / "libnexus_sensors.so"
     )
     if not local_extension.exists():
         return None
 
     try:
-        spec = importlib.util.spec_from_file_location("zeus_sensors", local_extension)
+        spec = importlib.util.spec_from_file_location("nexus_sensors", local_extension)
         if spec is None or spec.loader is None:
             return None
         module = importlib.util.module_from_spec(spec)

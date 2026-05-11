@@ -4,7 +4,7 @@ from nexus_core.events.event_bus import event_bus, EventType
 
 
 class ExecutiveAgent:
-    """Agente Executivo para Proatividade no ZEUS.
+    """Agente Executivo para Proatividade no NEXUS.
     Monitora padrões para sugerir ou executar ações sem solicitação direta.
     """
 

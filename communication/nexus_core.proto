@@ -1,9 +1,9 @@
 syntax = "proto3";
 
-package zeus_core;
+package nexus_core;
 
 // The main service for controlling the OS
-service ZeusCore {
+service NexusCore {
   // Executes a command after simulation and validation
   rpc ExecuteAction (ActionRequest) returns (ActionResponse);
   

@@ -1,5 +1,5 @@
 """
-ZEUS Cognitive Core — Action Planner.
+NEXUS Cognitive Core — Action Planner.
 
 Creates deterministic execution plans from cognitive goals.
 Each plan is a sequence of steps with risk classification.
@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 
 from nexus_core.observability import get_logger, log_event
 
-logger = get_logger("zeus.cognitive.planner")
+logger = get_logger("nexus.cognitive.planner")
 
 
 def _now_iso() -> str:

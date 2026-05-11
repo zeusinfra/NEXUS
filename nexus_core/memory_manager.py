@@ -9,7 +9,7 @@ import logging
 from nexus_core.path_filters import is_runtime_noise_path
 
 try:
-    from zeus_synapse import SynapseManagerRust
+    from nexus_synapse import SynapseManagerRust
 
     SYNAPSE_RUST_AVAILABLE = True
 except ImportError:
@@ -18,11 +18,11 @@ except ImportError:
 
 class MemoryManager:
     """
-    ZEUS Memory Manager (PHASE 4 - Tiered Architecture)
+    NEXUS Memory Manager (PHASE 4 - Tiered Architecture)
     Orchestrates Sensory (L1), Working (L2), and Long-Term (L3) memory layers.
     """
 
-    def __init__(self, db_path="data/zeus_memory.db", vector_memory=None):
+    def __init__(self, db_path="data/nexus_memory.db", vector_memory=None):
         self.db_path = db_path
         self.vector_memory = vector_memory
         self.logger = logging.getLogger("NEXUS_MEMORY")
@@ -34,10 +34,10 @@ class MemoryManager:
         self._init_db()
 
         if SYNAPSE_RUST_AVAILABLE:
-            print("🦀 ZEUS: Usando Backend Rust para Sinapses (L2).")
+            print("🦀 NEXUS: Usando Backend Rust para Sinapses (L2).")
             self.rust_synapse = SynapseManagerRust(db_path)
         else:
-            print("🐍 ZEUS: Usando Backend Python para Sinapses (L2).")
+            print("🐍 NEXUS: Usando Backend Python para Sinapses (L2).")
             self.rust_synapse = None
 
     def _init_db(self):

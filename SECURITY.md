@@ -23,7 +23,7 @@ Do not report vulnerabilities through public GitHub issues.
 
 Preferred reporting path:
 
-1. Open a private GitHub security advisory for `zeusinfra/NEXUS`.
+1. Open a private GitHub security advisory for `nexusinfra/NEXUS`.
 2. Include enough detail for maintainers to reproduce and assess the issue.
 3. Wait for maintainer acknowledgement before public disclosure.
 

@@ -1,12 +1,12 @@
-# ZEUS Cognitive OS - System Report
+# NEXUS Cognitive OS - System Report
 
-> Enterprise operating report for the current ZEUS platform state, architecture maturity, risk posture, validation status, and execution roadmap.
+> Enterprise operating report for the current NEXUS platform state, architecture maturity, risk posture, validation status, and execution roadmap.
 
 | Report Field | Value |
 | --- | --- |
 | Original date | 2026-05-08 |
 | Last update | 2026-05-10 |
-| Platform | ZEUS Cognitive OS |
+| Platform | NEXUS Cognitive OS |
 | Operating model | Local-first cognitive desktop layer |
 | Primary interface | Cinnamon applet + GTK4 Ops Chat |
 | Backend | FastAPI, SQLite, Rust watcher, event bus |
@@ -14,7 +14,7 @@
 
 ## Executive Summary
 
-ZEUS has evolved from a mature monitoring assistant into a proactive cognitive operations platform. The system now combines autonomous planning, secure administrative workflows, desktop-native command surfaces, persistent memory, Second Brain synchronization, and peripheral sensing.
+NEXUS has evolved from a mature monitoring assistant into a proactive cognitive operations platform. The system now combines autonomous planning, secure administrative workflows, desktop-native command surfaces, persistent memory, Second Brain synchronization, and peripheral sensing.
 
 The latest operating milestone focuses on enterprise readiness:
 
@@ -106,7 +106,7 @@ Key posture:
 
 ## Conversation And Memory
 
-ZEUS now uses layered memory instead of relying only on raw prompt concatenation.
+NEXUS now uses layered memory instead of relying only on raw prompt concatenation.
 
 | Layer | Purpose |
 | --- | --- |
@@ -225,15 +225,15 @@ Current environment note: `pytest` is not installed in the active system Python 
 
 | Task | Command |
 | --- | --- |
-| Start headless backend | `./bin/zeus server` |
-| Ensure backend | `./bin/zeus ensure-server` |
-| Open GTK chat | `./bin/zeus-gtk-chat` |
-| Open default chat | `./bin/zeus chat` |
-| Open TUI standby | `./bin/zeus tui` |
-| View logs | `./bin/zeus logs` |
+| Start headless backend | `./bin/nexus server` |
+| Ensure backend | `./bin/nexus ensure-server` |
+| Open GTK chat | `./bin/nexus-gtk-chat` |
+| Open default chat | `./bin/nexus chat` |
+| Open TUI standby | `./bin/nexus tui` |
+| View logs | `./bin/nexus logs` |
 | Run Python tests | `.venv/bin/python -m pytest -q` |
 | Run frontend tests | `node --test public/tests/*.test.js` |
 
 ## Conclusion
 
-ZEUS is now positioned as a local-first cognitive operations platform with a stronger enterprise shape: clear operating surfaces, guarded autonomy, persistent memory, structured integrations, and headless peripheral awareness. The next maturity step is converting the newest sentinels and approval flows into fully audited, policy-packaged services suitable for long-running desktop operation.
+NEXUS is now positioned as a local-first cognitive operations platform with a stronger enterprise shape: clear operating surfaces, guarded autonomy, persistent memory, structured integrations, and headless peripheral awareness. The next maturity step is converting the newest sentinels and approval flows into fully audited, policy-packaged services suitable for long-running desktop operation.

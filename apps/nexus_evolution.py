@@ -91,20 +91,20 @@ class NexusBrain:
 
 
 if __name__ == "__main__":
-    zeus = NexusBrain()
+    nexus = NexusBrain()
 
     os.system("clear")
-    zeus.print_neon("╔════════════════════════════════════════════╗\n", "cyan")
-    zeus.print_neon("║      NEXUS COGNITIVE OPERATING SYSTEM       ║\n", "cyan")
-    zeus.print_neon("╚════════════════════════════════════════════╝\n\n", "cyan")
+    nexus.print_neon("╔════════════════════════════════════════════╗\n", "cyan")
+    nexus.print_neon("║      NEXUS COGNITIVE OPERATING SYSTEM       ║\n", "cyan")
+    nexus.print_neon("╚════════════════════════════════════════════╝\n\n", "cyan")
 
-    zeus.print_neon("Initializing Neural Context...\n", "bold")
-    zeus.load_memories()
-    zeus.print_neon("Brain DNA Loaded. Synapses Ready.\n\n", "green")
+    nexus.print_neon("Initializing Neural Context...\n", "bold")
+    nexus.load_memories()
+    nexus.print_neon("Brain DNA Loaded. Synapses Ready.\n\n", "green")
 
     thought = input("⌨ INPUT THOUGHT (Enter para Auditoria Geral) > ")
     if not thought.strip():
-        zeus.print_neon("Iniciando Auditoria Geral Autônoma...\n", "purple")
+        nexus.print_neon("Iniciando Auditoria Geral Autônoma...\n", "purple")
         thought = "Realize uma auditoria geral de todos os meus módulos core e do meu DNA de sistema. Sugira a próxima fase de evolução e registre no log."
 
-    zeus.cognitive_loop(thought)
+    nexus.cognitive_loop(thought)

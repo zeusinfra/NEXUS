@@ -179,7 +179,7 @@ def create_insight_issue(
     title: str,
     description: str,
     priority: str = "medium",
-    source: str = "zeus-sync-engine",
+    source: str = "nexus-sync-engine",
 ) -> dict:
     """
     Wrapper simplificado para criação automática de issues a partir de insights do sync engine.
@@ -194,14 +194,14 @@ def create_insight_issue(
     full_description = (
         f"{description}\n\n"
         f"---\n"
-        f"*Gerado automaticamente pelo ZEUS Sync Engine*\n"
+        f"*Gerado automaticamente pelo NEXUS Sync Engine*\n"
         f"*Fonte: {source}*"
     )
 
     return create_linear_issue(
         title=prefixed_title,
         description=full_description,
-        labels=["zeus-insight"],
+        labels=["nexus-insight"],
         priority=priority,
         source_path=source,
     )

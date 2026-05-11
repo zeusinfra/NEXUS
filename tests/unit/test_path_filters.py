@@ -6,7 +6,7 @@ from nexus_core.path_filters import is_runtime_noise_path
 class PathFilterTests(unittest.TestCase):
     def test_runtime_noise_paths_are_ignored(self):
         noisy_paths = [
-            "/repo/data/zeus_memory.db",
+            "/repo/data/nexus_memory.db",
             "/repo/nexus_events.db-journal",
             "/repo/nexus_core.log",
             "/repo/logs/watcher.log",

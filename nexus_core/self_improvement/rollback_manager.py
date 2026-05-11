@@ -3,7 +3,7 @@ from typing import List
 from nexus_core.observability import get_logger
 from nexus_core.security.daemon_client import daemon_client
 
-logger = get_logger("zeus.self_improvement.rollback")
+logger = get_logger("nexus.self_improvement.rollback")
 
 
 class RollbackManager:

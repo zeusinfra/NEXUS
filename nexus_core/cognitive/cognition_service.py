@@ -1,5 +1,5 @@
 """
-ZEUS Cognitive Core — Cognition Service.
+NEXUS Cognitive Core — Cognition Service.
 
 Standalone entry point for running the cognitive loop as a daemon.
 Can be invoked via:
@@ -30,7 +30,7 @@ from nexus_core.observability import get_logger, log_event, setup_logging
 
 load_project_env()
 
-logger = get_logger("zeus.cognitive.service")
+logger = get_logger("nexus.cognitive.service")
 
 
 class CognitionService:
@@ -87,7 +87,7 @@ class CognitionService:
             logger,
             20,
             "cognition_daemon_starting",
-            db_path=self.db_path or os.getenv("NEXUS_DB_PATH", "./zeus_events.db"),
+            db_path=self.db_path or os.getenv("NEXUS_DB_PATH", "./nexus_events.db"),
         )
 
         loop = asyncio.get_running_loop()

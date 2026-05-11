@@ -1,4 +1,4 @@
-# ZEUS COGNITIVE OS CORE — VERSION 3.0 (PRODUCTION-GRADE)
+# NEXUS COGNITIVE OS CORE — VERSION 3.0 (PRODUCTION-GRADE)
 # PHASE 0: BOOTSTRAP MODE & PHASE 1: ORCHESTRATOR
 
 import asyncio
@@ -34,7 +34,7 @@ class BootstrapConfig:
 
         # Log centralizado na pasta logs/
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.log_file = os.path.join(project_root, "logs", "zeus_boot.log")
+        self.log_file = os.path.join(project_root, "logs", "nexus_boot.log")
         self.setup_logging()
 
     def setup_logging(self):
@@ -52,7 +52,7 @@ class BootstrapConfig:
             old_mode = self.mode
             self.mode = new_mode
             self.logger.info(f"Mode switched: {old_mode.value} -> {new_mode.value}")
-            print(f"ZEUS MODE: {old_mode.value} -> {new_mode.value}")
+            print(f"NEXUS MODE: {old_mode.value} -> {new_mode.value}")
         except KeyError:
             self.logger.error(f"Invalid mode attempt: {mode_str}")
             print(f"ERROR: Invalid mode '{mode_str}'. Use SAFE, DEV, or AUTONOMOUS.")
@@ -100,7 +100,7 @@ class CognitiveOrchestrator:
         """Starts the infinite cognitive loop."""
         self.is_running = True
         self.config.logger.info("Cognitive Orchestrator STARTED.")
-        print("ZEUS CORE: Orchestrator initialized. Awaiting Blackboard...")
+        print("NEXUS CORE: Orchestrator initialized. Awaiting Blackboard...")
 
         while self.is_running:
             start_time = time.time()
@@ -163,7 +163,7 @@ class CognitiveOrchestrator:
         """Safely stop the orchestrator."""
         self.is_running = False
         self.config.logger.info("Cognitive Orchestrator STOPPED.")
-        print("ZEUS CORE: Orchestrator stopped.")
+        print("NEXUS CORE: Orchestrator stopped.")
 
 
 # --- MAIN ENTRY POINT FOR CORE v3.0 ---
@@ -172,7 +172,7 @@ class CognitiveOrchestrator:
 async def run_nexus_core():
     """Entry point for the new Production Core."""
     config = BootstrapConfig()
-    print(f"ZEUS v3.0 Booting in {config.mode.value} MODE.")
+    print(f"NEXUS v3.0 Booting in {config.mode.value} MODE.")
     orchestrator = CognitiveOrchestrator(config)
 
     # Iniciar Monitores de Periféricos

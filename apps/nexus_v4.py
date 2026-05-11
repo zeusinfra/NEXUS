@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import asyncio
 
-from nexus_core.v4.core import ZeusCognitiveCoreV4
+from nexus_core.v4.core import NexusCognitiveCoreV4
 
 
 async def main() -> None:
-    core = ZeusCognitiveCoreV4()
+    core = NexusCognitiveCoreV4()
     await core.run_forever()
 
 

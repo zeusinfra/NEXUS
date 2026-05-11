@@ -7,7 +7,7 @@ from typing import Callable
 from nexus_core.observability import get_logger, increment_metric, log_event
 
 
-logger = get_logger("zeus.llm")
+logger = get_logger("nexus.llm")
 
 
 @dataclass(frozen=True)
@@ -21,7 +21,7 @@ class LLMService:
         try:
             reply = self.call_llm(
                 [
-                    {"role": "system", "content": "Responda apenas com: ZEUS LLM OK"},
+                    {"role": "system", "content": "Responda apenas com: NEXUS LLM OK"},
                     {"role": "user", "content": "Teste de conectividade do modelo."},
                 ]
             )

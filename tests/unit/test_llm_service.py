@@ -8,7 +8,7 @@ class LLMServiceTests(unittest.TestCase):
     def test_connectivity_test_returns_ok_for_normal_reply(self):
         service = LLMService(
             get_status=lambda: {"provider": "test"},
-            call_llm=lambda messages: "ZEUS LLM OK",
+            call_llm=lambda messages: "NEXUS LLM OK",
         )
 
         with patch("nexus_core.llm_service.log_event"):
@@ -16,7 +16,7 @@ class LLMServiceTests(unittest.TestCase):
 
         self.assertTrue(result["ok"])
         self.assertEqual(result["status"]["provider"], "test")
-        self.assertIn("ZEUS LLM OK", result["reply"])
+        self.assertIn("NEXUS LLM OK", result["reply"])
 
     def test_connectivity_test_marks_provider_error_as_not_ok(self):
         service = LLMService(

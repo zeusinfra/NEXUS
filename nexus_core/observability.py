@@ -46,7 +46,7 @@ def setup_logging(level: str = "INFO") -> None:
     root.setLevel(getattr(logging, level.upper(), logging.INFO))
 
 
-def get_logger(name: str = "zeus") -> logging.Logger:
+def get_logger(name: str = "nexus") -> logging.Logger:
     return logging.getLogger(name)
 
 
@@ -71,7 +71,7 @@ async def correlation_id_middleware(request: Request, call_next):
     )
     token = correlation_id_var.set(correlation_id)
     start = time.time()
-    logger = get_logger("zeus.http")
+    logger = get_logger("nexus.http")
     try:
         response = await call_next(request)
     except Exception:

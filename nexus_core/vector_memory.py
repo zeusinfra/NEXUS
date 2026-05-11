@@ -5,7 +5,7 @@ import numpy as np
 from typing import List, Dict, Tuple
 
 try:
-    from zeus_memory import VectorMemoryRust
+    from nexus_memory import VectorMemoryRust
 
     RUST_AVAILABLE = True
 except ImportError:

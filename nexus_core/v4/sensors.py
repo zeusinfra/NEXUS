@@ -15,7 +15,7 @@ def _now() -> float:
 
 
 try:
-    from zeus_sensors import SensorEngineRust
+    from nexus_sensors import SensorEngineRust
 
     RUST_SENSORS_AVAILABLE = True
 except ImportError:

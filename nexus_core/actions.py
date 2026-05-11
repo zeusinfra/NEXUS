@@ -319,12 +319,12 @@ def install_tesseract(parameters: dict) -> dict:
 
 
 def system_capabilities(parameters: dict) -> dict:
-    """Report what ZEUS can currently observe or operate without exposing secrets."""
+    """Report what NEXUS can currently observe or operate without exposing secrets."""
     allowed_paths = [
         item.strip()
         for item in os.getenv(
             "NEXUS_ALLOWED_EDIT_PATHS",
-            "/home/zeus/Documentos/NEXUS_SYSTEM,/home/zeus/Documentos/Brain,/tmp/nexus_",
+            "/home/zeus/Documentos/ZEUS_SYSTEM,/home/zeus/Documentos/Brain,/tmp/nexus_",
         ).split(",")
         if item.strip()
     ]
@@ -391,7 +391,7 @@ def obsidian_read_note(parameters: dict) -> dict:
 
 
 def obsidian_write_insight(parameters: dict) -> dict:
-    title = str((parameters or {}).get("title") or "ZEUS Insight").strip()
+    title = str((parameters or {}).get("title") or "NEXUS Insight").strip()
     content = str((parameters or {}).get("content") or "").strip()
     if not content:
         raise ToolError("obsidian_write_insight requer 'content'.")
@@ -421,10 +421,10 @@ def obsidian_mirror_filesystem(parameters: dict) -> dict:
 
 
 def notion_create_page(parameters: dict) -> dict:
-    title = str((parameters or {}).get("title") or "ZEUS Note").strip()
+    title = str((parameters or {}).get("title") or "NEXUS Note").strip()
     content = str((parameters or {}).get("content") or "").strip()
     tags = list((parameters or {}).get("tags") or [])
-    response = create_notion_page(title, content, tags, "ZEUS Agent")
+    response = create_notion_page(title, content, tags, "NEXUS Agent")
     return {"ok": "error" not in response, "response": response}
 
 
@@ -437,11 +437,11 @@ def notion_search(parameters: dict) -> dict:
 
 
 def linear_create_issue(parameters: dict) -> dict:
-    title = str((parameters or {}).get("title") or "ZEUS Task").strip()
+    title = str((parameters or {}).get("title") or "NEXUS Task").strip()
     description = str((parameters or {}).get("description") or "").strip()
     labels = list((parameters or {}).get("labels") or [])
     priority = str((parameters or {}).get("priority") or "medium").strip()
-    response = create_linear_issue(title, description, labels, priority, "ZEUS Agent")
+    response = create_linear_issue(title, description, labels, priority, "NEXUS Agent")
     return {"ok": "error" not in response, "response": response}
 
 

@@ -1,6 +1,6 @@
-# ZEUS Second Brain Architecture
+# NEXUS Second Brain Architecture
 
-> Enterprise architecture reference for ZEUS as a bi-directional cognitive operations layer across local files, Obsidian, Notion, Linear, telemetry, and secure desktop execution.
+> Enterprise architecture reference for NEXUS as a bi-directional cognitive operations layer across local files, Obsidian, Notion, Linear, telemetry, and secure desktop execution.
 
 | Area | Role | System of Record |
 | --- | --- | --- |
@@ -14,7 +14,7 @@
 
 ## Strategic Context
 
-The Second Brain turns ZEUS from a reactive assistant into a cognitive operations platform. It preserves the local-first model while allowing selected knowledge and execution signals to move into structured external tools.
+The Second Brain turns NEXUS from a reactive assistant into a cognitive operations platform. It preserves the local-first model while allowing selected knowledge and execution signals to move into structured external tools.
 
 The design principles are:
 
@@ -38,7 +38,7 @@ flowchart LR
     Sentinel --> EventBus
     API[FastAPI Backend] --> EventBus
 
-    EventBus --> SQLite[(zeus_events.db)]
+    EventBus --> SQLite[(nexus_events.db)]
     EventBus --> Cognition[Cognitive Loop]
     EventBus --> Sync[Sync Engine]
 
@@ -57,7 +57,7 @@ flowchart LR
 1. **Sense:** Rust watcher, USB Sentinel, Bluetooth monitor, web sensing, and local telemetry observe changes.
 2. **Normalize:** Events are shaped into consistent payloads and routed through the backend queue.
 3. **Classify:** Sync workers and cognitive services determine whether an event is memory-only, Notion-worthy, Linear-worthy, or operationally urgent.
-4. **Act:** ZEUS updates memory, generates issues, exports summaries, speaks alerts, or proposes privileged actions.
+4. **Act:** NEXUS updates memory, generates issues, exports summaries, speaks alerts, or proposes privileged actions.
 5. **Audit:** SQLite logs, conversation memory, Notion pages, Linear issues, and admin action records preserve traceability.
 
 ## Event Pipeline
@@ -69,7 +69,7 @@ flowchart LR
 | `event_batcher` | Aggregates file/system bursts | Prevents noisy UI and excessive downstream work |
 | `sync_worker.py` | Processes persisted events | Records pending, processed, and error states |
 | `sync_engine.py` | Exports structured memory | Can run selectively per integration |
-| `EventBus` | Async pub/sub inside ZEUS | Decouples producers and consumers |
+| `EventBus` | Async pub/sub inside NEXUS | Decouples producers and consumers |
 
 ## Knowledge Surfaces
 
@@ -110,7 +110,7 @@ Linear receives execution-ready issues:
 
 ## Conversation Memory
 
-ZEUS maintains a short and medium-term conversational memory in SQLite.
+NEXUS maintains a short and medium-term conversational memory in SQLite.
 
 | Field | Purpose |
 | --- | --- |
@@ -187,23 +187,23 @@ The monitor is designed for headless operation and does not require the GTK or W
 ## Configuration
 
 ```ini
-ZEUS_VAULT_PATH=/home/zeus/Documentos/Brain
-ZEUS_DB_PATH=./zeus_events.db
-ZEUS_CONVERSATION_DB_PATH=./data/conversation_memory.db
+NEXUS_VAULT_PATH=/home/zeus/Documentos/Brain
+NEXUS_DB_PATH=./nexus_events.db
+NEXUS_CONVERSATION_DB_PATH=./data/conversation_memory.db
 
-ZEUS_ENABLE_SECOND_BRAIN=1
-ZEUS_ENABLE_SECOND_BRAIN_SYNC_ENGINE=0
-ZEUS_ENABLE_NOTION_AUTO_SYNC=1
-ZEUS_ENABLE_OBSIDIAN_AUTO_SYNC=1
-ZEUS_ENABLE_LINEAR_AUTO_SYNC=1
+NEXUS_ENABLE_SECOND_BRAIN=1
+NEXUS_ENABLE_SECOND_BRAIN_SYNC_ENGINE=0
+NEXUS_ENABLE_NOTION_AUTO_SYNC=1
+NEXUS_ENABLE_OBSIDIAN_AUTO_SYNC=1
+NEXUS_ENABLE_LINEAR_AUTO_SYNC=1
 
 NOTION_TOKEN=secret_xxx
 NOTION_DATABASE_ID=xxx
-ZEUS_ENABLE_NOTION=true
+NEXUS_ENABLE_NOTION=true
 
 LINEAR_API_KEY=your_linear_api_key_here
 LINEAR_TEAM_ID=xxx
-ZEUS_ENABLE_LINEAR=true
+NEXUS_ENABLE_LINEAR=true
 ```
 
 ## Lightweight Mode

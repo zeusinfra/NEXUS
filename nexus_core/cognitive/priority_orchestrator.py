@@ -1,5 +1,5 @@
 """
-ZEUS Cognitive Core — Priority Orchestrator.
+NEXUS Cognitive Core — Priority Orchestrator.
 
 The executive control module that decides which goals should be pursued
 in the current cycle based on attention, resources, and temporal context.
@@ -13,10 +13,10 @@ from typing import Any, List
 
 from nexus_core.observability import get_logger, log_event
 
-logger = get_logger("zeus.cognitive.orchestrator")
+logger = get_logger("nexus.cognitive.orchestrator")
 
 try:
-    from zeus_cognitive import CognitiveEngineRust
+    from nexus_cognitive import CognitiveEngineRust
 
     RUST_COGNITIVE_AVAILABLE = True
 except ImportError:

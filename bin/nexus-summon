@@ -6,16 +6,16 @@ import os
 OLLAMA_URL = os.getenv("NEXUS_API_URL", "http://localhost:5000/api/message")
 
 def summon():
-    """Manda um sinal para o ZEUS acordar e focar na janela ativa."""
+    """Manda um sinal para o NEXUS acordar e focar na janela ativa."""
     payload = {
         "text": "/summon",
         "context": "global_hotkey"
     }
     try:
         requests.post(OLLAMA_URL, json=payload, timeout=2)
-        print("ZEUS Summoned!")
+        print("NEXUS Summoned!")
     except Exception as e:
-        print(f"Erro ao chamar o ZEUS: {e}")
+        print(f"Erro ao chamar o NEXUS: {e}")
 
 if __name__ == "__main__":
     summon()

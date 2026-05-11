@@ -28,8 +28,8 @@ def _update_path(p: str) -> str:
     p = p.replace("/core_modules/", "/nexus_core/")
     # antigos entrypoints
     p = p.replace("/web_gui.py", "/apps/web_gui.py")
-    p = p.replace("/zeus_v4.py", "/apps/zeus_v4.py")
-    p = p.replace("/zeus_evolution.py", "/apps/zeus_evolution.py")
+    p = p.replace("/nexus_v4.py", "/apps/nexus_v4.py")
+    p = p.replace("/nexus_evolution.py", "/apps/nexus_evolution.py")
     return p
 
 

@@ -1,10 +1,10 @@
-# ZEUS Rust Migration Plan
+# NEXUS Rust Migration Plan
 
 Updated: 2026-05-10
 
 ## Objective
 
-Improve ZEUS stability, speed, observability, and safety by moving deterministic
+Improve NEXUS stability, speed, observability, and safety by moving deterministic
 system components to Rust while keeping Python where it is strongest: LLM
 orchestration, FastAPI surfaces, integrations, and rapid iteration.
 
@@ -38,15 +38,15 @@ Python compatibility until tests prove parity.
 
 Target modules:
 
-- `zeus_core.command_policy`
-- `zeus_core.diagnostics`
+- `nexus_core.command_policy`
+- `nexus_core.diagnostics`
 - `apps.web_gui.get_os_snapshot`
-- `zeus_core.path_filters`
+- `nexus_core.path_filters`
 
 Rust modules already present:
 
-- `core-rust/zeus_policy`
-- `core-rust/zeus_sensors`
+- `core-rust/nexus_policy`
+- `core-rust/nexus_sensors`
 
 Expected benefits:
 
@@ -67,14 +67,14 @@ Acceptance criteria:
 
 Target modules:
 
-- `zeus_core.vector_memory`
-- `zeus_core.memory_manager`
+- `nexus_core.vector_memory`
+- `nexus_core.memory_manager`
 - cognitive memory compression routines
 
 Rust modules already present:
 
-- `core-rust/zeus_memory`
-- `core-rust/zeus_synapse`
+- `core-rust/nexus_memory`
+- `core-rust/nexus_synapse`
 
 Expected benefits:
 
@@ -92,14 +92,14 @@ Acceptance criteria:
 
 Target modules:
 
-- `zeus_core.cognitive.priority_orchestrator`
+- `nexus_core.cognitive.priority_orchestrator`
 - deterministic parts of `planner`, `simulator`, and `attention_engine`
 
 Rust modules already present:
 
-- `core-rust/zeus_cognitive`
-- `core-rust/zeus_state`
-- `core-rust/zeus_patterns`
+- `core-rust/nexus_cognitive`
+- `core-rust/nexus_state`
+- `core-rust/nexus_patterns`
 
 Expected benefits:
 
@@ -117,14 +117,14 @@ Acceptance criteria:
 
 Target modules:
 
-- `zeus_core.security.root_daemon`
+- `nexus_core.security.root_daemon`
 - backup/audit helpers
 - privileged command classifier
 
 Rust modules already present:
 
-- `core-rust/zeus_security`
-- `core-rust/zeus_policy`
+- `core-rust/nexus_security`
+- `core-rust/nexus_policy`
 
 Expected benefits:
 
@@ -149,8 +149,8 @@ Target modules:
 Rust modules already present:
 
 - `watcher_rs`
-- `core-rust/zeus_sync`
-- `core-rust/zeus_sensors`
+- `core-rust/nexus_sync`
+- `core-rust/nexus_sensors`
 
 Expected benefits:
 
@@ -169,7 +169,7 @@ Acceptance criteria:
 - `apps.web_gui` is doing too many jobs in one module: API routes, telemetry,
   memory, chat, vision, voice, lifecycle, and sync orchestration.
 - Rust policy exists but is less complete than the Python policy.
-- `ZEUS_AUTONOMY_LEVEL=FULL` changes test expectations; parity tests should run
+- `NEXUS_AUTONOMY_LEVEL=FULL` changes test expectations; parity tests should run
   in `GUARDED` and `FULL`.
 - Several Rust crates expose useful kernels, but the Python fallback remains the
   source of truth in many places.
@@ -178,10 +178,10 @@ Acceptance criteria:
 
 Start with Phase 1:
 
-1. Expand `core-rust/zeus_policy` to match Python command policy.
+1. Expand `core-rust/nexus_policy` to match Python command policy.
 2. Add parity tests that compare Python and Rust decisions.
 3. Make Python use Rust policy when available, with clear fallback logging.
-4. Move `get_os_snapshot` toward `zeus_sensors` once sensor payload parity is
+4. Move `get_os_snapshot` toward `nexus_sensors` once sensor payload parity is
    tested.
 
 This improves all agents indirectly because every agent uses the same safer and
@@ -190,23 +190,23 @@ faster command/sensor substrate.
 ## Interface Posture
 
 - GTK4/Libadwaita chat remains the default operator console.
-- `bin/zeus-chat` launches GTK by default.
-- `./bin/zeus tui` launches the Cyber TUI terminal surface.
+- `bin/nexus-chat` launches GTK by default.
+- `./bin/nexus tui` launches the Cyber TUI terminal surface.
 - Rust migration work should not depend on replacing the GTK desktop flow.
 
 ## Phase 1 Progress
 
-- 2026-05-10: `core-rust/zeus_policy` expanded to cover the Python command
+- 2026-05-10: `core-rust/nexus_policy` expanded to cover the Python command
   policy surface: autonomy level, allowlist, absolute blocklist, shell-control
   detection, risky interpreter flags, package subcommands, and confirmation
   requirements.
 - 2026-05-10: Python loader now uses the local Rust extension from
-  `core-rust/target/release/libzeus_policy.so` when the package is not installed
+  `core-rust/target/release/libnexus_policy.so` when the package is not installed
   globally.
 - 2026-05-10: Added Rust unit tests and Python parity tests for guarded policy
   decisions.
-- 2026-05-10: `core-rust/zeus_sensors` now exposes a typed OS snapshot JSON
+- 2026-05-10: `core-rust/nexus_sensors` now exposes a typed OS snapshot JSON
   covering CPU cores, CPU average, RAM, root disk usage, pressure, and top
   processes.
-- 2026-05-10: Python now loads `libzeus_sensors.so` locally when available and
+- 2026-05-10: Python now loads `libnexus_sensors.so` locally when available and
   `apps.web_gui.get_os_snapshot` uses Rust first with `psutil` fallback.

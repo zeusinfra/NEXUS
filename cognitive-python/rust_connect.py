@@ -17,7 +17,7 @@ except ImportError:
 
 class RustConnect:
     """
-    Async gRPC Client for ZEUS Core (Rust).
+    Async gRPC Client for NEXUS Core (Rust).
     Replaces subprocess calls with remote Rust execution.
     """
 
@@ -29,14 +29,14 @@ class RustConnect:
     async def connect(self):
         """Establishes connection to Rust Core."""
         self.channel = grpc.aio.insecure_channel(self.target)
-        self.stub = nexus_core_pb2_grpc.ZeusCoreStub(self.channel)
-        print(f"🔗 Connected to ZEUS CORE (Rust) at {self.target}")
+        self.stub = nexus_core_pb2_grpc.NexusCoreStub(self.channel)
+        print(f"🔗 Connected to NEXUS CORE (Rust) at {self.target}")
 
     async def disconnect(self):
         """Closes connection."""
         if self.channel:
             await self.channel.close()
-            print("🔌 Disconnected from ZEUS CORE")
+            print("🔌 Disconnected from NEXUS CORE")
 
     async def execute_command(
         self, command: str, target_files: List[str] = None

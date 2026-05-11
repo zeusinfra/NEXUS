@@ -1,5 +1,5 @@
 """
-ZEUS Cognitive Core — Goal Engine.
+NEXUS Cognitive Core — Goal Engine.
 
 Creates, manages, and deduplicates autonomous goals.
 Goals are persisted to the ``cognitive_goals`` table in SQLite.
@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from nexus_core.cognitive.cognitive_db import get_connection
 from nexus_core.observability import get_logger, log_event
 
-logger = get_logger("zeus.cognitive.goals")
+logger = get_logger("nexus.cognitive.goals")
 
 
 def _now_iso() -> str:

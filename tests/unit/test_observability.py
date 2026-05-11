@@ -51,7 +51,7 @@ class ObservabilityTests(unittest.IsolatedAsyncioTestCase):
     def test_json_formatter_outputs_structured_record(self):
         formatter = JsonFormatter()
         record = logging.LogRecord(
-            name="zeus.test",
+            name="nexus.test",
             level=logging.INFO,
             pathname=__file__,
             lineno=1,
@@ -64,7 +64,7 @@ class ObservabilityTests(unittest.IsolatedAsyncioTestCase):
         payload = json.loads(formatter.format(record))
 
         self.assertEqual(payload["level"], "info")
-        self.assertEqual(payload["logger"], "zeus.test")
+        self.assertEqual(payload["logger"], "nexus.test")
         self.assertEqual(payload["message"], "hello")
         self.assertEqual(payload["component"], "test")
 

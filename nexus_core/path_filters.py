@@ -43,12 +43,12 @@ IGNORED_RUNTIME_EXTENSIONS = {
 }
 
 IGNORED_RUNTIME_FILES = {
-    "zeus_events.db",
-    "zeus_events.db-journal",
-    "zeus_events.db-wal",
-    "zeus_events.db-shm",
+    "nexus_events.db",
+    "nexus_events.db-journal",
+    "nexus_events.db-wal",
+    "nexus_events.db-shm",
     "nexus_core.log",
-    "zeus_server.log",
+    "nexus_server.log",
 }
 
 

@@ -74,7 +74,7 @@ ensure_server_background() {
     echo "🌑 Iniciando backend NEXUS em background..."
     (
         cd "$ROOT_DIR"
-        setsid -f nohup "$DIR/zeus" server > "$SERVER_LOG" 2>&1
+        setsid -f nohup "$DIR/nexus" server > "$SERVER_LOG" 2>&1
     )
 
     for _ in $(seq 1 30); do
@@ -105,7 +105,7 @@ start_rust_services() {
     if service_responds "http://127.0.0.1:8082/health"; then
         echo "✅ Memory Service já está respondendo na porta 8082."
     else
-        (cd "$ROOT_DIR/core-rust/zeus_memory" && cargo run --release --bin memory_service > "$ROOT_DIR/logs/memory.log" 2>&1) &
+        (cd "$ROOT_DIR/core-rust/nexus_memory" && cargo run --release --bin memory_service > "$ROOT_DIR/logs/memory.log" 2>&1) &
         MEMORY_PID=$!
     fi
     sleep 2
@@ -137,7 +137,7 @@ export LANG=C.UTF-8
 export ALSA_CARD=0
 export SDL_AUDIODRIVER=pulseaudio
 
-# Help rápido: ./zeus help
+# Help rápido: ./nexus help
 if [[ "$1" == "help" || "$1" == "-h" || "$1" == "--help" ]]; then
     echo "╔════════════════════════════════════╗"
     echo "║     NEXUS — Command Launcher       ║"
@@ -167,7 +167,7 @@ case "$1" in
     v4|core4|daemon)
         echo "🧠 Iniciando NEXUS Cognitive Core v4 (Loop contínuo)..."
         echo "📝 Inbox: scratch/v4_inbox.txt (adicione texto lá para o core perceber)"
-        "$PY" -m apps.zeus_v4
+        "$PY" -m apps.nexus_v4
         ;;
     server|headless)
         echo "🌑 Iniciando NEXUS em modo Headless (Cérebro em Background)..."
@@ -190,7 +190,7 @@ case "$1" in
         ;;
     evolve|think|ev)
         echo "🌀 Iniciando Motor de Evolução..."
-        "$PY" -m apps.zeus_evolution
+        "$PY" -m apps.nexus_evolution
         ;;
     logs)
         echo "📜  Monitorando logs do NEXUS..."
@@ -199,7 +199,7 @@ case "$1" in
     tui|console|ops)
         echo "📟  Iniciando NEXUS Cyber TUI..."
         ensure_server_background
-        "$PY" "$ROOT_DIR/bin/zeus-cyber-tui"
+        "$PY" "$ROOT_DIR/bin/nexus-cyber-tui"
         ;;
     chat)
         echo "💬  Abrindo chat NEXUS GTK..."
@@ -216,6 +216,6 @@ case "$1" in
         # Padrão: inicia o Cyber TUI com backend
         echo "🧠 NEXUS — Iniciando..."
         ensure_server_background
-        "$PY" "$ROOT_DIR/bin/zeus-cyber-tui"
+        "$PY" "$ROOT_DIR/bin/nexus-cyber-tui"
         ;;
 esac

@@ -1,5 +1,5 @@
 """
-ZEUS Cognitive Core — Package Init.
+NEXUS Cognitive Core — Package Init.
 
 Public API for the cognitive subsystem.
 """

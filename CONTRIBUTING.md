@@ -16,7 +16,7 @@ credentials, and privileged actions.
 ## Development Setup
 
 ```bash
-git clone https://github.com/zeusinfra/NEXUS.git
+git clone https://github.com/nexusinfra/NEXUS.git
 cd NEXUS
 
 ./scripts/bootstrap.sh

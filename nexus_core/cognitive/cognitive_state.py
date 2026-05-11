@@ -1,5 +1,5 @@
 """
-ZEUS Cognitive Core — Global Cognitive State.
+NEXUS Cognitive Core — Global Cognitive State.
 
 Thread-safe singleton holding the current cognitive state of the system.
 Updated atomically after each loop cycle and exposed via API.
@@ -19,7 +19,7 @@ def _now_iso() -> str:
 
 @dataclass
 class CognitiveState:
-    """Represents the current cognitive state of ZEUS."""
+    """Represents the current cognitive state of NEXUS."""
 
     mode: str = "safe"  # safe | autonomous | manual
     loop_running: bool = False

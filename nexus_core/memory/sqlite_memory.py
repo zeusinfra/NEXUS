@@ -6,7 +6,7 @@ from nexus_core.env import load_project_env
 
 load_project_env()
 
-DB_PATH = os.getenv("NEXUS_DB_PATH", "./zeus_events.db")
+DB_PATH = os.getenv("NEXUS_DB_PATH", "./nexus_events.db")
 
 
 def get_connection(db_path: str | None = None):

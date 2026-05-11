@@ -1,5 +1,5 @@
 """
-ZEUS Cognitive Core — Self-Healing Infrastructure.
+NEXUS Cognitive Core — Self-Healing Infrastructure.
 
 Monitors system logs and health metrics to detect repeated failures,
 proposing and applying autonomous fixes where safe.
@@ -18,7 +18,7 @@ from nexus_core.observability import get_logger, log_event
 from nexus_core.core_system import call_cloud_llm
 from nexus_core.command_policy import validate_command
 
-logger = get_logger("zeus.cognitive.self_healing")
+logger = get_logger("nexus.cognitive.self_healing")
 
 
 @dataclass
@@ -32,7 +32,7 @@ class HealingProposal:
 class SelfHealingEngine:
     def __init__(self, db_path: str | None = None) -> None:
         self.db_path = db_path
-        self.log_path = os.getenv("NEXUS_LOG_PATH", "/var/log/zeus.log")
+        self.log_path = os.getenv("NEXUS_LOG_PATH", "/var/log/nexus.log")
 
     def scan_for_issues(self) -> List[str]:
         """Reads recent logs to find error patterns."""
@@ -61,7 +61,7 @@ class SelfHealingEngine:
 
         sample_text = "\n".join(error_sample[:10])
         system_prompt = (
-            "Você é o SELF-HEALING ENGINE do ZEUS. Analise os erros de log fornecidos e "
+            "Você é o SELF-HEALING ENGINE do NEXUS. Analise os erros de log fornecidos e "
             "proponha uma solução técnica (comandos shell) para resolver o problema. "
             "Se o erro for comum (permissão, arquivo ausente, dependência), seja direto. "
             "Retorne em formato JSON: { 'issue': '...', 'rationale': '...', 'commands': [...], 'risk': 'low/medium/high' }"

@@ -27,13 +27,13 @@ class SecondBrainTests(unittest.TestCase):
     def test_obsidian_note_parser_extracts_metadata(self):
         with tempfile.TemporaryDirectory() as tmp:
             note = Path(tmp) / "Roadmap.md"
-            note.write_text("# Roadmap\n#project [[ZEUS]]\nTexto", encoding="utf-8")
+            note.write_text("# Roadmap\n#project [[NEXUS]]\nTexto", encoding="utf-8")
 
             parsed = read_note(str(note))
 
         self.assertEqual(parsed["title"], "Roadmap")
         self.assertIn("#project", parsed["tags"])
-        self.assertIn("ZEUS", parsed["internal_links"])
+        self.assertIn("NEXUS", parsed["internal_links"])
         self.assertTrue(parsed["hash"])
 
     def test_tag_extraction_ignores_markdown_headers(self):
@@ -52,7 +52,7 @@ class SecondBrainTests(unittest.TestCase):
 
         with patch.dict(
             os.environ,
-            {"ZEUS_ENABLE_NOTION": "0", "ZEUS_ENABLE_LINEAR": "0"},
+            {"NEXUS_ENABLE_NOTION": "0", "NEXUS_ENABLE_LINEAR": "0"},
             clear=False,
         ):
             notion = importlib.reload(notion)
@@ -72,15 +72,15 @@ class SecondBrainTests(unittest.TestCase):
     def test_env_example_keeps_sync_engine_opt_in(self):
         env_example = Path(".env.example").read_text(encoding="utf-8")
 
-        self.assertIn("ZEUS_ENABLE_SECOND_BRAIN=0", env_example)
-        self.assertIn("ZEUS_ENABLE_SECOND_BRAIN_SYNC_ENGINE=0", env_example)
-        self.assertIn("ZEUS_ENABLE_NOTION_AUTO_SYNC=0", env_example)
-        self.assertIn("ZEUS_ENABLE_LINEAR_AUTO_SYNC=0", env_example)
+        self.assertIn("NEXUS_ENABLE_SECOND_BRAIN=0", env_example)
+        self.assertIn("NEXUS_ENABLE_SECOND_BRAIN_SYNC_ENGINE=0", env_example)
+        self.assertIn("NEXUS_ENABLE_NOTION_AUTO_SYNC=0", env_example)
+        self.assertIn("NEXUS_ENABLE_LINEAR_AUTO_SYNC=0", env_example)
 
     def test_context_area_mapping_links_information_to_domain(self):
         self.assertEqual(_area_from_tags('["#bug", "#infra"]'), "tarefa/operação")
         self.assertEqual(_area_from_tags('["#to-notion"]'), "documentação")
-        self.assertEqual(_area_from_tags('["#zeus-memory"]'), "memória")
+        self.assertEqual(_area_from_tags('["#nexus-memory"]'), "memória")
 
     def test_operational_status_page_formats_sync_data(self):
         content = _format_operational_status_for_notion(
@@ -94,7 +94,7 @@ class SecondBrainTests(unittest.TestCase):
             }
         )
 
-        self.assertIn("ZEUS — Estado Operacional", content)
+        self.assertIn("NEXUS — Estado Operacional", content)
         self.assertIn("Eventos totais: 3", content)
         self.assertIn("Operações de sync registradas: 8", content)
 
@@ -106,7 +106,7 @@ class SecondBrainTests(unittest.TestCase):
         }
 
         with patch.object(notion, "_get_database_properties", return_value=schema):
-            properties = notion._build_page_properties("ZEUS", ["#memory"], "memory.md")
+            properties = notion._build_page_properties("NEXUS", ["#memory"], "memory.md")
 
         self.assertIn("Title", properties)
         self.assertIn("Tags", properties)

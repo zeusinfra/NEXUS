@@ -19,7 +19,7 @@ def test_filesystem_mirror_basic(monkeypatch):
         vault_dir = test_root / "vault"
         vault_dir.mkdir(parents=True, exist_ok=True)
 
-        monkeypatch.setenv("ZEUS_VAULT_PATH", str(vault_dir))
+        monkeypatch.setenv("NEXUS_VAULT_PATH", str(vault_dir))
         mirror = FilesystemMirror()
 
         # Run mirror

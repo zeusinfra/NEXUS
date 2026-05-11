@@ -123,7 +123,7 @@ class VoiceSensing:
                 [part.strip() for part in aliases_env.split(",") if part.strip()]
             )
         else:
-            # Default PT-BR: Whisper às vezes entende "Zeus" como "Deus".
+            # Default PT-BR: Whisper às vezes entende "Nexus" como "Deus".
             if self._normalize_text(self.wake_word) == "nexus":
                 aliases.append("nexus")
         self._wake_aliases = [a for a in aliases if a]
@@ -349,8 +349,8 @@ class VoiceSensing:
                 woke = bool(self._wake_re.search(normalized))
 
                 # Só processa comando se:
-                # - contém wake word (ex: "Zeus, ..."), OU
-                # - foi "armado" por um wake anterior (dizer só "Zeus" e depois falar o comando).
+                # - contém wake word (ex: "Nexus, ..."), OU
+                # - foi "armado" por um wake anterior (dizer só "Nexus" e depois falar o comando).
                 # - OU se o wake word NÃO for obrigatório.
                 if not (woke or armed or not self.wake_word_required):
                     if os.getenv("NEXUS_VOICE_DEBUG", "0").strip().lower() in {

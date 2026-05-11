@@ -1,5 +1,5 @@
 """
-ZEUS Cognitive Core — Memory Compression.
+NEXUS Cognitive Core — Memory Compression.
 
 Handles semantic summarization, temporal decay, and archiving
 to ensure the cognitive database remains sustainable.
@@ -17,7 +17,7 @@ from nexus_core.cognitive.cognitive_db import get_connection
 from nexus_core.observability import get_logger, log_event
 from nexus_core import core_system
 
-logger = get_logger("zeus.cognitive.memory_compression")
+logger = get_logger("nexus.cognitive.memory_compression")
 
 
 class MemoryCompression:
@@ -28,7 +28,7 @@ class MemoryCompression:
     ) -> None:
         self.db_path = db_path
         self.archive_path = archive_path or (
-            os.path.join(os.path.dirname(db_path), "zeus_archive.db")
+            os.path.join(os.path.dirname(db_path), "nexus_archive.db")
             if db_path
             else None
         )
@@ -90,7 +90,7 @@ class MemoryCompression:
         prompt = [
             {
                 "role": "system",
-                "content": "Você é o motor de compressão de memória do ZEUS. Resuma as seguintes interações do usuário em um parágrafo denso e semântico, destacando intenções, tarefas recorrentes e aprendizados.",
+                "content": "Você é o motor de compressão de memória do NEXUS. Resuma as seguintes interações do usuário em um parágrafo denso e semântico, destacando intenções, tarefas recorrentes e aprendizados.",
             },
             {"role": "user", "content": text_to_summarize},
         ]

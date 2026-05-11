@@ -1,4 +1,4 @@
-# NEXUS by ZEUS Protocol
+# NEXUS by NEXUS Protocol
 
 > Local-first cognitive operations for Linux desktops.
 
@@ -29,7 +29,7 @@ auditable, and reversible.
 | Path | Purpose |
 | --- | --- |
 | `apps/` | FastAPI app, routes, web GUI, cognitive entrypoints |
-| `zeus_core/` | Core orchestration, security, cognition, memory, integrations |
+| `nexus_core/` | Core orchestration, security, cognition, memory, integrations |
 | `bin/` | Launchers for backend, GTK chat, TUI, and local helpers |
 | `core-rust/` | Rust workspace for memory, sensors, policy, state, and bridges |
 | `watcher_rs/` | Rust watcher service |

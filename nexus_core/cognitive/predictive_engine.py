@@ -1,5 +1,5 @@
 """
-ZEUS Cognitive Core — Predictive Engine.
+NEXUS Cognitive Core — Predictive Engine.
 
 Anticipates user needs and system events based on habits,
 workflows, and historical patterns.
@@ -11,7 +11,7 @@ from typing import List
 
 from nexus_core.observability import get_logger, log_event
 
-logger = get_logger("zeus.cognitive.predictive")
+logger = get_logger("nexus.cognitive.predictive")
 
 
 class PredictiveEngine:

@@ -153,7 +153,7 @@ class Event:
 
 
 class EventBus:
-    """Pub/Sub mechanism for ZEUS components."""
+    """Pub/Sub mechanism for NEXUS components."""
 
     _instance = None
 

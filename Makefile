@@ -7,8 +7,8 @@ bootstrap:
 	./scripts/bootstrap.sh
 
 lint:
-	$(PYTHON) -m ruff check zeus_core apps communication tests
-	$(PYTHON) -m flake8 zeus_core apps communication tests --count --select=E9,F63,F7,F82 --show-source --statistics
+	$(PYTHON) -m ruff check nexus_core apps communication tests
+	$(PYTHON) -m flake8 nexus_core apps communication tests --count --select=E9,F63,F7,F82 --show-source --statistics
 
 test:
 	$(PYTHON) -m pytest
