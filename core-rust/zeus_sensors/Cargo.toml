@@ -8,7 +8,7 @@ name = "zeus_sensors"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-pyo3 = { version = "0.20", features = ["auto-initialize"] }
+pyo3 = { version = "0.24", features = ["auto-initialize"] }
 walkdir = "2.4"
 sysinfo = "0.30"
 serde = { version = "1.0", features = ["derive"] }
