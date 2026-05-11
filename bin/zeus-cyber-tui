@@ -61,7 +61,7 @@ from rich.panel import Panel
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 BACKEND = (sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("--") else os.getenv("ZEUS_BACKEND_URL", "http://127.0.0.1:8080")).rstrip("/")
-CLIENT_ID = os.getenv("ZEUS_TUI_CLIENT_ID", "zeus_cyber_tui").strip() or "zeus_cyber_tui"
+CLIENT_ID = os.getenv("ZEUS_TUI_CLIENT_ID", "nexus_cyber_tui").strip() or "nexus_cyber_tui"
 SESSION_ID = os.getenv("ZEUS_TUI_SESSION_ID") or datetime.now().strftime("tui-%Y%m%d-%H%M%S")
 VERSION = "1.14.46"
 SHELL_TIMEOUT = 30  # segundos max por comando shell
@@ -70,12 +70,12 @@ OUTPUT_LIMIT = 16_000
 # ──────────────────────── ASCII Logo ────────────────────────
 
 LOGO = """
-[bold #00ffcc]███████╗[/][#00ddaa]███████╗[/][#00bb88]██╗   ██╗[/][#009966]███████╗[/]
-[bold #00ffcc]╚══███╔╝[/][#00ddaa]██╔════╝[/][#00bb88]██║   ██║[/][#009966]██╔════╝[/]
-[bold #00ffcc]  ███╔╝ [/][#00ddaa]█████╗  [/][#00bb88]██║   ██║[/][#009966]███████╗[/]
-[bold #00ffcc] ███╔╝  [/][#00ddaa]██╔══╝  [/][#00bb88]██║   ██║[/][#009966]╚════██║[/]
-[bold #00ffcc]███████╗[/][#00ddaa]███████╗[/][#00bb88]╚██████╔╝[/][#009966]███████║[/]
-[bold #00ffcc]╚══════╝[/][#00ddaa]╚══════╝[/][#00bb88] ╚═════╝ [/][#009966]╚══════╝[/]
+[bold #00ffcc]███╗   ██╗[/][#00ddaa]███████╗[/][#00bb88]██╗  ██╗[/][#009966]██╗   ██╗[/][#00aa77]███████╗[/]
+[bold #00ffcc]████╗  ██║[/][#00ddaa]██╔════╝[/][#00bb88]╚██╗██╔╝[/][#009966]██║   ██║[/][#00aa77]██╔════╝[/]
+[bold #00ffcc]██╔██╗ ██║[/][#00ddaa]█████╗  [/][#00bb88] ╚███╔╝ [/][#009966]██║   ██║[/][#00aa77]███████╗[/]
+[bold #00ffcc]██║╚██╗██║[/][#00ddaa]██╔══╝  [/][#00bb88] ██╔██╗ [/][#009966]██║   ██║[/][#00aa77]╚════██║[/]
+[bold #00ffcc]██║ ╚████║[/][#00ddaa]███████╗[/][#00bb88]██╔╝ ██╗[/][#009966]╚██████╔╝[/][#00aa77]███████║[/]
+[bold #00ffcc]╚═╝  ╚═══╝[/][#00ddaa]╚══════╝[/][#00bb88]╚═╝  ╚═╝[/][#009966] ╚═════╝ [/][#00aa77]╚══════╝[/]
 """
 
 SUBTITLE = "[dim]Cognitive OS[/dim] [bold #00ffcc]v" + VERSION + "[/]"
@@ -420,13 +420,15 @@ def _system_summary() -> tuple[int, str, str]:
 def _journal_lines(count: int) -> tuple[int, str, str]:
     count = max(1, min(count, 300))
     for args in (
+        ["journalctl", "--user", "-u", "nexus", "-n", str(count), "--no-pager"],
         ["journalctl", "--user", "-u", "zeus", "-n", str(count), "--no-pager"],
+        ["journalctl", "-u", "nexus", "-n", str(count), "--no-pager"],
         ["journalctl", "-u", "zeus", "-n", str(count), "--no-pager"],
     ):
         code, stdout, stderr = _run_process(args)
         if code == 0 and stdout.strip():
             return code, stdout, stderr
-    return 1, "zeus.service nao encontrado no journal", ""
+    return 1, "servico NEXUS nao encontrado no journal", ""
 
 def _service_lines() -> tuple[int, str, str]:
     code, stdout, stderr = _run_process(["systemctl", "list-units", "--type=service", "--state=running", "--no-pager", "--no-legend"])
@@ -970,8 +972,8 @@ class ChatScreen(Screen):
 
 # ──────────────────────── App ────────────────────────
 
-class ZeusCyberApp(App):
-    """ZEUS Cognitive TUI — Full-Screen Modern Interface."""
+class NexusCyberApp(App):
+    """NEXUS Cognitive TUI — Full-Screen Modern Interface."""
 
     TITLE = "NEXUS"
     CSS = CSS
@@ -980,7 +982,7 @@ class ZeusCyberApp(App):
         self.push_screen(GreetingScreen())
 
 if __name__ == "__main__":
-    app = ZeusCyberApp()
+    app = NexusCyberApp()
     try:
         app.run()
     except KeyboardInterrupt:

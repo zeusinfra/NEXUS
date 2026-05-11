@@ -9,11 +9,11 @@ const ByteArray = imports.byteArray;
 const APPLET_UUID = 'nexus@local';
 const APPLET_VERSION = '1.0.4';
 const DEFAULT_BACKEND = 'http://127.0.0.1:8080';
-const PROJECT_ROOT = '__ZEUS_PROJECT_ROOT__';
+const PROJECT_ROOT = '__NEXUS_PROJECT_ROOT__';
 const POLL_SECONDS = 10;
 
 function _projectRoot() {
-    if (PROJECT_ROOT.indexOf('__ZEUS_') !== 0) {
+    if (PROJECT_ROOT.indexOf('__NEXUS_') !== 0) {
         return PROJECT_ROOT;
     }
     return GLib.build_filenamev([GLib.get_home_dir(), 'Documentos', 'ZEUS_SYSTEM']);
@@ -27,7 +27,7 @@ function _truncate(text, limit) {
     return text.slice(0, limit - 1) + '...';
 }
 
-class ZeusApplet extends Applet.TextIconApplet {
+class NexusApplet extends Applet.TextIconApplet {
     constructor(orientation, panelHeight, instanceId) {
         super(orientation, panelHeight, instanceId);
 
@@ -159,7 +159,7 @@ class ZeusApplet extends Applet.TextIconApplet {
 
     _openChat() {
         const root = _projectRoot();
-        const chat = GLib.build_filenamev([root, 'bin', 'zeus-chat']);
+        const chat = GLib.build_filenamev([root, 'bin', 'nexus-chat']);
         try {
             GLib.spawn_async(
                 root,
@@ -176,7 +176,7 @@ class ZeusApplet extends Applet.TextIconApplet {
 
     _startBackend() {
         const root = _projectRoot();
-        const launcher = GLib.build_filenamev([root, 'bin', 'zeus']);
+        const launcher = GLib.build_filenamev([root, 'bin', 'nexus']);
         try {
             GLib.spawn_async(
                 root,
@@ -198,5 +198,5 @@ class ZeusApplet extends Applet.TextIconApplet {
 }
 
 function main(metadata, orientation, panelHeight, instanceId) {
-    return new ZeusApplet(orientation, panelHeight, instanceId);
+    return new NexusApplet(orientation, panelHeight, instanceId);
 }

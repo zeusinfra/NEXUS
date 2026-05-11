@@ -1,11 +1,12 @@
 #!/bin/bash
 # ══════════════════════════════════════
-#  ZEUS — Launcher Unificado
+#  NEXUS — Launcher Unificado
 # ══════════════════════════════════════
 DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(dirname "$DIR")"
 VENV="$ROOT_DIR/.venv/bin/python"
 SYS="python3"
+SERVER_LOG="$ROOT_DIR/nexus_server.log"
 
 # Usa venv se existir, senão usa sistema
 PY="$SYS"
@@ -42,7 +43,7 @@ stop_stale_backend() {
 
 ensure_server_background() {
     if backend_responds; then
-        echo "✅ Backend ZEUS já está respondendo."
+        echo "✅ Backend NEXUS já está respondendo."
         return 0
     fi
 
@@ -50,7 +51,7 @@ ensure_server_background() {
         echo "⏳ Porta ${ZEUS_PORT:-8080} já está aberta. Aguardando health check..."
         for _ in $(seq 1 20); do
             if backend_responds; then
-                echo "✅ Backend ZEUS pronto em http://127.0.0.1:${ZEUS_PORT:-8080}"
+                echo "✅ Backend NEXUS pronto em http://127.0.0.1:${ZEUS_PORT:-8080}"
                 return 0
             fi
             sleep 1
@@ -61,7 +62,7 @@ ensure_server_background() {
 
     stop_stale_backend
     if backend_responds; then
-        echo "✅ Backend ZEUS voltou a responder."
+        echo "✅ Backend NEXUS voltou a responder."
         return 0
     fi
 
@@ -70,10 +71,10 @@ ensure_server_background() {
         return 1
     fi
 
-    echo "🌑 Iniciando backend ZEUS em background..."
+    echo "🌑 Iniciando backend NEXUS em background..."
     (
         cd "$ROOT_DIR"
-        setsid -f nohup "$DIR/zeus" server > "$ROOT_DIR/zeus_server.log" 2>&1
+        setsid -f nohup "$DIR/zeus" server > "$SERVER_LOG" 2>&1
     )
 
     for _ in $(seq 1 30); do
@@ -82,13 +83,13 @@ ensure_server_background() {
             if ! backend_responds; then
                 continue
             fi
-            echo "✅ Backend ZEUS pronto em http://127.0.0.1:${ZEUS_PORT:-8080}"
+            echo "✅ Backend NEXUS pronto em http://127.0.0.1:${ZEUS_PORT:-8080}"
             return 0
         fi
         sleep 1
     done
 
-    echo "❌ Backend não respondeu dentro do tempo esperado. Veja zeus_server.log." >&2
+    echo "❌ Backend não respondeu dentro do tempo esperado. Veja $SERVER_LOG." >&2
     return 1
 }
 
@@ -139,49 +140,49 @@ export SDL_AUDIODRIVER=pulseaudio
 # Help rápido: ./zeus help
 if [[ "$1" == "help" || "$1" == "-h" || "$1" == "--help" ]]; then
     echo "╔════════════════════════════════════╗"
-    echo "║     ZEUS — Command Launcher        ║"
+    echo "║     NEXUS — Command Launcher       ║"
     echo "╚════════════════════════════════════╝"
     echo ""
-    echo "  ./zeus               → Cyber TUI (padrão)"
-    echo "  ./zeus tui            → Cyber TUI (explícito)"
-    echo "  ./zeus chat           → Abrir chat GTK (desktop)"
-    echo "  ./zeus web            → Iniciar Servidor (Browser)"
-    echo "  ./zeus server         → Backend headless"
-    echo "  ./zeus ensure-server  → Garantir backend online"
-    echo "  ./zeus logs           → Ver logs em tempo real"
-    echo "  ./zeus v4             → Core v4 (loop contínuo)"
-    echo "  ./zeus evolve         → Motor de Evolução"
-    echo "  ./zeus setup-aliases  → Instalar aliases"
+    echo "  ./bin/nexus               → Cyber TUI (padrão)"
+    echo "  ./bin/nexus tui            → Cyber TUI (explícito)"
+    echo "  ./bin/nexus chat           → Abrir chat GTK (desktop)"
+    echo "  ./bin/nexus web            → Iniciar Servidor (Browser)"
+    echo "  ./bin/nexus server         → Backend headless"
+    echo "  ./bin/nexus ensure-server  → Garantir backend online"
+    echo "  ./bin/nexus logs           → Ver logs em tempo real"
+    echo "  ./bin/nexus v4             → Core v4 (loop contínuo)"
+    echo "  ./bin/nexus evolve         → Motor de Evolução"
+    echo "  ./bin/nexus setup-aliases  → Instalar aliases"
     echo ""
     exit 0
 fi
 
 case "$1" in
     sphere|gui|3d|web)
-        echo "🧠 Iniciando ZEUS Command Center (Browser)..."
+        echo "🧠 Iniciando NEXUS Command Center (Browser)..."
         echo "🌐 Acesse: http://127.0.0.1:8080"
         start_rust_services
         "$PY" -m apps.web_gui
         ;;
     v4|core4|daemon)
-        echo "🧠 Iniciando ZEUS Cognitive Core v4 (Loop contínuo)..."
+        echo "🧠 Iniciando NEXUS Cognitive Core v4 (Loop contínuo)..."
         echo "📝 Inbox: scratch/v4_inbox.txt (adicione texto lá para o core perceber)"
         "$PY" -m apps.zeus_v4
         ;;
     server|headless)
-        echo "🌑 Iniciando ZEUS em modo Headless (Cérebro em Background)..."
+        echo "🌑 Iniciando NEXUS em modo Headless (Cérebro em Background)..."
         export_headless_light_profile
         if backend_responds; then
-            echo "✅ Backend ZEUS já está respondendo em http://127.0.0.1:${ZEUS_PORT:-8080}"
+            echo "✅ Backend NEXUS já está respondendo em http://127.0.0.1:${ZEUS_PORT:-8080}"
             exit 0
         fi
         if backend_port_open; then
-            echo "❌ Porta ${ZEUS_PORT:-8080} já está ocupada, mas /api/health não respondeu. Use './bin/zeus ensure-server' para diagnosticar." >&2
+            echo "❌ Porta ${ZEUS_PORT:-8080} já está ocupada, mas /api/health não respondeu. Use './bin/nexus ensure-server' para diagnosticar." >&2
             exit 1
         fi
         stop_stale_backend
         start_rust_services
-        echo "🧠 ZEUS Core operacional. Conecte-se via Applet/HUD."
+        echo "🧠 NEXUS Core operacional. Conecte-se via Applet/HUD."
         "$PY" -m apps.web_gui --headless
         ;;
     ensure-server)
@@ -192,29 +193,29 @@ case "$1" in
         "$PY" -m apps.zeus_evolution
         ;;
     logs)
-        echo "📜  Monitorando logs do ZEUS..."
-        tail -f zeus_server.log
+        echo "📜  Monitorando logs do NEXUS..."
+        tail -f "$SERVER_LOG"
         ;;
     tui|console|ops)
-        echo "📟  Iniciando ZEUS Cyber TUI..."
+        echo "📟  Iniciando NEXUS Cyber TUI..."
         ensure_server_background
-        "$PY" "$ROOT_DIR/bin/zeus-cyber-tui"
+        "$PY" "$ROOT_DIR/bin/nexus-cyber-tui"
         ;;
     chat)
-        echo "💬  Abrindo chat ZEUS GTK..."
-        "$ROOT_DIR/bin/zeus-chat"
+        echo "💬  Abrindo chat NEXUS GTK..."
+        "$ROOT_DIR/bin/nexus-chat"
         ;;
     setup-aliases)
         echo "🔧  Configurando aliases globais em ~/.bashrc..."
-        grep -q "alias nexus-server" ~/.bashrc || echo "alias nexus-server='cd $ROOT_DIR && ./bin/zeus web > zeus_server.log 2>&1 & sleep 1 && tail -f zeus_server.log'" >> ~/.bashrc
-        grep -q "alias nexus-chat" ~/.bashrc || echo "alias nexus-chat='cd $ROOT_DIR && ./bin/zeus-chat'" >> ~/.bashrc
-        echo "✅  Aliases criados: 'zeus-server' e 'zeus-chat'."
+        grep -q "alias nexus-server" ~/.bashrc || echo "alias nexus-server='cd $ROOT_DIR && ./bin/nexus web > nexus_server.log 2>&1 & sleep 1 && tail -f nexus_server.log'" >> ~/.bashrc
+        grep -q "alias nexus-chat" ~/.bashrc || echo "alias nexus-chat='cd $ROOT_DIR && ./bin/nexus-chat'" >> ~/.bashrc
+        echo "✅  Aliases criados: 'nexus-server' e 'nexus-chat'."
         echo "🔄  Execute 'source ~/.bashrc' para ativar."
         ;;
     *)
         # Padrão: inicia o Cyber TUI com backend
-        echo "🧠 ZEUS — Iniciando..."
+        echo "🧠 NEXUS — Iniciando..."
         ensure_server_background
-        "$PY" "$ROOT_DIR/bin/zeus-cyber-tui"
+        "$PY" "$ROOT_DIR/bin/nexus-cyber-tui"
         ;;
 esac

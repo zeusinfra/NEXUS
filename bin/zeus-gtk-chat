@@ -39,10 +39,10 @@ from zeus_core.security.approval_listener import start_approval_listener_glib
 # Se o primeiro argumento não começar com '--', assumimos que é a URL do backend.
 _backend_arg = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("--") else None
 BACKEND = (_backend_arg or os.getenv("ZEUS_BACKEND_URL", "http://127.0.0.1:8080")).rstrip("/")
-APP_ID = "local.zeus.CognitiveChat"
+APP_ID = "local.nexus.CognitiveChat"
 
 
-class ZeusGtkChat(Adw.Application):
+class NexusGtkChat(Adw.Application):
     def __init__(self) -> None:
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE)
         self.window: Adw.ApplicationWindow | None = None
@@ -71,11 +71,11 @@ class ZeusGtkChat(Adw.Application):
         self._seen_event_keys: set[str] = set()
         self._events_polling = False
         self.sidebar_scroll: Gtk.ScrolledWindow | None = None
-        self._client_id = os.getenv("ZEUS_GTK_CLIENT_ID", "zeus_gtk_chat").strip() or "zeus_gtk_chat"
+        self._client_id = os.getenv("ZEUS_GTK_CLIENT_ID", "nexus_gtk_chat").strip() or "nexus_gtk_chat"
         self._session_id = os.getenv("ZEUS_GTK_SESSION_ID") or datetime.now().strftime("gtk-%Y%m%d-%H%M%S")
         self._history_db = os.path.join(
             os.getenv("XDG_DATA_HOME", os.path.expanduser("~/.local/share")),
-            "zeus",
+            "nexus",
             "gtk_conversations.sqlite",
         )
         self._init_history_db()
@@ -120,7 +120,7 @@ class ZeusGtkChat(Adw.Application):
 
         window = Adw.ApplicationWindow(application=self)
         window.set_default_size(1100, 760)
-        window.add_css_class("zeus-window")
+        window.add_css_class("nexus-window")
         
         # Keyboard shortcuts
         key_ctrl = Gtk.EventControllerKey.new()
@@ -469,7 +469,7 @@ class ZeusGtkChat(Adw.Application):
             font-family: 'Inter', 'Cantarell', system-ui, sans-serif;
         }
 
-        .zeus-window { 
+        .nexus-window {
             background-color: @window_bg_color;
         }
 
@@ -1414,7 +1414,7 @@ class ZeusGtkChat(Adw.Application):
 
     def _play_audio(self, audio_b64: str) -> None:
         raw = base64.b64decode(audio_b64)
-        with tempfile.NamedTemporaryFile(prefix="zeus-tts-", suffix=".mp3", delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(prefix="nexus-tts-", suffix=".mp3", delete=False) as tmp:
             tmp.write(raw)
             path = tmp.name
         player = _find_player()
@@ -1458,7 +1458,7 @@ def shutil_which(name: str) -> str | None:
     return None
 
 def main() -> int:
-    app = ZeusGtkChat()
+    app = NexusGtkChat()
     return app.run(sys.argv)
 
 if __name__ == "__main__":

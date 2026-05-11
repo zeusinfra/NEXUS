@@ -28,7 +28,7 @@ def draw_interface(data):
     grid.add_column(ratio=1)
     grid.add_column(justify="right")
     grid.add_row(
-        Text("ZEUS COGNITIVE OS [v4.5]", style="bold green"),
+        Text("NEXUS COGNITIVE OS [v4.5]", style="bold green"),
         Text(datetime.now().strftime("%H:%M:%S"), style="bold white"),
     )
     console.print(Panel(grid, style="green"))
@@ -92,7 +92,7 @@ def main():
             data = get_data()
             draw_interface(data)
             
-            cmd = console.input("[bold green]zeus@ops[/bold green]:[bold white]~$ [/bold white]")
+            cmd = console.input("[bold green]nexus@ops[/bold green]:[bold white]~$ [/bold white]")
             
             if not cmd.strip() or cmd.lower() == 'r':
                 continue

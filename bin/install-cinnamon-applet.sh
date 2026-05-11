@@ -27,7 +27,9 @@ import sys
 path = Path(sys.argv[1])
 root = sys.argv[2]
 content = path.read_text(encoding="utf-8")
-path.write_text(content.replace("__ZEUS_PROJECT_ROOT__", root), encoding="utf-8")
+content = content.replace("__NEXUS_PROJECT_ROOT__", root)
+content = content.replace("__ZEUS_PROJECT_ROOT__", root)
+path.write_text(content, encoding="utf-8")
 PY
 
 echo "Applet instalado em: $DEST_DIR"
@@ -35,7 +37,7 @@ echo ""
 echo "Para ativar:"
 echo "  1. Abra Configuracoes do Sistema > Applets"
 echo "  2. Va em Gerenciar"
-echo "  3. Ative 'ZEUS Cognitive AI'"
+echo "  3. Ative 'NEXUS Cognitive AI'"
 echo ""
 echo "Atalho:"
 echo "  cinnamon-settings applets"
