@@ -96,6 +96,8 @@ cargo build --manifest-path watcher_rs/Cargo.toml
 
 | Command | Description |
 | --- | --- |
+| `pip install -r requirements/base.txt` | Install base dependencies |
+| `pip install -r requirements/dev.txt` | Install development dependencies |
 | `make bootstrap` | Create `.venv` and install development dependencies |
 | `make lint` | Run Python lint checks |
 | `make test` | Run the Python test suite |
