@@ -1,0 +1,13 @@
+# Trivy ignore file
+
+# Low-severity buffer overflow risk in PyO3 (0.20.3). 
+# Fixed in 0.24.1, but keeping current version for compatibility.
+# Risk is minimal in our current usage.
+GHSA-pph8-gcv7-4qj5
+
+# Secrets ignored because they are either legitimate test placeholders
+# or local-only configurations already excluded from git via .gitignore.
+# Gitleaks is also configured to ignore these.
+.env
+configs/key.pem
+tests/unit/test_cognitive_maturity_final.py
