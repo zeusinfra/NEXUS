@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from threading import Lock
-from typing import Any, Dict, Optional
+from typing import Optional
 
 from zeus_core.core_system import call_cloud_llm
 
@@ -52,7 +51,9 @@ def save_memory(memory: dict) -> None:
         return
     MEMORY_PATH.parent.mkdir(parents=True, exist_ok=True)
     with _LOCK:
-        MEMORY_PATH.write_text(json.dumps(memory, indent=2, ensure_ascii=False), encoding="utf-8")
+        MEMORY_PATH.write_text(
+            json.dumps(memory, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
 
 
 def _truncate(val: str, max_len: int = 400) -> str:
@@ -144,7 +145,9 @@ def should_extract_memory(user_text: str, assistant_text: str) -> bool:
         "Ignore: resultados de busca, clima, comandos pontuais, logs."
     )
     prompt = f"User: {u[:350]}\nAssistant: {a[:250]}"
-    out = call_cloud_llm([{"role": "system", "content": system}, {"role": "user", "content": prompt}])
+    out = call_cloud_llm(
+        [{"role": "system", "content": system}, {"role": "user", "content": prompt}]
+    )
     return "YES" in (out or "").upper()
 
 
@@ -156,28 +159,33 @@ def extract_memory(user_text: str, assistant_text: str) -> dict:
         "Retorne APENAS JSON válido ou {}.\n"
         "Estrutura:\n"
         "{\n"
-        "  \"identity\": {\"name\": {\"value\": \"...\"}},\n"
-        "  \"preferences\": {...},\n"
-        "  \"projects\": {...},\n"
-        "  \"relationships\": {...},\n"
-        "  \"wishes\": {...},\n"
-        "  \"notes\": {...}\n"
+        '  "identity": {"name": {"value": "..."}},\n'
+        '  "preferences": {...},\n'
+        '  "projects": {...},\n'
+        '  "relationships": {...},\n'
+        '  "wishes": {...},\n'
+        '  "notes": {...}\n'
         "}\n"
         "Se algo for incerto, não invente."
     )
     prompt = f"User: {u[:600]}\nAssistant: {a[:450]}\n\nJSON:"
-    raw = call_cloud_llm([{"role": "system", "content": system}, {"role": "user", "content": prompt}]) or ""
+    raw = (
+        call_cloud_llm(
+            [{"role": "system", "content": system}, {"role": "user", "content": prompt}]
+        )
+        or ""
+    )
     raw = re.sub(r"```(?:json)?", "", raw).strip().rstrip("`").strip()
     if not raw or raw == "{}":
         return {}
     try:
         return json.loads(raw)
     except Exception:
-        l = raw.find("{")
-        r = raw.rfind("}")
-        if l != -1 and r != -1 and r > l:
+        left = raw.find("{")
+        right = raw.rfind("}")
+        if left != -1 and right != -1 and right > left:
             try:
-                return json.loads(raw[l : r + 1])
+                return json.loads(raw[left : right + 1])
             except Exception:
                 return {}
         return {}

@@ -5,13 +5,13 @@ Manages data classification, user consent, and export filtering.
 Ensures no sensitive data (tokens, .env, private habits) is exported
 to external services without explicit permission.
 """
+
 from __future__ import annotations
 
-import json
 import os
 import re
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 from enum import IntEnum
 from typing import Any
@@ -25,11 +25,13 @@ logger = get_logger("zeus.security.privacy")
 # Models
 # ------------------------------------------------------------------
 
+
 class PrivacyLevel(IntEnum):
     PUBLIC = 0
     LOCAL_SENSITIVE = 1
     HIGHLY_SENSITIVE = 2
     SECRET = 3
+
 
 @dataclass
 class ValidationResult:
@@ -38,6 +40,7 @@ class ValidationResult:
     level: PrivacyLevel
     reason: str | None = None
     sanitized_content: str | None = None
+
 
 # ------------------------------------------------------------------
 # Regex Patterns for Sensitive Data
@@ -64,9 +67,11 @@ SENSITIVE_PATHS = [
 
 try:
     from zeus_security import PrivacyEngineRust
+
     RUST_SECURITY_AVAILABLE = True
 except ImportError:
     RUST_SECURITY_AVAILABLE = False
+
 
 class PrivacyGuard:
     """The central engine for privacy protection."""
@@ -76,7 +81,7 @@ class PrivacyGuard:
         # Global privacy mode: 'balanced' | 'strict' | 'local_only'
         self.mode = os.getenv("ZEUS_PRIVACY_MODE", "balanced").lower()
         self.session_masked_count = 0
-        
+
         if RUST_SECURITY_AVAILABLE:
             self.rust_engine = PrivacyEngineRust()
             logger.info("🦀 ZEUS: Privacy Guard operando com motor Rust otimizado.")
@@ -102,10 +107,10 @@ class PrivacyGuard:
         for path in SENSITIVE_PATHS:
             if re.search(path, content):
                 return PrivacyLevel.HIGHLY_SENSITIVE
-        
+
         if "habits" in content.lower() or "workflow" in content.lower():
-             if "detected" in content.lower() or "observed" in content.lower():
-                 return PrivacyLevel.HIGHLY_SENSITIVE
+            if "detected" in content.lower() or "observed" in content.lower():
+                return PrivacyLevel.HIGHLY_SENSITIVE
 
         # Check for LOCAL_SENSITIVE (generic chat/notes)
         if len(content) > 10:
@@ -125,28 +130,49 @@ class PrivacyGuard:
         if level == PrivacyLevel.SECRET:
             if dest_type == "local":
                 return ValidationResult(True, "allowed", level)
-            
+
             # Attempt to sanitize
             sanitized = self.sanitize(content)
-            self._audit("export_attempt", destination, "sanitized", level, "Masked SECRET patterns")
-            return ValidationResult(True, "sanitized", level, "Secrets masked", sanitized)
+            self._audit(
+                "export_attempt",
+                destination,
+                "sanitized",
+                level,
+                "Masked SECRET patterns",
+            )
+            return ValidationResult(
+                True, "sanitized", level, "Secrets masked", sanitized
+            )
 
         # 2. HIGHLY_SENSITIVE requires explicit consent for external
         if level == PrivacyLevel.HIGHLY_SENSITIVE:
             if dest_type == "local":
-                 return ValidationResult(True, "allowed", level)
-            
+                return ValidationResult(True, "allowed", level)
+
             if self.check_consent(f"export_{destination}"):
                 return ValidationResult(True, "allowed", level)
-            
-            self._audit("export_attempt", destination, "blocked", level, "Requires explicit consent")
-            return ValidationResult(False, "blocked", level, "Consente requerido para dados altamente sensíveis")
+
+            self._audit(
+                "export_attempt",
+                destination,
+                "blocked",
+                level,
+                "Requires explicit consent",
+            )
+            return ValidationResult(
+                False,
+                "blocked",
+                level,
+                "Consente requerido para dados altamente sensíveis",
+            )
 
         # 3. LOCAL_SENSITIVE allows balanced export, blocks in local_only
         if level == PrivacyLevel.LOCAL_SENSITIVE:
             if self.mode == "local_only" and dest_type != "local":
-                return ValidationResult(False, "blocked", level, "Modo local_only ativo")
-            
+                return ValidationResult(
+                    False, "blocked", level, "Modo local_only ativo"
+                )
+
             return ValidationResult(True, "allowed", level)
 
         return ValidationResult(True, "allowed", PrivacyLevel.PUBLIC)
@@ -208,14 +234,18 @@ class PrivacyGuard:
         except Exception:
             return False
 
-    def grant_consent(self, resource: str, scope: str = "session", duration_min: int = 30) -> str:
+    def grant_consent(
+        self, resource: str, scope: str = "session", duration_min: int = 30
+    ) -> str:
         """Grant a new consent."""
         cid = uuid.uuid4().hex[:12]
         expires = None
         if scope == "session":
-            expires = (datetime.now(timezone.utc) + timedelta(minutes=duration_min)).isoformat()
+            expires = (
+                datetime.now(timezone.utc) + timedelta(minutes=duration_min)
+            ).isoformat()
         elif scope == "once":
-             expires = (datetime.now(timezone.utc) + timedelta(seconds=1)).isoformat()
+            expires = (datetime.now(timezone.utc) + timedelta(seconds=1)).isoformat()
 
         with get_connection(self.db_path) as conn:
             conn.execute(
@@ -223,35 +253,68 @@ class PrivacyGuard:
                 "VALUES (?, ?, ?, 1, ?, ?)",
                 (cid, resource, scope, expires, datetime.now(timezone.utc).isoformat()),
             )
-        self._audit("consent_granted", resource, "allowed", PrivacyLevel.PUBLIC, f"Scope: {scope}")
+        self._audit(
+            "consent_granted",
+            resource,
+            "allowed",
+            PrivacyLevel.PUBLIC,
+            f"Scope: {scope}",
+        )
         return cid
 
     def revoke_consent(self, resource: str) -> None:
         with get_connection(self.db_path) as conn:
-            conn.execute("UPDATE privacy_consents SET allowed = 0 WHERE resource = ?", (resource,))
+            conn.execute(
+                "UPDATE privacy_consents SET allowed = 0 WHERE resource = ?",
+                (resource,),
+            )
         self._audit("consent_revoked", resource, "revoked", PrivacyLevel.PUBLIC)
 
     # ------------------------------------------------------------------
     # Auditing
     # ------------------------------------------------------------------
 
-    def _audit(self, etype: str, resource: str, action: str, level: PrivacyLevel, reason: str | None = None) -> None:
+    def _audit(
+        self,
+        etype: str,
+        resource: str,
+        action: str,
+        level: PrivacyLevel,
+        reason: str | None = None,
+    ) -> None:
         aid = uuid.uuid4().hex[:12]
         try:
             with get_connection(self.db_path) as conn:
                 conn.execute(
                     "INSERT INTO privacy_audit_log (id, event_type, resource, destination, action, reason, created_at) "
                     "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    (aid, etype, resource, "n/a", action, reason, datetime.now(timezone.utc).isoformat()),
+                    (
+                        aid,
+                        etype,
+                        resource,
+                        "n/a",
+                        action,
+                        reason,
+                        datetime.now(timezone.utc).isoformat(),
+                    ),
                 )
         except Exception:
             pass
-        log_event(logger, 20 if action == "allowed" else 30, "privacy_audit",
-                  id=aid, event=etype, resource=resource, action=action, privacy_level=level.name)
+        log_event(
+            logger,
+            20 if action == "allowed" else 30,
+            "privacy_audit",
+            id=aid,
+            event=etype,
+            resource=resource,
+            action=action,
+            privacy_level=level.name,
+        )
 
     def get_audit_logs(self, limit: int = 50) -> list[dict]:
         with get_connection(self.db_path) as conn:
             rows = conn.execute(
-                "SELECT * FROM privacy_audit_log ORDER BY created_at DESC LIMIT ?", (limit,)
+                "SELECT * FROM privacy_audit_log ORDER BY created_at DESC LIMIT ?",
+                (limit,),
             ).fetchall()
         return [dict(r) for r in rows]

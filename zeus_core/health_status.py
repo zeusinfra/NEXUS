@@ -11,7 +11,9 @@ import psutil
 import requests
 
 
-def check_memory_service(url: str = "http://127.0.0.1:8082/health", timeout: float = 0.35) -> dict[str, Any]:
+def check_memory_service(
+    url: str = "http://127.0.0.1:8082/health", timeout: float = 0.35
+) -> dict[str, Any]:
     try:
         resp = requests.get(url, timeout=timeout)
         return {"status": "online" if resp.status_code == 200 else "offline"}
@@ -19,17 +21,23 @@ def check_memory_service(url: str = "http://127.0.0.1:8082/health", timeout: flo
         return {"status": "offline"}
 
 
-def build_watcher_status(process: Any, started_at: float | None, last_event_at: float | None) -> dict[str, Any]:
+def build_watcher_status(
+    process: Any, started_at: float | None, last_event_at: float | None
+) -> dict[str, Any]:
     running = bool(process and process.returncode is None)
     return {
         "status": "online" if running else "offline",
         "pid": process.pid if process else None,
         "uptime_s": round(time.time() - started_at) if started_at else None,
-        "last_event_age_s": round(time.time() - last_event_at) if last_event_at else None,
+        "last_event_age_s": round(time.time() - last_event_at)
+        if last_event_at
+        else None,
     }
 
 
-def _watcher_command_matches(cmdline: list[str], project_root: str | Path | None = None) -> bool:
+def _watcher_command_matches(
+    cmdline: list[str], project_root: str | Path | None = None
+) -> bool:
     command = " ".join(str(part) for part in cmdline)
     if "watcher_rs" not in command:
         return False
@@ -39,10 +47,16 @@ def _watcher_command_matches(cmdline: list[str], project_root: str | Path | None
         root = str(Path(project_root).resolve())
     except Exception:
         root = str(project_root)
-    return root in command or "target/release/watcher_rs" in command or "cargo run --release" in command
+    return (
+        root in command
+        or "target/release/watcher_rs" in command
+        or "cargo run --release" in command
+    )
 
 
-def _watcher_port_open(host: str = "127.0.0.1", port: int = 8081, timeout: float = 0.2) -> bool:
+def _watcher_port_open(
+    host: str = "127.0.0.1", port: int = 8081, timeout: float = 0.2
+) -> bool:
     try:
         with socket.create_connection((host, port), timeout=timeout):
             return True
@@ -102,7 +116,8 @@ def build_runtime_health(
             "sensing_enabled": bool(enable_voice_sensing),
         },
         "asr": {
-            "backend_available": ffmpeg_available and (importlib.util.find_spec("faster_whisper") is not None),
+            "backend_available": ffmpeg_available
+            and (importlib.util.find_spec("faster_whisper") is not None),
             "ffmpeg_available": ffmpeg_available,
         },
         "vision": {

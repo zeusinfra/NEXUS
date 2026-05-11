@@ -10,7 +10,14 @@ import shlex
 from pathlib import Path
 from zeus_core.v4.guardian import RiskAssessment, SemanticGuardian
 from zeus_core.v4.reward import RewardSignal, cost_from_runtime, risk_score
-from zeus_core.v4.types import AutonomyMode, Decision, DecisionType, Plan, PlanStep, RiskLevel
+from zeus_core.v4.types import (
+    AutonomyMode,
+    Decision,
+    DecisionType,
+    Plan,
+    PlanStep,
+    RiskLevel,
+)
 
 
 @dataclass(slots=True)
@@ -30,16 +37,22 @@ class ShadowExecutor:
         self.guardian = SemanticGuardian(mode=mode)
         self.shadow_root = Path(os.getenv("ZEUS_SHADOW_ROOT", "/tmp/zeus_shadow"))
         self.shadow_root.mkdir(parents=True, exist_ok=True)
-        self.enable_real = os.getenv("ZEUS_V4_ENABLE_REAL_EXECUTION", "0").strip().lower() in {"1", "true", "yes", "on"}
+        self.enable_real = os.getenv(
+            "ZEUS_V4_ENABLE_REAL_EXECUTION", "0"
+        ).strip().lower() in {"1", "true", "yes", "on"}
         self.allowlist = {
             tok.strip()
-            for tok in os.getenv("ZEUS_V4_CMD_ALLOWLIST", "ls,ps,du,df,free,uptime,whoami,id,uname").split(",")
+            for tok in os.getenv(
+                "ZEUS_V4_CMD_ALLOWLIST", "ls,ps,du,df,free,uptime,whoami,id,uname"
+            ).split(",")
             if tok.strip()
         }
 
     def decide(self, plan: Plan) -> Decision:
         worst = plan.estimated_risk
-        exp_reward = max(-2.0, min(2.0, (plan.expected_impact * 0.6) - risk_score(worst)))
+        exp_reward = max(
+            -2.0, min(2.0, (plan.expected_impact * 0.6) - risk_score(worst))
+        )
         assess_confirm = self.guardian.requires_confirmation(
             RiskAssessment(level=worst, reason="risco do plano", intent="plan")
         )
@@ -59,9 +72,16 @@ class ShadowExecutor:
                 plan=plan,
                 requires_confirmation=True,
             )
-        return Decision(kind=DecisionType.ACT, reason="Risco aceitável", expected_reward=exp_reward, plan=plan)
+        return Decision(
+            kind=DecisionType.ACT,
+            reason="Risco aceitável",
+            expected_reward=exp_reward,
+            plan=plan,
+        )
 
-    async def run_plan_shadow(self, plan: Plan) -> tuple[list[StepResult], RewardSignal]:
+    async def run_plan_shadow(
+        self, plan: Plan
+    ) -> tuple[list[StepResult], RewardSignal]:
         results: list[StepResult] = []
         overall_success = 1.0
         avg_impact = 0.0
@@ -103,7 +123,13 @@ class ShadowExecutor:
         if a_type == "cmd":
             cmd = str(action.get("command") or "").strip()
             if not cmd:
-                return StepResult(step=step.step, ok=True, duration_s=0.0, risk=assessment.level, impact=step.estimated_impact)
+                return StepResult(
+                    step=step.step,
+                    ok=True,
+                    duration_s=0.0,
+                    risk=assessment.level,
+                    impact=step.estimated_impact,
+                )
             sim = await self._simulate_command(cmd)
             dt = time.time() - t0
             return StepResult(
@@ -128,7 +154,9 @@ class ShadowExecutor:
             impact=0.0,
         )
 
-    async def _maybe_execute_real(self, step: PlanStep, shadow_result: StepResult) -> bool:
+    async def _maybe_execute_real(
+        self, step: PlanStep, shadow_result: StepResult
+    ) -> bool:
         action = step.action or {}
         a_type = (action.get("type") or "").strip().lower()
         if a_type != "cmd":
@@ -164,7 +192,10 @@ class ShadowExecutor:
         return proc.returncode == 0
 
     def _argv_for_allowed_command(self, command: str) -> list[str]:
-        if any(token in command for token in ("|", "&&", "||", ";", ">", ">>", "<", "$(", "`")):
+        if any(
+            token in command
+            for token in ("|", "&&", "||", ";", ">", ">>", "<", "$(", "`")
+        ):
             return []
         try:
             argv = shlex.split(command)
@@ -182,7 +213,13 @@ class ShadowExecutor:
 
         argv = self._argv_for_allowed_command(command)
         if not argv:
-            return {"success": False, "confidence": 0.0, "output": "", "error": "Command blocked by v4 allowlist", "return_code": None}
+            return {
+                "success": False,
+                "confidence": 0.0,
+                "output": "",
+                "error": "Command blocked by v4 allowlist",
+                "return_code": None,
+            }
 
         proc = await asyncio.create_subprocess_exec(
             *argv,
@@ -195,7 +232,13 @@ class ShadowExecutor:
         except asyncio.TimeoutError:
             proc.kill()
             await proc.wait()
-            return {"success": False, "confidence": 0.0, "output": "", "error": "Simulation Timeout", "return_code": None}
+            return {
+                "success": False,
+                "confidence": 0.0,
+                "output": "",
+                "error": "Simulation Timeout",
+                "return_code": None,
+            }
 
         success = proc.returncode == 0
         out_s = (out or b"").decode(errors="ignore")
@@ -207,4 +250,10 @@ class ShadowExecutor:
             score += 0.3
         if success and out_s.strip():
             score += 0.3
-        return {"success": success, "confidence": score, "output": out_s, "error": err_s, "return_code": proc.returncode}
+        return {
+            "success": success,
+            "confidence": score,
+            "output": out_s,
+            "error": err_s,
+            "return_code": proc.returncode,
+        }

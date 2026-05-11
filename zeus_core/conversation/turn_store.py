@@ -2,7 +2,8 @@ import uuid
 import hashlib
 from datetime import datetime
 from typing import Dict, List, Optional
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
+
 
 @dataclass
 class Turn:
@@ -20,10 +21,18 @@ class Turn:
     expires_at: Optional[str]
 
     @classmethod
-    def create(cls, session_id: str, role: str, content: str, source: str = "chat",
-               topic_id: str = "general", intent: str = "unknown", 
-               parent_turn_id: Optional[str] = None, importance: float = 1.0) -> 'Turn':
-        content_hash = hashlib.sha256(content.encode('utf-8')).hexdigest()
+    def create(
+        cls,
+        session_id: str,
+        role: str,
+        content: str,
+        source: str = "chat",
+        topic_id: str = "general",
+        intent: str = "unknown",
+        parent_turn_id: Optional[str] = None,
+        importance: float = 1.0,
+    ) -> "Turn":
+        content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
         return cls(
             turn_id=uuid.uuid4().hex,
             session_id=session_id,
@@ -36,12 +45,13 @@ class Turn:
             content_hash=content_hash,
             source=source,
             importance=importance,
-            expires_at=None
+            expires_at=None,
         )
+
 
 class TurnStore:
     """Armazena e gerencia os turnos da conversa, evitando duplicação e concatenação bruta."""
-    
+
     def __init__(self):
         # In a real scenario this should use a DB like SQLite. Using in-memory for the architectural base.
         self._turns: Dict[str, Turn] = {}
@@ -52,7 +62,10 @@ class TurnStore:
         if turn.session_id in self._session_turns:
             for existing_id in self._session_turns[turn.session_id]:
                 existing_turn = self._turns[existing_id]
-                if existing_turn.content_hash == turn.content_hash and existing_turn.role == turn.role:
+                if (
+                    existing_turn.content_hash == turn.content_hash
+                    and existing_turn.role == turn.role
+                ):
                     # Duplicated content, ignore or update timestamp
                     return
 
@@ -68,5 +81,6 @@ class TurnStore:
     def get_turns_for_topic(self, session_id: str, topic_id: str) -> List[Turn]:
         turns = self.get_turns_for_session(session_id)
         return [t for t in turns if t.topic_id == topic_id]
+
 
 turn_store = TurnStore()

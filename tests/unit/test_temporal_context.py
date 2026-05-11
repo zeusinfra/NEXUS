@@ -1,6 +1,5 @@
 """Tests for Temporal Context logic."""
-import pytest
-from datetime import datetime
+
 from zeus_core.cognitive.user_profile_engine import _period_label, TemporalContext
 
 
@@ -19,7 +18,7 @@ def test_temporal_context_serialization():
         current_weekday=1,
         is_work_hours=True,
         is_deep_focus=False,
-        period_label="afternoon"
+        period_label="afternoon",
     )
     d = ctx.to_dict()
     assert d["current_hour"] == 14

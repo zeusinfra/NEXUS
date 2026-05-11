@@ -28,7 +28,13 @@ class LLMService:
         except Exception as e:
             increment_metric("llm_connectivity_total")
             increment_metric("llm_connectivity_failed")
-            log_event(logger, 40, "llm_connectivity_exception", provider=status.get("provider"), error=str(e))
+            log_event(
+                logger,
+                40,
+                "llm_connectivity_exception",
+                provider=status.get("provider"),
+                error=str(e),
+            )
             return {
                 "ok": False,
                 "status": status,

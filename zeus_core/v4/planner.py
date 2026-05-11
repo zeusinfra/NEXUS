@@ -41,10 +41,10 @@ def _extract_json(text: str) -> dict[str, Any]:
     try:
         return json.loads(raw)
     except Exception:
-        l = raw.find("{")
-        r = raw.rfind("}")
-        if l != -1 and r != -1 and r > l:
-            return json.loads(raw[l : r + 1])
+        left = raw.find("{")
+        right = raw.rfind("}")
+        if left != -1 and right != -1 and right > left:
+            return json.loads(raw[left : right + 1])
         raise
 
 
@@ -81,14 +81,18 @@ class MultiStepPlanner:
 
     def _plan_llm(self, goal: Goal, *, context: str) -> dict[str, Any]:
         user = f"Objetivo persistente: {goal.descricao}\nProgresso atual: {goal.progresso}\n\nContexto:\n{context}"
-        raw = call_cloud_llm([{"role": "system", "content": _PROMPT}, {"role": "user", "content": user}])
+        raw = call_cloud_llm(
+            [{"role": "system", "content": _PROMPT}, {"role": "user", "content": user}]
+        )
         return _extract_json(raw)
 
     def _to_plan(self, goal: Goal, payload: dict[str, Any]) -> Plan:
         objective = str(payload.get("objective") or goal.descricao).strip()
         expected_impact = _clamp01(payload.get("expected_impact"), default=0.4)
         est_risk = _risk(str(payload.get("estimated_risk") or "medium"))
-        steps_payload = payload.get("steps") if isinstance(payload.get("steps"), list) else []
+        steps_payload = (
+            payload.get("steps") if isinstance(payload.get("steps"), list) else []
+        )
         steps: list[PlanStep] = []
         for i, s in enumerate(steps_payload[:6], start=1):
             if not isinstance(s, dict):
@@ -119,7 +123,10 @@ class MultiStepPlanner:
             PlanStep(
                 step=1,
                 description="Diagnosticar pressão do sistema e processos mais pesados",
-                action={"type": "cmd", "command": "ps -eo pid,comm,%cpu,%mem --sort=-%cpu | head"},
+                action={
+                    "type": "cmd",
+                    "command": "ps -eo pid,comm,%cpu,%mem --sort=-%cpu | head",
+                },
                 estimated_risk=RiskLevel.LOW,
                 estimated_impact=0.25,
             ),

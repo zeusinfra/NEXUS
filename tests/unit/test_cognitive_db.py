@@ -1,7 +1,4 @@
 """Tests for the cognitive database layer."""
-import os
-import sqlite3
-import tempfile
 
 import pytest
 
@@ -19,7 +16,8 @@ class TestCognitiveDB:
     def test_tables_created(self, tmp_db):
         with get_connection(tmp_db) as conn:
             tables = [
-                r[0] for r in conn.execute(
+                r[0]
+                for r in conn.execute(
                     "SELECT name FROM sqlite_master WHERE type='table'"
                 ).fetchall()
             ]
@@ -40,7 +38,9 @@ class TestCognitiveDB:
                 "VALUES ('test1', 'lesson text', 'test', 0.5, '[]', '2026-01-01T00:00:00Z')"
             )
         with get_connection(tmp_db) as conn:
-            row = conn.execute("SELECT * FROM cognitive_lessons WHERE id = 'test1'").fetchone()
+            row = conn.execute(
+                "SELECT * FROM cognitive_lessons WHERE id = 'test1'"
+            ).fetchone()
         assert row is not None
         assert row["lesson"] == "lesson text"
 
@@ -56,13 +56,16 @@ class TestCognitiveDB:
             pass
 
         with get_connection(tmp_db) as conn:
-            row = conn.execute("SELECT * FROM cognitive_lessons WHERE id = 'test2'").fetchone()
+            row = conn.execute(
+                "SELECT * FROM cognitive_lessons WHERE id = 'test2'"
+            ).fetchone()
         assert row is None
 
     def test_indexes_created(self, tmp_db):
         with get_connection(tmp_db) as conn:
             indexes = [
-                r[0] for r in conn.execute(
+                r[0]
+                for r in conn.execute(
                     "SELECT name FROM sqlite_master WHERE type='index'"
                 ).fetchall()
             ]

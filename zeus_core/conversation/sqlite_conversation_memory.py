@@ -9,9 +9,37 @@ from pathlib import Path
 
 
 STOPWORDS = {
-    "a", "o", "e", "de", "do", "da", "dos", "das", "um", "uma", "para", "por",
-    "com", "que", "em", "no", "na", "os", "as", "me", "eu", "voce", "você",
-    "isso", "esse", "essa", "aquele", "aquela", "como", "mais", "menos",
+    "a",
+    "o",
+    "e",
+    "de",
+    "do",
+    "da",
+    "dos",
+    "das",
+    "um",
+    "uma",
+    "para",
+    "por",
+    "com",
+    "que",
+    "em",
+    "no",
+    "na",
+    "os",
+    "as",
+    "me",
+    "eu",
+    "voce",
+    "você",
+    "isso",
+    "esse",
+    "essa",
+    "aquele",
+    "aquela",
+    "como",
+    "mais",
+    "menos",
 }
 
 
@@ -63,7 +91,9 @@ class SQLiteConversationMemory:
                 "ON conversation_turns(client_id, created_at)"
             )
 
-    def add_turn(self, session_id: str, client_id: str, role: str, content: str) -> None:
+    def add_turn(
+        self, session_id: str, client_id: str, role: str, content: str
+    ) -> None:
         content = (content or "").strip()
         if not content:
             return
@@ -74,7 +104,9 @@ class SQLiteConversationMemory:
                 (session_id, client_id, role, content[:12000], time.time()),
             )
 
-    def recent_turns(self, session_id: str, *, limit: int = 8) -> list[ConversationMemoryItem]:
+    def recent_turns(
+        self, session_id: str, *, limit: int = 8
+    ) -> list[ConversationMemoryItem]:
         with self._connect() as conn:
             rows = conn.execute(
                 "SELECT role, content, created_at FROM conversation_turns "
@@ -113,11 +145,17 @@ class SQLiteConversationMemory:
             if overlap <= 0:
                 continue
             score = overlap / max(1, len(query_tokens))
-            scored.append(ConversationMemoryItem(row["role"], row["content"], row["created_at"], score))
+            scored.append(
+                ConversationMemoryItem(
+                    row["role"], row["content"], row["created_at"], score
+                )
+            )
         scored.sort(key=lambda item: (item.score, item.created_at), reverse=True)
         return scored[:limit]
 
-    def build_context_block(self, query: str, *, session_id: str, client_id: str) -> str:
+    def build_context_block(
+        self, query: str, *, session_id: str, client_id: str
+    ) -> str:
         parts: list[str] = []
         recent = self.recent_turns(session_id, limit=8)
         if recent:
@@ -126,7 +164,10 @@ class SQLiteConversationMemory:
 
         similar = self.recall_similar(query, client_id=client_id, limit=6)
         if similar:
-            lines = [f"{item.role.upper()} [{item.score:.2f}]: {item.content[:700]}" for item in similar]
+            lines = [
+                f"{item.role.upper()} [{item.score:.2f}]: {item.content[:700]}"
+                for item in similar
+            ]
             parts.append("--- MEMORIAS DE CONVERSAS PARECIDAS ---\n" + "\n".join(lines))
 
         return "\n\n".join(parts)

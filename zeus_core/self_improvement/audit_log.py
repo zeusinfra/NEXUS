@@ -6,9 +6,14 @@ from zeus_core.observability import get_logger
 
 logger = get_logger("zeus.self_improvement.audit")
 
+
 class AuditLog:
     def __init__(self):
-        self.db_path = os.path.join(os.getenv("ZEUS_VAULT_PATH", "/home/zeus/Documentos/Brain"), "logs", "self_improvement_audit.db")
+        self.db_path = os.path.join(
+            os.getenv("ZEUS_VAULT_PATH", "/home/zeus/Documentos/Brain"),
+            "logs",
+            "self_improvement_audit.db",
+        )
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self._init_db()
 
@@ -26,12 +31,21 @@ class AuditLog:
         """)
         conn.close()
 
-    def record_patch(self, patch_id: str, files_changed: list, diff: str, status: str, reason: str):
+    def record_patch(
+        self, patch_id: str, files_changed: list, diff: str, status: str, reason: str
+    ):
         try:
             conn = sqlite3.connect(self.db_path)
             conn.execute(
                 "INSERT INTO patches (id, timestamp, files_changed, diff, status, reason) VALUES (?, ?, ?, ?, ?, ?)",
-                (patch_id, datetime.datetime.now().isoformat(), json.dumps(files_changed), diff, status, reason)
+                (
+                    patch_id,
+                    datetime.datetime.now().isoformat(),
+                    json.dumps(files_changed),
+                    diff,
+                    status,
+                    reason,
+                ),
             )
             conn.commit()
             conn.close()
@@ -41,9 +55,12 @@ class AuditLog:
     def get_history(self, limit: int = 50):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM patches ORDER BY timestamp DESC LIMIT ?", (limit,))
+        cursor.execute(
+            "SELECT * FROM patches ORDER BY timestamp DESC LIMIT ?", (limit,)
+        )
         rows = cursor.fetchall()
         conn.close()
         return rows
+
 
 audit_log = AuditLog()

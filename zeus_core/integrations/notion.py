@@ -1,6 +1,5 @@
 import os
 import requests
-import json
 
 from zeus_core.env import load_project_env
 from zeus_core.security.privacy_guard import PrivacyGuard
@@ -11,17 +10,23 @@ privacy_guard = PrivacyGuard()
 
 NOTION_TOKEN = os.getenv("NOTION_TOKEN")
 NOTION_DATABASE_ID = os.getenv("NOTION_DATABASE_ID")
-NOTION_ENABLED = os.getenv("ZEUS_ENABLE_NOTION", "false").lower() in {"1", "true", "yes", "on"}
+NOTION_ENABLED = os.getenv("ZEUS_ENABLE_NOTION", "false").lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 NOTION_VERSION = "2022-06-28"
 
 BASE_URL = "https://api.notion.com/v1"
 _DATABASE_PROPERTIES_CACHE = None
 
+
 def _get_headers():
     return {
         "Authorization": f"Bearer {NOTION_TOKEN}",
         "Content-Type": "application/json",
-        "Notion-Version": NOTION_VERSION
+        "Notion-Version": NOTION_VERSION,
     }
 
 
@@ -33,7 +38,11 @@ def _get_database_properties() -> dict:
         _DATABASE_PROPERTIES_CACHE = {}
         return _DATABASE_PROPERTIES_CACHE
     try:
-        response = requests.get(f"{BASE_URL}/databases/{NOTION_DATABASE_ID}", headers=_get_headers(), timeout=10)
+        response = requests.get(
+            f"{BASE_URL}/databases/{NOTION_DATABASE_ID}",
+            headers=_get_headers(),
+            timeout=10,
+        )
         response.raise_for_status()
         _DATABASE_PROPERTIES_CACHE = response.json().get("properties", {}) or {}
     except Exception as e:
@@ -53,57 +62,53 @@ def _title_property_name() -> str:
 def _build_page_properties(title: str, tags: list[str], source_path: str) -> dict:
     props = _get_database_properties()
     title_prop = _title_property_name()
-    page_props = {
-        title_prop: {
-            "title": [
-                {
-                    "text": {"content": title[:2000]}
-                }
-            ]
-        }
-    }
+    page_props = {title_prop: {"title": [{"text": {"content": title[:2000]}}]}}
 
     if props.get("Source Path", {}).get("type") == "rich_text":
         page_props["Source Path"] = {
-            "rich_text": [
-                {
-                    "text": {"content": (source_path or "")[:2000]}
-                }
-            ]
+            "rich_text": [{"text": {"content": (source_path or "")[:2000]}}]
         }
 
     if props.get("Tags", {}).get("type") == "multi_select":
         page_props["Tags"] = {
-            "multi_select": [{"name": t.replace('#', '')[:100]} for t in tags if t]
+            "multi_select": [{"name": t.replace("#", "")[:100]} for t in tags if t]
         }
 
     return page_props
 
+
 def _markdown_to_blocks(content: str) -> list:
     """Conversor simplificado de MD para Notion Blocks. Em prod, usar 'notion-blockify' ou similar."""
     blocks = []
-    lines = content.split('\n')
+    lines = content.split("\n")
     for line in lines:
         if not line.strip():
             continue
         # Trata tudo como parágrafo (simplificação para a Fase 3)
-        blocks.append({
-            "object": "block",
-            "type": "paragraph",
-            "paragraph": {
-                "rich_text": [
-                    {
-                        "type": "text",
-                        "text": {
-                            "content": line[:2000] # Limite de chars do Notion por text block
+        blocks.append(
+            {
+                "object": "block",
+                "type": "paragraph",
+                "paragraph": {
+                    "rich_text": [
+                        {
+                            "type": "text",
+                            "text": {
+                                "content": line[
+                                    :2000
+                                ]  # Limite de chars do Notion por text block
+                            },
                         }
-                    }
-                ]
+                    ]
+                },
             }
-        })
+        )
     return blocks
 
-def create_notion_page(title: str, content: str, tags: list[str], source_path: str) -> dict:
+
+def create_notion_page(
+    title: str, content: str, tags: list[str], source_path: str
+) -> dict:
     if not NOTION_ENABLED:
         print("[Notion] Integração desabilitada. Ignorando sincronização.")
         return {"error": "Disabled"}
@@ -112,19 +117,21 @@ def create_notion_page(title: str, content: str, tags: list[str], source_path: s
         return {"error": "Not configured"}
 
     url = f"{BASE_URL}/pages"
-    
+
     # Privacy Check
     validation = privacy_guard.validate_export(f"{title}\n{content}", "notion")
     if not validation.allowed:
         print(f"[Notion] Exportação bloqueada por privacidade: {validation.reason}")
         return {"error": "Privacy Block", "reason": validation.reason}
-    
-    final_content = validation.sanitized_content if validation.action == "sanitized" else content
-    
+
+    final_content = (
+        validation.sanitized_content if validation.action == "sanitized" else content
+    )
+
     payload = {
         "parent": {"database_id": NOTION_DATABASE_ID},
         "properties": _build_page_properties(title, tags, source_path),
-        "children": _markdown_to_blocks(final_content)
+        "children": _markdown_to_blocks(final_content),
     }
 
     try:
@@ -135,35 +142,39 @@ def create_notion_page(title: str, content: str, tags: list[str], source_path: s
         print(f"[Notion] Erro ao criar página: {e}")
         return {"error": str(e)}
 
+
 def update_notion_page(page_id: str, content: str) -> dict:
     # A atualização de conteúdo no Notion requer deletar blocos antigos e inserir novos (APPEND).
     # Para simplificar, estamos apenas atualizando properties aqui.
-    print("[Notion] Atualização de blocos requer lógica complexa (Append/Delete block children). Omitido por enquanto.")
+    print(
+        "[Notion] Atualização de blocos requer lógica complexa (Append/Delete block children). Omitido por enquanto."
+    )
     return {"status": "not_implemented"}
+
 
 def search_notion(query: str) -> list[dict]:
     if not NOTION_ENABLED:
         return []
-    if not NOTION_TOKEN: return []
-    
+    if not NOTION_TOKEN:
+        return []
+
     url = f"{BASE_URL}/search"
     payload = {
         "query": query,
-        "sort": {
-            "direction": "descending",
-            "timestamp": "last_edited_time"
-        }
+        "sort": {"direction": "descending", "timestamp": "last_edited_time"},
     }
     try:
         response = requests.post(url, headers=_get_headers(), json=payload, timeout=10)
         response.raise_for_status()
-        return response.json().get('results', [])
+        return response.json().get("results", [])
     except Exception as e:
         print(f"[Notion] Erro ao buscar: {e}")
         return []
 
 
-def upsert_notion_page(title: str, content: str, tags: list[str], source_path: str) -> dict:
+def upsert_notion_page(
+    title: str, content: str, tags: list[str], source_path: str
+) -> dict:
     """
     Cria ou atualiza uma página no Notion Database.
     Busca por título existente para evitar duplicatas.
@@ -177,18 +188,15 @@ def upsert_notion_page(title: str, content: str, tags: list[str], source_path: s
     search_url = f"{BASE_URL}/databases/{NOTION_DATABASE_ID}/query"
     title_prop = _title_property_name()
     search_payload = {
-        "filter": {
-            "property": title_prop,
-            "title": {
-                "equals": title
-            }
-        },
-        "page_size": 1
+        "filter": {"property": title_prop, "title": {"equals": title}},
+        "page_size": 1,
     }
 
     existing_page_id = None
     try:
-        resp = requests.post(search_url, headers=_get_headers(), json=search_payload, timeout=10)
+        resp = requests.post(
+            search_url, headers=_get_headers(), json=search_payload, timeout=10
+        )
         resp.raise_for_status()
         results = resp.json().get("results", [])
         if results:
@@ -204,7 +212,12 @@ def upsert_notion_page(title: str, content: str, tags: list[str], source_path: s
         new_blocks = [separator_block] + _markdown_to_blocks(content)
 
         try:
-            resp = requests.patch(append_url, headers=_get_headers(), json={"children": new_blocks}, timeout=10)
+            resp = requests.patch(
+                append_url,
+                headers=_get_headers(),
+                json={"children": new_blocks},
+                timeout=10,
+            )
             resp.raise_for_status()
             print(f"[Notion] Página '{title}' atualizada (ID: {existing_page_id})")
             return {"id": existing_page_id, "action": "updated"}

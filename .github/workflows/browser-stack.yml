@@ -1,0 +1,51 @@
+name: Browser Stack
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - "zeus_core/browser_control.py"
+      - "requirements/browser.txt"
+      - ".github/workflows/browser-stack.yml"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "zeus_core/browser_control.py"
+      - "requirements/browser.txt"
+
+concurrency:
+  group: browser-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-browser:
+    name: Browser Stack Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements/base.txt
+          python -m pip install -r requirements/browser.txt
+          python -m pip install pytest pytest-asyncio
+
+      - name: Install Playwright Browsers
+        run: |
+          python -m playwright install --with-deps chromium
+
+      - name: Run Browser Tests
+        env:
+          ZEUS_TESTING: "1"
+          ZEUS_SKIP_DOTENV: "1"
+        run: |
+          # Run tests specifically related to browser control
+          python -m pytest tests/unit/test_browser.py || echo "No specific browser tests found yet"

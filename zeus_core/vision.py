@@ -23,7 +23,9 @@ def capture_screen(*, save_dir: str = "scratch/screens") -> dict:
     try:
         import mss  # type: ignore
     except Exception as e:
-        raise ToolError("Dependência ausente: instale 'mss' para captura de tela.") from e
+        raise ToolError(
+            "Dependência ausente: instale 'mss' para captura de tela."
+        ) from e
 
     try:
         from PIL import Image  # type: ignore
@@ -81,7 +83,11 @@ def ocr_image(path: str, *, lang: str = "por") -> dict:
         if proc.returncode != 0:
             raise ToolError(f"OCR falhou: {((proc.stderr or proc.stdout) or '')[:200]}")
         txt_path = Path(f"{out_base}.txt")
-        text = txt_path.read_text(encoding="utf-8", errors="replace") if txt_path.exists() else ""
+        text = (
+            txt_path.read_text(encoding="utf-8", errors="replace")
+            if txt_path.exists()
+            else ""
+        )
         return {"text": text[:50_000]}
 
 
@@ -118,7 +124,9 @@ def analyze_image_with_llm(path: str, *, question: str) -> dict:
     return {"answer": answer}
 
 
-def analyze_with_ocr_fallback(path: str, *, question: str, ocr_lang: str = "por") -> dict:
+def analyze_with_ocr_fallback(
+    path: str, *, question: str, ocr_lang: str = "por"
+) -> dict:
     """
     Fallback robusto: tenta OCR local e pede para a LLM responder usando o texto extraído.
     """

@@ -3,7 +3,12 @@ import logging
 import unittest
 from types import SimpleNamespace
 
-from zeus_core.observability import JsonFormatter, correlation_id_middleware, get_metrics_snapshot, metrics_counter
+from zeus_core.observability import (
+    JsonFormatter,
+    correlation_id_middleware,
+    get_metrics_snapshot,
+    metrics_counter,
+)
 
 
 class FakeResponse:

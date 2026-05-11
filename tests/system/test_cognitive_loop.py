@@ -1,4 +1,5 @@
 """Tests for the cognitive loop — single cycle execution."""
+
 import asyncio
 import pytest
 
@@ -69,14 +70,18 @@ class TestCognitiveLoop:
 
     @pytest.mark.asyncio
     async def test_health_calculation(self, loop_instance):
-        perception = {"system": {"cpu_percent": 50, "ram_percent": 60, "disk_percent": 50}}
+        perception = {
+            "system": {"cpu_percent": 50, "ram_percent": 60, "disk_percent": 50}
+        }
         analysis = {"anomalies": []}
         health = loop_instance._calculate_health(perception, analysis)
         assert 80 <= health <= 100
 
     @pytest.mark.asyncio
     async def test_health_calculation_under_pressure(self, loop_instance):
-        perception = {"system": {"cpu_percent": 95, "ram_percent": 92, "disk_percent": 50}}
+        perception = {
+            "system": {"cpu_percent": 95, "ram_percent": 92, "disk_percent": 50}
+        }
         analysis = {"anomalies": [{"type": "high_cpu"}, {"type": "high_ram"}]}
         health = loop_instance._calculate_health(perception, analysis)
         assert health < 60

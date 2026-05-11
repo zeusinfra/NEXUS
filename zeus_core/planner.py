@@ -64,17 +64,22 @@ def _extract_json(text: str) -> dict:
     try:
         return json.loads(text)
     except Exception:
-        l = text.find("{")
-        r = text.rfind("}")
-        if l != -1 and r != -1 and r > l:
-            return json.loads(text[l : r + 1])
+        left = text.find("{")
+        right = text.rfind("}")
+        if left != -1 and right != -1 and right > left:
+            return json.loads(text[left : right + 1])
         raise
 
 
 def create_plan(goal: str, *, context: str = "") -> Dict[str, Any]:
     messages = [
         {"role": "system", "content": PLANNER_PROMPT},
-        {"role": "user", "content": f"Objetivo: {goal}\n\nContexto:\n{context}" if context else f"Objetivo: {goal}"},
+        {
+            "role": "user",
+            "content": f"Objetivo: {goal}\n\nContexto:\n{context}"
+            if context
+            else f"Objetivo: {goal}",
+        },
     ]
     raw = call_cloud_llm(messages)
     try:
@@ -99,8 +104,15 @@ def create_plan(goal: str, *, context: str = "") -> Dict[str, Any]:
         }
 
 
-def replan(goal: str, *, completed_steps: list, failed_step: dict, error: str) -> Dict[str, Any]:
-    summary = "\n".join([f"- Step {s.get('step')} [{s.get('tool')}]: OK" for s in (completed_steps or [])])
+def replan(
+    goal: str, *, completed_steps: list, failed_step: dict, error: str
+) -> Dict[str, Any]:
+    summary = "\n".join(
+        [
+            f"- Step {s.get('step')} [{s.get('tool')}]: OK"
+            for s in (completed_steps or [])
+        ]
+    )
     context = (
         f"Já concluído:\n{summary if summary else '(nada)'}\n\n"
         f"Falha em: {json.dumps(failed_step, ensure_ascii=False)}\n"

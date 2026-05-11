@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -38,9 +38,13 @@ class MidTermMemory:
 
     def suggest_goals(self) -> list[tuple[str, float]]:
         suggestions: list[tuple[str, float]] = []
-        for label, count in sorted(self.counters.items(), key=lambda kv: kv[1], reverse=True)[:5]:
+        for label, count in sorted(
+            self.counters.items(), key=lambda kv: kv[1], reverse=True
+        )[:5]:
             if count >= 4:
-                suggestions.append((f"Reduzir recorrência: {label}", min(1.0, 0.55 + count / 20)))
+                suggestions.append(
+                    (f"Reduzir recorrência: {label}", min(1.0, 0.55 + count / 20))
+                )
         return suggestions
 
 
@@ -49,14 +53,21 @@ class LongTermMemory:
         self.vec = VectorMemory(storage_file=storage_file)
 
     def index_episode(self, key: str, text: str) -> None:
-        if os.getenv("ZEUS_V4_EMBEDDINGS", "1").strip().lower() not in {"1", "true", "yes", "on"}:
+        if os.getenv("ZEUS_V4_EMBEDDINGS", "1").strip().lower() not in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }:
             return
         # VectorMemory atual indexa arquivo. Para manter compatível, salvamos episódio em arquivo e indexamos.
         if not text.strip():
             return
         base = Path(os.getenv("ZEUS_V4_EPISODES_DIR", "scratch/v4_episodes")).resolve()
         base.mkdir(parents=True, exist_ok=True)
-        safe = "".join(ch if ch.isalnum() or ch in {"-", "_"} else "_" for ch in key)[:80]
+        safe = "".join(ch if ch.isalnum() or ch in {"-", "_"} else "_" for ch in key)[
+            :80
+        ]
         path = base / f"{int(time.time())}_{safe}.txt"
         path.write_text(text, encoding="utf-8")
         try:

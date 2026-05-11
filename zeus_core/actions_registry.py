@@ -36,4 +36,3 @@ class ToolRegistry:
             }
             for spec in self._tools.values()
         ]
-

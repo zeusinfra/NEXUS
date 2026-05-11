@@ -21,17 +21,27 @@ try:
 except Exception:
     edge_tts = None
 
+
 def _suppress_alsa_errors():
     """Suprime mensagens de erro ALSA/JACK que poluem o terminal."""
     try:
-        asound = ctypes.cdll.LoadLibrary('libasound.so.2')
-        c_error_handler = ctypes.CFUNCTYPE(None, ctypes.c_char_p, ctypes.c_int,
-                                           ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p)
+        asound = ctypes.cdll.LoadLibrary("libasound.so.2")
+        c_error_handler = ctypes.CFUNCTYPE(
+            None,
+            ctypes.c_char_p,
+            ctypes.c_int,
+            ctypes.c_char_p,
+            ctypes.c_int,
+            ctypes.c_char_p,
+        )
+
         def _null_handler(filename, line, function, err, fmt):
             pass
+
         asound.snd_lib_error_set_handler(c_error_handler(_null_handler))
     except Exception:
         pass
+
 
 def _configure_stdout_encoding() -> None:
     # Força encoding UTF-8 para evitar erros com acentos do Português.
@@ -44,10 +54,12 @@ def _configure_stdout_encoding() -> None:
     except Exception:
         pass
 
+
 class VoiceSensing:
     """Módulo de Escuta Ativa 100% Local para o ZEUS.
     Detecta silêncio (VAD), converte áudio localmente via Whisper e toca via Edge-TTS.
     """
+
     def __init__(self, broadcast_callback=None, wake_word="zeus", llm_callback=None):
         _configure_stdout_encoding()
         _suppress_alsa_errors()
@@ -56,7 +68,7 @@ class VoiceSensing:
         self.wake_word = wake_word.lower()
         self.llm_callback = llm_callback
         self.broadcast = broadcast_callback
-        
+
         self.is_listening = False
         self.is_speaking = False
         self.thread = None
@@ -66,16 +78,20 @@ class VoiceSensing:
         self._armed_until = 0.0
         aliases_env = os.getenv("ZEUS_WAKE_ALIASES", "").strip()
         aliases = [self.wake_word]
-        self.wake_word_required = os.getenv("ZEUS_WAKE_WORD_REQUIRED", "1").strip().lower() in {"1", "true", "yes", "on"}
+        self.wake_word_required = os.getenv(
+            "ZEUS_WAKE_WORD_REQUIRED", "1"
+        ).strip().lower() in {"1", "true", "yes", "on"}
         if aliases_env:
-            aliases.extend([part.strip() for part in aliases_env.split(",") if part.strip()])
+            aliases.extend(
+                [part.strip() for part in aliases_env.split(",") if part.strip()]
+            )
         else:
             # Default PT-BR: Whisper às vezes entende "Zeus" como "Deus".
             if self._normalize_text(self.wake_word) == "zeus":
                 aliases.append("deus")
         self._wake_aliases = [a for a in aliases if a]
         self._wake_re = self._build_wake_regex(self._wake_aliases)
-        
+
         # Ajustes de sensibilidade (VAD)
         if self.recognizer is not None:
             self.recognizer.dynamic_energy_threshold = True
@@ -130,7 +146,9 @@ class VoiceSensing:
                 ) from exc
             print("[ZEUS LOCAL] Carregando modelo Faster-Whisper...")
             model_name = os.getenv("ZEUS_WHISPER_MODEL", "small").strip() or "small"
-            self.whisper_model = WhisperModel(model_name, device="cpu", compute_type="int8")
+            self.whisper_model = WhisperModel(
+                model_name, device="cpu", compute_type="int8"
+            )
             print("[ZEUS LOCAL] Whisper pronto.")
 
     async def _send_status(self, text):
@@ -147,10 +165,17 @@ class VoiceSensing:
     def _listen_loop(self):
         """Loop síncrono de captura de áudio (roda em thread separada)."""
         if sr is None or self.recognizer is None:
-            print("[ZEUS LOCAL] Voice sensing unavailable: SpeechRecognition is not installed.")
+            print(
+                "[ZEUS LOCAL] Voice sensing unavailable: SpeechRecognition is not installed."
+            )
             self.is_listening = False
             return
-        if os.getenv("ZEUS_MIC_LIST", "0").strip().lower() in {"1", "true", "yes", "on"}:
+        if os.getenv("ZEUS_MIC_LIST", "0").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }:
             try:
                 names = sr.Microphone.list_microphone_names()
                 print("[ZEUS LOCAL] Dispositivos de microfone:")
@@ -172,21 +197,29 @@ class VoiceSensing:
                             match = idx
                             break
                     if match is None:
-                        print(f"[ZEUS LOCAL] ⚠️ ZEUS_MIC_NAME não encontrado: '{mic_name}'. Use ZEUS_MIC_LIST=1 para listar.")
+                        print(
+                            f"[ZEUS LOCAL] ⚠️ ZEUS_MIC_NAME não encontrado: '{mic_name}'. Use ZEUS_MIC_LIST=1 para listar."
+                        )
                     else:
                         mic_kwargs["device_index"] = match
-                        print(f"[ZEUS LOCAL] 🎙️ Microfone selecionado por nome: [{match}] {names[match]}")
+                        print(
+                            f"[ZEUS LOCAL] 🎙️ Microfone selecionado por nome: [{match}] {names[match]}"
+                        )
                 except Exception as e:
                     print(f"[ZEUS LOCAL] ⚠️ Falha ao selecionar microfone por nome: {e}")
             elif device_index is not None and str(device_index).strip() != "":
                 try:
                     mic_kwargs["device_index"] = int(str(device_index).strip())
                 except Exception:
-                    print(f"[ZEUS LOCAL] ⚠️ ZEUS_MIC_DEVICE_INDEX inválido: {device_index}")
+                    print(
+                        f"[ZEUS LOCAL] ⚠️ ZEUS_MIC_DEVICE_INDEX inválido: {device_index}"
+                    )
             mic = sr.Microphone(**mic_kwargs)
         except Exception as e:
             print(f"[ZEUS LOCAL] ❌ Falha ao abrir microfone: {e}")
-            print("[ZEUS LOCAL] Verifique se há um dispositivo de áudio conectado (ex: DroidCam).")
+            print(
+                "[ZEUS LOCAL] Verifique se há um dispositivo de áudio conectado (ex: DroidCam)."
+            )
             self.is_listening = False
             return
 
@@ -195,8 +228,10 @@ class VoiceSensing:
             self.recognizer.adjust_for_ambient_noise(source, duration=1)
             print("[ZEUS LOCAL] Ouvindo...")
             if self._loop:
-                asyncio.run_coroutine_threadsafe(self._send_voice_state("listening"), self._loop)
-            
+                asyncio.run_coroutine_threadsafe(
+                    self._send_voice_state("listening"), self._loop
+                )
+
             while self.is_listening:
                 if self.is_speaking:
                     # Pausa a escuta enquanto o ZEUS está falando
@@ -205,20 +240,22 @@ class VoiceSensing:
                 if time.time() < self._ignore_audio_until:
                     time.sleep(0.1)
                     continue
-                
+
                 try:
                     # Captura o áudio até detectar silêncio (pause_threshold)
                     try:
                         phrase_limit = float(os.getenv("ZEUS_PHRASE_TIME_LIMIT", "6"))
                     except Exception:
                         phrase_limit = 6.0
-                    audio_data = self.recognizer.listen(source, timeout=2, phrase_time_limit=max(1.0, phrase_limit))
-                    
+                    audio_data = self.recognizer.listen(
+                        source, timeout=2, phrase_time_limit=max(1.0, phrase_limit)
+                    )
+
                     if self.is_speaking:
-                        continue # Ignora áudio captado enquanto falava
-                        
+                        continue  # Ignora áudio captado enquanto falava
+
                     self._process_audio(audio_data)
-                            
+
                 except sr.WaitTimeoutError:
                     continue
                 except Exception as e:
@@ -226,25 +263,36 @@ class VoiceSensing:
 
     def _process_audio(self, audio_data: sr.AudioData):
         if self._loop and self.broadcast:
-            asyncio.run_coroutine_threadsafe(self._send_status("Transcrevendo audio..."), self._loop)
-            asyncio.run_coroutine_threadsafe(self._send_voice_state("transcribing"), self._loop)
-            
+            asyncio.run_coroutine_threadsafe(
+                self._send_status("Transcrevendo audio..."), self._loop
+            )
+            asyncio.run_coroutine_threadsafe(
+                self._send_voice_state("transcribing"), self._loop
+            )
+
         tmp_path = None
         try:
             self._ensure_whisper_loaded()
             # Salva o áudio em disco para o Whisper ler (prefixo ASCII-safe)
-            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False, prefix="zeus_asr_") as tmp:
+            with tempfile.NamedTemporaryFile(
+                suffix=".wav", delete=False, prefix="zeus_asr_"
+            ) as tmp:
                 tmp.write(audio_data.get_wav_data(convert_rate=16000, convert_width=2))
                 tmp_path = tmp.name
 
-            vad = os.getenv("ZEUS_WHISPER_VAD", "1").strip().lower() in {"1", "true", "yes", "on"}
+            vad = os.getenv("ZEUS_WHISPER_VAD", "1").strip().lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
             segments, info = self.whisper_model.transcribe(
                 tmp_path,
                 language="pt",
                 beam_size=1,
                 vad_filter=vad,
             )
-            
+
             # Coleta texto com proteção de encoding
             text_parts = []
             for seg in segments:
@@ -253,9 +301,9 @@ class VoiceSensing:
                     t = t.decode("utf-8", errors="replace")
                 if t and t.strip():
                     text_parts.append(t.strip())
-            
+
             text = " ".join(text_parts).strip()
-                
+
             if text:
                 normalized = self._normalize_text(text)
                 now = time.time()
@@ -268,7 +316,12 @@ class VoiceSensing:
                 # - foi "armado" por um wake anterior (dizer só "Zeus" e depois falar o comando).
                 # - OU se o wake word NÃO for obrigatório.
                 if not (woke or armed or not self.wake_word_required):
-                    if os.getenv("ZEUS_VOICE_DEBUG", "0").strip().lower() in {"1", "true", "yes", "on"}:
+                    if os.getenv("ZEUS_VOICE_DEBUG", "0").strip().lower() in {
+                        "1",
+                        "true",
+                        "yes",
+                        "on",
+                    }:
                         try:
                             print(f"[VOICE DEBUG] (sem wake) {text}")
                         except UnicodeEncodeError:
@@ -276,12 +329,19 @@ class VoiceSensing:
                     return
 
                 command = self._strip_wake_word(text) if woke else normalized
-                if os.getenv("ZEUS_VOICE_DEBUG", "0").strip().lower() in {"1", "true", "yes", "on"}:
+                if os.getenv("ZEUS_VOICE_DEBUG", "0").strip().lower() in {
+                    "1",
+                    "true",
+                    "yes",
+                    "on",
+                }:
                     try:
-                        print(f"[VOICE DEBUG] wake={1 if woke else 0} armed={1 if armed else 0} command='{command}' raw='{text}'")
+                        print(
+                            f"[VOICE DEBUG] wake={1 if woke else 0} armed={1 if armed else 0} command='{command}' raw='{text}'"
+                        )
                     except UnicodeEncodeError:
                         print("[VOICE DEBUG] wake=1 (encoding issue)")
-                
+
                 # Print com encoding seguro
                 try:
                     print(f"[USER] {text}")
@@ -297,8 +357,13 @@ class VoiceSensing:
                     self._armed_until = time.time() + max(0.0, arm_sec)
                     if self._loop:
                         if self.broadcast:
-                            asyncio.run_coroutine_threadsafe(self.broadcast({"type": "CHAT_USER", "message": text}), self._loop)
-                        asyncio.run_coroutine_threadsafe(self.speak("Pode falar."), self._loop)
+                            asyncio.run_coroutine_threadsafe(
+                                self.broadcast({"type": "CHAT_USER", "message": text}),
+                                self._loop,
+                            )
+                        asyncio.run_coroutine_threadsafe(
+                            self.speak("Pode falar."), self._loop
+                        )
                     return
 
                 # Se consumiu um comando no modo armado, desarma.
@@ -307,7 +372,9 @@ class VoiceSensing:
 
                 # Envia para o LLM (texto original)
                 if self.llm_callback and self._loop:
-                    asyncio.run_coroutine_threadsafe(self.llm_callback(text), self._loop)
+                    asyncio.run_coroutine_threadsafe(
+                        self.llm_callback(text), self._loop
+                    )
 
         except Exception as e:
             try:
@@ -328,17 +395,17 @@ class VoiceSensing:
         spoken_text = speech_text(text)
         if not spoken_text:
             return
-        
+
         try:
             print(f"[ZEUS] {text}")
         except UnicodeEncodeError:
             print("[ZEUS] (resposta com caracteres especiais)")
-            
+
         if self.broadcast:
             await self.broadcast({"type": "CHAT_AI", "message": text})
             await self._send_status("Sintetizando voz...")
             await self._send_voice_state("speaking", text_preview=spoken_text[:80])
-            
+
         self.is_speaking = True
         try:
             tmp_path = None
@@ -346,9 +413,13 @@ class VoiceSensing:
                 VOICE = "pt-BR-AntonioNeural"
                 if edge_tts is None:
                     raise RuntimeError("edge-tts is not installed")
-                communicate = edge_tts.Communicate(spoken_text, VOICE, rate="+5%", pitch="-2Hz")
+                communicate = edge_tts.Communicate(
+                    spoken_text, VOICE, rate="+5%", pitch="-2Hz"
+                )
 
-                with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False, prefix="zeus_tts_") as tmp:
+                with tempfile.NamedTemporaryFile(
+                    suffix=".mp3", delete=False, prefix="zeus_tts_"
+                ) as tmp:
                     tmp_path = tmp.name
 
                 tts_timeout = float(os.getenv("ZEUS_TTS_TIMEOUT_SEC", "12"))
@@ -358,8 +429,6 @@ class VoiceSensing:
                     await self._send_status("Falando...")
 
                 play_timeout = float(os.getenv("ZEUS_AUDIO_PLAY_TIMEOUT_SEC", "45"))
-                paplay = shutil.which("paplay")
-                aplay = shutil.which("aplay")
 
                 # Tocar MP3 diretamente para evitar delay de conversão
                 proc = await asyncio.create_subprocess_exec(
@@ -373,7 +442,9 @@ class VoiceSensing:
                     stderr=asyncio.subprocess.PIPE,
                 )
                 try:
-                    _out, stderr = await asyncio.wait_for(proc.communicate(), timeout=play_timeout)
+                    _out, stderr = await asyncio.wait_for(
+                        proc.communicate(), timeout=play_timeout
+                    )
                 except asyncio.TimeoutError:
                     proc.kill()
                     await proc.wait()
@@ -381,7 +452,9 @@ class VoiceSensing:
                 rc = proc.returncode
                 if rc != 0:
                     err = (stderr or b"").decode(errors="ignore").strip()
-                    raise RuntimeError(f"ffplay falhou (rc={rc}){': ' + err if err else ''}")
+                    raise RuntimeError(
+                        f"ffplay falhou (rc={rc}){': ' + err if err else ''}"
+                    )
             except Exception as edge_err:
                 # Fallback offline via Speech Dispatcher (spd-say), se disponível.
                 spd = shutil.which("spd-say")
@@ -403,15 +476,21 @@ class VoiceSensing:
                 )
                 try:
                     # Evita travar indefinidamente em setups sem speech-dispatcher/voz.
-                    _out, stderr = await asyncio.wait_for(proc.communicate(), timeout=speak_timeout)
+                    _out, stderr = await asyncio.wait_for(
+                        proc.communicate(), timeout=speak_timeout
+                    )
                 except asyncio.TimeoutError:
                     proc.kill()
                     await proc.wait()
-                    raise RuntimeError(f"spd-say travou (timeout={speak_timeout}s)") from edge_err
+                    raise RuntimeError(
+                        f"spd-say travou (timeout={speak_timeout}s)"
+                    ) from edge_err
                 rc = proc.returncode
                 if rc != 0:
                     err = stderr.decode(errors="ignore").strip()
-                    raise RuntimeError(f"spd-say falhou (rc={rc}){': ' + err if err else ''}") from edge_err
+                    raise RuntimeError(
+                        f"spd-say falhou (rc={rc}){': ' + err if err else ''}"
+                    ) from edge_err
             finally:
                 if tmp_path:
                     try:
@@ -427,26 +506,32 @@ class VoiceSensing:
                 post = float(os.getenv("ZEUS_POST_SPEAK_IGNORE_SEC", "0.9"))
             except Exception:
                 post = 0.9
-            self._ignore_audio_until = max(self._ignore_audio_until, time.time() + max(0.0, post))
+            self._ignore_audio_until = max(
+                self._ignore_audio_until, time.time() + max(0.0, post)
+            )
             if self.broadcast:
                 await self._send_status("Aguardando atividade neural...")
-                await self._send_voice_state("listening" if self.is_listening else "idle")
+                await self._send_voice_state(
+                    "listening" if self.is_listening else "idle"
+                )
 
     async def run(self):
         """Inicia o loop assíncrono do módulo."""
         self._loop = asyncio.get_event_loop()
         if sr is None:
-            await self._send_status("Modulo de voz indisponivel: SpeechRecognition ausente.")
+            await self._send_status(
+                "Modulo de voz indisponivel: SpeechRecognition ausente."
+            )
             return
         await asyncio.to_thread(self._ensure_whisper_loaded)
-        
+
         if not self.is_listening:
             self.is_listening = True
             self.thread = threading.Thread(target=self._listen_loop, daemon=True)
             self.thread.start()
-            
+
         await self._send_status("Modulo de voz local (Whisper) online.")
-        
+
         while self.is_listening:
             await asyncio.sleep(1)
 

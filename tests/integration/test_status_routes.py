@@ -10,7 +10,9 @@ from zeus_core.llm_service import LLMService
 
 def _endpoint(router, path: str, method: str):
     for route in router.routes:
-        if getattr(route, "path", None) == path and method in getattr(route, "methods", set()):
+        if getattr(route, "path", None) == path and method in getattr(
+            route, "methods", set()
+        ):
             return route.endpoint
     raise AssertionError(f"endpoint not found: {method} {path}")
 
@@ -96,7 +98,9 @@ class StatusRoutesTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ctx.exception.status_code, 403)
 
     async def test_lan_token_error_is_propagated(self):
-        router, _ = self._router(token_error=HTTPException(status_code=401, detail="bad token"))
+        router, _ = self._router(
+            token_error=HTTPException(status_code=401, detail="bad token")
+        )
         endpoint = _endpoint(router, "/api/status", "GET")
 
         with self.assertRaises(HTTPException) as ctx:

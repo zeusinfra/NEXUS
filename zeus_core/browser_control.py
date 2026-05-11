@@ -35,7 +35,9 @@ class _BrowserState:
 
             self._playwright = await async_playwright().start()
             try:
-                self._browser = await self._playwright.chromium.launch(headless=self._headless)
+                self._browser = await self._playwright.chromium.launch(
+                    headless=self._headless
+                )
                 self._context = await self._browser.new_context()
                 self._page = await self._context.new_page()
                 await self._page.set_viewport_size({"width": 1280, "height": 720})

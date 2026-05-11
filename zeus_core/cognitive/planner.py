@@ -5,15 +5,13 @@ Creates deterministic execution plans from cognitive goals.
 Each plan is a sequence of steps with risk classification.
 No LLM dependency — plans are built from heuristic rules.
 """
+
 from __future__ import annotations
 
-import json
 import uuid
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
-from typing import Any
 
-from zeus_core.cognitive.cognitive_db import get_connection
 from zeus_core.observability import get_logger, log_event
 
 logger = get_logger("zeus.cognitive.planner")
@@ -90,13 +88,19 @@ class CognitivePlanner:
         )
 
         log_event(
-            logger, 20, "plan_created",
-            plan_id=plan.id, goal_id=goal_id,
-            step_count=len(steps), max_risk=plan.max_risk,
+            logger,
+            20,
+            "plan_created",
+            plan_id=plan.id,
+            goal_id=goal_id,
+            step_count=len(steps),
+            max_risk=plan.max_risk,
         )
         return plan
 
-    def _generate_steps(self, goal_type: str, title: str, description: str) -> list[PlanStep]:
+    def _generate_steps(
+        self, goal_type: str, title: str, description: str
+    ) -> list[PlanStep]:
         """Build steps based on goal type and content analysis."""
         title_lower = title.lower()
         desc_lower = description.lower()
@@ -105,12 +109,14 @@ class CognitivePlanner:
         steps: list[PlanStep] = []
 
         # All plans start with a diagnostic/read step
-        steps.append(PlanStep(
-            step=1,
-            action_type="read",
-            description="Coletar dados do sistema relevantes para diagnóstico",
-            risk="low",
-        ))
+        steps.append(
+            PlanStep(
+                step=1,
+                action_type="read",
+                description="Coletar dados do sistema relevantes para diagnóstico",
+                risk="low",
+            )
+        )
 
         if goal_type == "security":
             steps.extend(self._security_steps(combined))
@@ -131,99 +137,181 @@ class CognitivePlanner:
 
     def _security_steps(self, context: str) -> list[PlanStep]:
         steps = [
-            PlanStep(step=0, action_type="read", description="Analisar logs de segurança recentes", risk="low"),
-            PlanStep(step=0, action_type="memory", description="Consultar memória para incidentes similares", risk="low"),
-            PlanStep(step=0, action_type="suggestion", description="Gerar recomendações de segurança", risk="low"),
+            PlanStep(
+                step=0,
+                action_type="read",
+                description="Analisar logs de segurança recentes",
+                risk="low",
+            ),
+            PlanStep(
+                step=0,
+                action_type="memory",
+                description="Consultar memória para incidentes similares",
+                risk="low",
+            ),
+            PlanStep(
+                step=0,
+                action_type="suggestion",
+                description="Gerar recomendações de segurança",
+                risk="low",
+            ),
         ]
         if "permiss" in context or "chmod" in context:
-            steps.append(PlanStep(
-                step=0, action_type="command",
-                description="Verificar permissões do diretório afetado",
-                command="ls -la",
-                risk="low",
-            ))
+            steps.append(
+                PlanStep(
+                    step=0,
+                    action_type="command",
+                    description="Verificar permissões do diretório afetado",
+                    command="ls -la",
+                    risk="low",
+                )
+            )
         return steps
 
     def _performance_steps(self, context: str) -> list[PlanStep]:
         steps = [
-            PlanStep(step=0, action_type="command", description="Coletar métricas de uso de recursos",
-                     command="ps aux --sort=-%mem | head -20", risk="low"),
-            PlanStep(step=0, action_type="memory", description="Comparar com padrões históricos", risk="low"),
+            PlanStep(
+                step=0,
+                action_type="command",
+                description="Coletar métricas de uso de recursos",
+                command="ps aux --sort=-%mem | head -20",
+                risk="low",
+            ),
+            PlanStep(
+                step=0,
+                action_type="memory",
+                description="Comparar com padrões históricos",
+                risk="low",
+            ),
         ]
         if "ram" in context or "memória" in context:
-            steps.append(PlanStep(
-                step=0, action_type="command",
-                description="Verificar uso detalhado de RAM",
-                command="free -h", risk="low",
-            ))
+            steps.append(
+                PlanStep(
+                    step=0,
+                    action_type="command",
+                    description="Verificar uso detalhado de RAM",
+                    command="free -h",
+                    risk="low",
+                )
+            )
         if "disk" in context or "disco" in context:
-            steps.append(PlanStep(
-                step=0, action_type="command",
-                description="Verificar uso de disco",
-                command="df -h", risk="low",
-            ))
-        steps.append(PlanStep(
-            step=0, action_type="suggestion",
-            description="Sugerir ações para otimização de desempenho",
-            risk="low",
-        ))
+            steps.append(
+                PlanStep(
+                    step=0,
+                    action_type="command",
+                    description="Verificar uso de disco",
+                    command="df -h",
+                    risk="low",
+                )
+            )
+        steps.append(
+            PlanStep(
+                step=0,
+                action_type="suggestion",
+                description="Sugerir ações para otimização de desempenho",
+                risk="low",
+            )
+        )
         return steps
 
     def _maintenance_steps(self, context: str) -> list[PlanStep]:
         steps = [
-            PlanStep(step=0, action_type="read", description="Verificar estado atual do componente", risk="low"),
+            PlanStep(
+                step=0,
+                action_type="read",
+                description="Verificar estado atual do componente",
+                risk="low",
+            ),
         ]
         if "systemd" in context or "service" in context:
-            steps.append(PlanStep(
-                step=0, action_type="command",
-                description="Verificar status do serviço",
-                command="systemctl --user status",
-                risk="low",
-            ))
+            steps.append(
+                PlanStep(
+                    step=0,
+                    action_type="command",
+                    description="Verificar status do serviço",
+                    command="systemctl --user status",
+                    risk="low",
+                )
+            )
         if "log" in context:
-            steps.append(PlanStep(
-                step=0, action_type="command",
-                description="Verificar logs recentes",
-                command="journalctl --user -n 50 --no-pager",
+            steps.append(
+                PlanStep(
+                    step=0,
+                    action_type="command",
+                    description="Verificar logs recentes",
+                    command="journalctl --user -n 50 --no-pager",
+                    risk="low",
+                )
+            )
+        steps.append(
+            PlanStep(
+                step=0,
+                action_type="suggestion",
+                description="Propor ações de manutenção necessárias",
                 risk="low",
-            ))
-        steps.append(PlanStep(
-            step=0, action_type="suggestion",
-            description="Propor ações de manutenção necessárias",
-            risk="low",
-        ))
+            )
+        )
         return steps
 
     def _cognitive_steps(self, context: str) -> list[PlanStep]:
         return [
-            PlanStep(step=0, action_type="memory", description="Consultar base de conhecimento", risk="low"),
-            PlanStep(step=0, action_type="read", description="Analisar contexto operacional atual", risk="low"),
-            PlanStep(step=0, action_type="suggestion", description="Gerar insight cognitivo", risk="low"),
+            PlanStep(
+                step=0,
+                action_type="memory",
+                description="Consultar base de conhecimento",
+                risk="low",
+            ),
+            PlanStep(
+                step=0,
+                action_type="read",
+                description="Analisar contexto operacional atual",
+                risk="low",
+            ),
+            PlanStep(
+                step=0,
+                action_type="suggestion",
+                description="Gerar insight cognitivo",
+                risk="low",
+            ),
         ]
 
     def _operational_steps(self, context: str) -> list[PlanStep]:
         steps = [
-            PlanStep(step=0, action_type="read", description="Diagnosticar estado do componente afetado", risk="low"),
+            PlanStep(
+                step=0,
+                action_type="read",
+                description="Diagnosticar estado do componente afetado",
+                risk="low",
+            ),
         ]
         if "criar" in context or "create" in context:
-            steps.append(PlanStep(
-                step=0, action_type="write",
-                description="Criar recurso necessário",
-                risk="medium",
-                requires_confirmation=True,
-            ))
+            steps.append(
+                PlanStep(
+                    step=0,
+                    action_type="write",
+                    description="Criar recurso necessário",
+                    risk="medium",
+                    requires_confirmation=True,
+                )
+            )
         if "investigar" in context or "investigate" in context or "falha" in context:
-            steps.append(PlanStep(
-                step=0, action_type="command",
-                description="Executar diagnóstico adicional",
-                command="echo 'diagnostic placeholder'",
+            steps.append(
+                PlanStep(
+                    step=0,
+                    action_type="command",
+                    description="Executar diagnóstico adicional",
+                    command="echo 'diagnostic placeholder'",
+                    risk="low",
+                )
+            )
+        steps.append(
+            PlanStep(
+                step=0,
+                action_type="suggestion",
+                description="Resumir descobertas e propor próximos passos",
                 risk="low",
-            ))
-        steps.append(PlanStep(
-            step=0, action_type="suggestion",
-            description="Resumir descobertas e propor próximos passos",
-            risk="low",
-        ))
+            )
+        )
         return steps
 
     @staticmethod

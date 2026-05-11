@@ -71,11 +71,12 @@ def main() -> int:
         }
 
     backup = _backup(mem_path, "pre_migrate")
-    mem_path.write_text(json.dumps(updated, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    mem_path.write_text(
+        json.dumps(updated, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
     print(f"[migrate] ok. backup: {backup}")
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

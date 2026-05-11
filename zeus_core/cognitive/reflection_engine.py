@@ -10,6 +10,7 @@ Generates structured reflections at different depths:
 Reflections are persisted to ``cognitive_reflections`` and optionally
 exported to Obsidian vault.
 """
+
 from __future__ import annotations
 
 import json
@@ -18,7 +19,6 @@ import uuid
 from dataclasses import dataclass, asdict, field
 from datetime import datetime, timezone, date
 from pathlib import Path
-from typing import Any
 
 from zeus_core.cognitive.cognitive_db import get_connection
 from zeus_core.observability import get_logger, log_event
@@ -26,7 +26,11 @@ from zeus_core.observability import get_logger, log_event
 logger = get_logger("zeus.cognitive.reflection")
 
 VAULT_PATH = os.getenv("ZEUS_VAULT_PATH", "")
-OBSIDIAN_SYNC = os.getenv("ZEUS_ENABLE_OBSIDIAN_AUTO_SYNC", "0").strip().lower() in {"1", "true", "yes"}
+OBSIDIAN_SYNC = os.getenv("ZEUS_ENABLE_OBSIDIAN_AUTO_SYNC", "0").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+}
 
 
 def _now_iso() -> str:
@@ -79,7 +83,9 @@ class ReflectionEngine:
         if analysis_summary:
             summary_parts.append(f"Análise: {analysis_summary}")
         summary_parts.append(f"Metas criadas: {goals_created}")
-        summary_parts.append(f"Ações executadas: {actions_executed}, bloqueadas: {actions_blocked}")
+        summary_parts.append(
+            f"Ações executadas: {actions_executed}, bloqueadas: {actions_blocked}"
+        )
 
         reflection = Reflection(
             id=uuid.uuid4().hex[:12],
@@ -264,7 +270,9 @@ class ReflectionEngine:
             lines.append(reflection.learning)
             lines.append("")
 
-        lines.append(f"---\n*Gerado automaticamente pelo ZEUS Cognitive Core em {reflection.created_at}*\n")
+        lines.append(
+            f"---\n*Gerado automaticamente pelo ZEUS Cognitive Core em {reflection.created_at}*\n"
+        )
         return "\n".join(lines)
 
     # ------------------------------------------------------------------
@@ -278,11 +286,17 @@ class ReflectionEngine:
                 "(id, type, summary, events, failures, opportunities, actions, learning, next_goals, cycle_id, created_at) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
-                    r.id, r.type, r.summary,
-                    json.dumps(r.events), json.dumps(r.failures),
-                    json.dumps(r.opportunities), json.dumps(r.actions),
-                    r.learning, json.dumps(r.next_goals),
-                    r.cycle_id, r.created_at,
+                    r.id,
+                    r.type,
+                    r.summary,
+                    json.dumps(r.events),
+                    json.dumps(r.failures),
+                    json.dumps(r.opportunities),
+                    json.dumps(r.actions),
+                    r.learning,
+                    json.dumps(r.next_goals),
+                    r.cycle_id,
+                    r.created_at,
                 ),
             )
 
@@ -323,7 +337,11 @@ class ReflectionEngine:
 
         lines = ["# ZEUS Active Goals", "", f"*Atualizado: {_now_iso()}*", ""]
         for g in goals:
-            d = g if isinstance(g, dict) else (g.to_dict() if hasattr(g, "to_dict") else {"title": str(g)})
+            d = (
+                g
+                if isinstance(g, dict)
+                else (g.to_dict() if hasattr(g, "to_dict") else {"title": str(g)})
+            )
             status = d.get("status", "pending")
             priority = d.get("priority", "?")
             risk = d.get("risk", "?")

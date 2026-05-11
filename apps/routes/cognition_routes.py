@@ -4,6 +4,7 @@ ZEUS Cognitive Core — FastAPI Routes.
 Provides REST endpoints for inspecting and controlling the cognitive system.
 Follows the same dependency-injection pattern as ``status_routes.py``.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -21,6 +22,7 @@ from zeus_core.cognitive.execution_engine import CognitiveExecutionEngine
 @dataclass(frozen=True)
 class CognitionRouteDeps:
     """Dependencies injected from the host application."""
+
     is_trusted_request: Callable[[Request], bool]
     require_lan_token_for_request: Callable[[Request], None]
     cognition_service: CognitionService
@@ -37,7 +39,9 @@ def create_cognition_router(deps: CognitionRouteDeps) -> APIRouter:
 
     def require_access(request: Request) -> None:
         if not deps.is_trusted_request(request):
-            raise HTTPException(status_code=403, detail="Only trusted (local/LAN) requests are allowed.")
+            raise HTTPException(
+                status_code=403, detail="Only trusted (local/LAN) requests are allowed."
+            )
         deps.require_lan_token_for_request(request)
 
     # ------------------------------------------------------------------
@@ -89,7 +93,9 @@ def create_cognition_router(deps: CognitionRouteDeps) -> APIRouter:
 
     @router.get("/reflections")
     async def list_reflections(
-        request: Request, type: str | None = None, limit: int = 20,
+        request: Request,
+        type: str | None = None,
+        limit: int = 20,
     ):
         """List cognitive reflections."""
         require_access(request)
@@ -101,7 +107,9 @@ def create_cognition_router(deps: CognitionRouteDeps) -> APIRouter:
     # ------------------------------------------------------------------
 
     @router.get("/actions")
-    async def list_actions(request: Request, status: str | None = None, limit: int = 50):
+    async def list_actions(
+        request: Request, status: str | None = None, limit: int = 50
+    ):
         """List cognitive actions."""
         require_access(request)
         actions = execution_engine.list_actions(status=status, limit=limit)
@@ -113,7 +121,9 @@ def create_cognition_router(deps: CognitionRouteDeps) -> APIRouter:
         require_access(request)
         result = execution_engine.approve_action(action_id)
         if not result:
-            raise HTTPException(status_code=404, detail="Action not found or not pending confirmation.")
+            raise HTTPException(
+                status_code=404, detail="Action not found or not pending confirmation."
+            )
         return result.to_dict()
 
     # ------------------------------------------------------------------

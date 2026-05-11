@@ -4,6 +4,7 @@ ZEUS Cognitive Core — User Profile Engine.
 Tracks user behavior, synthesizes habits, detects workflows,
 and builds temporal context for cognitive loop awareness.
 """
+
 from __future__ import annotations
 
 import json
@@ -13,7 +14,6 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, asdict, field
 from datetime import datetime, timezone, timedelta, date
 from pathlib import Path
-from typing import Any
 
 from zeus_core.cognitive.cognitive_db import get_connection
 from zeus_core.observability import get_logger, log_event
@@ -22,7 +22,11 @@ logger = get_logger("zeus.cognitive.profile")
 
 SESSION_GAP_MINUTES = 5
 VAULT_PATH = os.getenv("ZEUS_VAULT_PATH", "")
-OBSIDIAN_SYNC = os.getenv("ZEUS_ENABLE_OBSIDIAN_AUTO_SYNC", "0").strip().lower() in {"1", "true", "yes"}
+OBSIDIAN_SYNC = os.getenv("ZEUS_ENABLE_OBSIDIAN_AUTO_SYNC", "0").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+}
 
 PERIOD_LABELS = {
     range(6, 12): "morning",
@@ -118,6 +122,7 @@ class UserWorkflow:
 # Module-level recording function (fire-and-forget from chat handler)
 # ------------------------------------------------------------------
 
+
 def record_interaction(
     interaction_type: str,
     content: str = "",
@@ -134,15 +139,25 @@ def record_interaction(
             "INSERT INTO user_interactions "
             "(id, type, content, context, hour, weekday, session_id, created_at) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (iid, interaction_type, content[:2000], context[:500],
-             now.hour, now.weekday(), session_id, _now_iso()),
+            (
+                iid,
+                interaction_type,
+                content[:2000],
+                context[:500],
+                now.hour,
+                now.weekday(),
+                session_id,
+                _now_iso(),
+            ),
         )
     return iid
 
 
 def _resolve_session(itype: str, now: datetime, db_path: str | None = None) -> str:
     """Find the current session or create a new one."""
-    cutoff = (now - timedelta(minutes=SESSION_GAP_MINUTES)).isoformat(timespec="seconds")
+    cutoff = (now - timedelta(minutes=SESSION_GAP_MINUTES)).isoformat(
+        timespec="seconds"
+    )
     try:
         with get_connection(db_path) as conn:
             row = conn.execute(
@@ -232,7 +247,9 @@ class UserProfileEngine:
         habits: list[UserHabit] = []
 
         # Get interactions from the last 14 days
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=14)).isoformat(timespec="seconds")
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=14)).isoformat(
+            timespec="seconds"
+        )
         with get_connection(self.db_path) as conn:
             rows = conn.execute(
                 "SELECT type, hour, weekday, session_id, created_at "
@@ -283,7 +300,9 @@ class UserProfileEngine:
                 avg_duration_m=0,
                 frequency=freq,
                 tools=[],
-                topics=list(set(i.get("context", "") for i in interactions if i.get("context")))[:10],
+                topics=list(
+                    set(i.get("context", "") for i in interactions if i.get("context"))
+                )[:10],
                 confidence=confidence,
                 last_observed=interactions[-1]["created_at"],
                 created_at=_now_iso(),
@@ -307,7 +326,9 @@ class UserProfileEngine:
         workflows: list[UserWorkflow] = []
 
         # Get sessions from the last 7 days
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat(timespec="seconds")
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat(
+            timespec="seconds"
+        )
         with get_connection(self.db_path) as conn:
             sessions = conn.execute(
                 "SELECT DISTINCT session_id FROM user_interactions "
@@ -328,7 +349,10 @@ class UserProfileEngine:
                     "WHERE session_id = ? ORDER BY created_at",
                     (sid,),
                 ).fetchall()
-            seq = [f"{r['type']}:{r['context']}" if r["context"] else r["type"] for r in rows]
+            seq = [
+                f"{r['type']}:{r['context']}" if r["context"] else r["type"]
+                for r in rows
+            ]
             if len(seq) >= 2:
                 sequences.append(seq)
 
@@ -389,24 +413,30 @@ class UserProfileEngine:
     def list_workflows(self, limit: int = 20) -> list[UserWorkflow]:
         with get_connection(self.db_path) as conn:
             rows = conn.execute(
-                "SELECT * FROM user_workflows ORDER BY confidence DESC LIMIT ?", (limit,)
+                "SELECT * FROM user_workflows ORDER BY confidence DESC LIMIT ?",
+                (limit,),
             ).fetchall()
         return [self._row_to_workflow(r) for r in rows]
 
     def get_interaction_stats(self, days: int = 7) -> dict:
         """Return interaction statistics for the last N days."""
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat(timespec="seconds")
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat(
+            timespec="seconds"
+        )
         with get_connection(self.db_path) as conn:
             total = conn.execute(
-                "SELECT COUNT(*) as cnt FROM user_interactions WHERE created_at > ?", (cutoff,)
+                "SELECT COUNT(*) as cnt FROM user_interactions WHERE created_at > ?",
+                (cutoff,),
             ).fetchone()["cnt"]
             by_type = conn.execute(
                 "SELECT type, COUNT(*) as cnt FROM user_interactions "
-                "WHERE created_at > ? GROUP BY type ORDER BY cnt DESC", (cutoff,)
+                "WHERE created_at > ? GROUP BY type ORDER BY cnt DESC",
+                (cutoff,),
             ).fetchall()
             by_hour = conn.execute(
                 "SELECT hour, COUNT(*) as cnt FROM user_interactions "
-                "WHERE created_at > ? GROUP BY hour ORDER BY hour", (cutoff,)
+                "WHERE created_at > ? GROUP BY hour ORDER BY hour",
+                (cutoff,),
             ).fetchall()
         return {
             "total_interactions": total,
@@ -491,7 +521,9 @@ class UserProfileEngine:
         lines.append(f"---\n*Atualizado: {_now_iso()}*\n")
 
         try:
-            (profile_dir / "daily_profile.md").write_text("\n".join(lines), encoding="utf-8")
+            (profile_dir / "daily_profile.md").write_text(
+                "\n".join(lines), encoding="utf-8"
+            )
             log_event(logger, 20, "profile_exported_obsidian")
         except Exception as e:
             log_event(logger, 40, "profile_export_failed", error=str(e))
@@ -502,7 +534,9 @@ class UserProfileEngine:
 
     def _get_active_session(self) -> tuple[str | None, int]:
         """Return (session_id, duration_minutes) of current active session."""
-        cutoff = (_now_local() - timedelta(minutes=SESSION_GAP_MINUTES)).isoformat(timespec="seconds")
+        cutoff = (_now_local() - timedelta(minutes=SESSION_GAP_MINUTES)).isoformat(
+            timespec="seconds"
+        )
         try:
             with get_connection(self.db_path) as conn:
                 row = conn.execute(
@@ -527,11 +561,17 @@ class UserProfileEngine:
         """Return habits that typically occur at this hour/weekday."""
         try:
             with get_connection(self.db_path) as conn:
-                rows = conn.execute("SELECT * FROM user_habits WHERE confidence > 0.3").fetchall()
+                rows = conn.execute(
+                    "SELECT * FROM user_habits WHERE confidence > 0.3"
+                ).fetchall()
             results = []
             for r in rows:
                 try:
-                    wds = json.loads(r["weekdays"]) if isinstance(r["weekdays"], str) else r["weekdays"]
+                    wds = (
+                        json.loads(r["weekdays"])
+                        if isinstance(r["weekdays"], str)
+                        else r["weekdays"]
+                    )
                 except Exception:
                     wds = []
                 if weekday not in wds:
@@ -564,7 +604,9 @@ class UserProfileEngine:
                     "SELECT type FROM user_interactions WHERE session_id = ? ORDER BY created_at",
                     (session_id,),
                 ).fetchall()
-                wfs = conn.execute("SELECT name, steps FROM user_workflows WHERE confidence > 0.3").fetchall()
+                wfs = conn.execute(
+                    "SELECT name, steps FROM user_workflows WHERE confidence > 0.3"
+                ).fetchall()
 
             if not rows or not wfs:
                 return None
@@ -572,12 +614,16 @@ class UserProfileEngine:
             current_types = [r["type"] for r in rows]
             for wf in wfs:
                 try:
-                    steps = json.loads(wf["steps"]) if isinstance(wf["steps"], str) else wf["steps"]
+                    steps = (
+                        json.loads(wf["steps"])
+                        if isinstance(wf["steps"], str)
+                        else wf["steps"]
+                    )
                 except Exception:
                     continue
                 step_types = [s.split(":")[0] for s in steps]
                 if len(step_types) <= len(current_types):
-                    if current_types[:len(step_types)] == step_types:
+                    if current_types[: len(step_types)] == step_types:
                         return wf["name"]
             return None
         except Exception:
@@ -592,17 +638,34 @@ class UserProfileEngine:
                 conn.execute(
                     "UPDATE user_habits SET time_range=?, weekdays=?, frequency=?, "
                     "topics=?, confidence=?, last_observed=? WHERE name=?",
-                    (habit.time_range, json.dumps(habit.weekdays), habit.frequency,
-                     json.dumps(habit.topics), habit.confidence, habit.last_observed, habit.name),
+                    (
+                        habit.time_range,
+                        json.dumps(habit.weekdays),
+                        habit.frequency,
+                        json.dumps(habit.topics),
+                        habit.confidence,
+                        habit.last_observed,
+                        habit.name,
+                    ),
                 )
             else:
                 conn.execute(
                     "INSERT INTO user_habits "
                     "(id, name, time_range, weekdays, avg_duration_m, frequency, tools, topics, confidence, last_observed, created_at) "
                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    (habit.id, habit.name, habit.time_range, json.dumps(habit.weekdays),
-                     habit.avg_duration_m, habit.frequency, json.dumps(habit.tools),
-                     json.dumps(habit.topics), habit.confidence, habit.last_observed, habit.created_at),
+                    (
+                        habit.id,
+                        habit.name,
+                        habit.time_range,
+                        json.dumps(habit.weekdays),
+                        habit.avg_duration_m,
+                        habit.frequency,
+                        json.dumps(habit.tools),
+                        json.dumps(habit.topics),
+                        habit.confidence,
+                        habit.last_observed,
+                        habit.created_at,
+                    ),
                 )
 
     def _upsert_workflow(self, wf: UserWorkflow) -> None:
@@ -614,21 +677,39 @@ class UserProfileEngine:
                 conn.execute(
                     "UPDATE user_workflows SET steps=?, description=?, frequency=?, "
                     "confidence=?, last_observed=? WHERE name=?",
-                    (json.dumps(wf.steps), wf.description, wf.frequency,
-                     wf.confidence, wf.last_observed, wf.name),
+                    (
+                        json.dumps(wf.steps),
+                        wf.description,
+                        wf.frequency,
+                        wf.confidence,
+                        wf.last_observed,
+                        wf.name,
+                    ),
                 )
             else:
                 conn.execute(
                     "INSERT INTO user_workflows "
                     "(id, name, description, steps, trigger, frequency, avg_duration_m, confidence, last_observed, created_at) "
                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    (wf.id, wf.name, wf.description, json.dumps(wf.steps), wf.trigger,
-                     wf.frequency, wf.avg_duration_m, wf.confidence, wf.last_observed, wf.created_at),
+                    (
+                        wf.id,
+                        wf.name,
+                        wf.description,
+                        json.dumps(wf.steps),
+                        wf.trigger,
+                        wf.frequency,
+                        wf.avg_duration_m,
+                        wf.confidence,
+                        wf.last_observed,
+                        wf.created_at,
+                    ),
                 )
 
     def _decay_habits(self, max_age_days: int = 7) -> None:
         """Reduce confidence of habits not observed recently."""
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=max_age_days)).isoformat(timespec="seconds")
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=max_age_days)).isoformat(
+            timespec="seconds"
+        )
         try:
             with get_connection(self.db_path) as conn:
                 conn.execute(
@@ -646,12 +727,19 @@ class UserProfileEngine:
                 return json.loads(v) if isinstance(v, str) else (v or [])
             except Exception:
                 return []
+
         return UserHabit(
-            id=row["id"], name=row["name"], time_range=row["time_range"],
-            weekdays=_jparse(row["weekdays"]), avg_duration_m=row["avg_duration_m"],
-            frequency=row["frequency"], tools=_jparse(row["tools"]),
-            topics=_jparse(row["topics"]), confidence=row["confidence"],
-            last_observed=row["last_observed"], created_at=row["created_at"],
+            id=row["id"],
+            name=row["name"],
+            time_range=row["time_range"],
+            weekdays=_jparse(row["weekdays"]),
+            avg_duration_m=row["avg_duration_m"],
+            frequency=row["frequency"],
+            tools=_jparse(row["tools"]),
+            topics=_jparse(row["topics"]),
+            confidence=row["confidence"],
+            last_observed=row["last_observed"],
+            created_at=row["created_at"],
         )
 
     @staticmethod
@@ -661,10 +749,16 @@ class UserProfileEngine:
                 return json.loads(v) if isinstance(v, str) else (v or [])
             except Exception:
                 return []
+
         return UserWorkflow(
-            id=row["id"], name=row["name"], description=row["description"],
-            steps=_jparse(row["steps"]), trigger=row["trigger"],
-            frequency=row["frequency"], avg_duration_m=row["avg_duration_m"],
-            confidence=row["confidence"], last_observed=row["last_observed"],
+            id=row["id"],
+            name=row["name"],
+            description=row["description"],
+            steps=_jparse(row["steps"]),
+            trigger=row["trigger"],
+            frequency=row["frequency"],
+            avg_duration_m=row["avg_duration_m"],
+            confidence=row["confidence"],
+            last_observed=row["last_observed"],
             created_at=row["created_at"],
         )

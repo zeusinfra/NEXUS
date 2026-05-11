@@ -29,7 +29,9 @@ def ensure_memory_entry(path: str) -> dict[str, Any]:
         connections = entry.get("connections", set())
         if isinstance(connections, set):
             normalized_connections = connections
-        elif isinstance(connections, Iterable) and not isinstance(connections, (str, bytes)):
+        elif isinstance(connections, Iterable) and not isinstance(
+            connections, (str, bytes)
+        ):
             normalized_connections = set(connections)
         else:
             normalized_connections = set()
@@ -43,11 +45,12 @@ def ensure_memory_entry(path: str) -> dict[str, Any]:
 def build_memory_summary() -> dict[str, Any]:
     """Build a compact summary for the legacy in-memory synaptic graph."""
     normalized_entries = {
-        path: ensure_memory_entry(path)
-        for path in list(synaptic_memory.keys())
+        path: ensure_memory_entry(path) for path in list(synaptic_memory.keys())
     }
     learned_paths = len(normalized_entries)
-    connection_total = sum(len(entry["connections"]) for entry in normalized_entries.values())
+    connection_total = sum(
+        len(entry["connections"]) for entry in normalized_entries.values()
+    )
     hottest_path = None
     hottest_weight = 0
 
@@ -58,7 +61,9 @@ def build_memory_summary() -> dict[str, Any]:
         )
         hottest_weight = hottest_entry["weight"]
 
-    recall_index = min(100, round((connection_total * 2 + hottest_weight) / max(1, learned_paths)))
+    recall_index = min(
+        100, round((connection_total * 2 + hottest_weight) / max(1, learned_paths))
+    )
     memory_density = round(connection_total / max(1, learned_paths), 2)
     return {
         "learned_paths": learned_paths,

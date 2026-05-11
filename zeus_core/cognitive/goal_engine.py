@@ -4,13 +4,13 @@ ZEUS Cognitive Core — Goal Engine.
 Creates, manages, and deduplicates autonomous goals.
 Goals are persisted to the ``cognitive_goals`` table in SQLite.
 """
+
 from __future__ import annotations
 
 import json
 import uuid
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
-from typing import List, Optional
 
 from zeus_core.cognitive.cognitive_db import get_connection
 from zeus_core.observability import get_logger, log_event
@@ -22,12 +22,24 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-VALID_TYPES = {"operational", "cognitive", "security", "performance", "ux", "maintenance"}
+VALID_TYPES = {
+    "operational",
+    "cognitive",
+    "security",
+    "performance",
+    "ux",
+    "maintenance",
+}
 VALID_ORIGINS = {"system_analysis", "user_request", "reflection", "watcher", "error"}
 VALID_RISKS = {"low", "medium", "high", "critical"}
 VALID_STATUSES = {
-    "pending", "planned", "blocked", "requires_confirmation",
-    "executing", "done", "failed",
+    "pending",
+    "planned",
+    "blocked",
+    "requires_confirmation",
+    "executing",
+    "done",
+    "failed",
 }
 
 
@@ -106,7 +118,15 @@ class GoalEngine:
         )
 
         self._persist(goal)
-        log_event(logger, 20, "goal_created", goal_id=goal.id, title=title, priority=priority, risk=risk)
+        log_event(
+            logger,
+            20,
+            "goal_created",
+            goal_id=goal.id,
+            title=title,
+            priority=priority,
+            risk=risk,
+        )
         return goal
 
     # ------------------------------------------------------------------
@@ -148,7 +168,9 @@ class GoalEngine:
 
     def get_goal(self, goal_id: str) -> CognitiveGoal | None:
         with get_connection(self.db_path) as conn:
-            row = conn.execute("SELECT * FROM cognitive_goals WHERE id = ?", (goal_id,)).fetchone()
+            row = conn.execute(
+                "SELECT * FROM cognitive_goals WHERE id = ?", (goal_id,)
+            ).fetchone()
         return self._row_to_goal(row) if row else None
 
     def count_by_status(self) -> dict[str, int]:
@@ -217,10 +239,18 @@ class GoalEngine:
                 "(id, title, description, type, origin, priority, risk, status, evidence, plan_id, created_at, updated_at) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
-                    goal.id, goal.title, goal.description, goal.type,
-                    goal.origin, goal.priority, goal.risk, goal.status,
-                    json.dumps(goal.evidence), goal.plan_id,
-                    goal.created_at, goal.updated_at,
+                    goal.id,
+                    goal.title,
+                    goal.description,
+                    goal.type,
+                    goal.origin,
+                    goal.priority,
+                    goal.risk,
+                    goal.status,
+                    json.dumps(goal.evidence),
+                    goal.plan_id,
+                    goal.created_at,
+                    goal.updated_at,
                 ),
             )
 

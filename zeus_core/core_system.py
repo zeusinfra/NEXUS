@@ -10,6 +10,7 @@ except ImportError:
     genai = None
     types = None
 
+
 # --- CARREGADOR DE AMBIENTE LOCAL (.env) ---
 def _load_local_env():
     # Procura o .env na raiz do projeto (um nível acima de core_modules)
@@ -23,6 +24,7 @@ def _load_local_env():
                     k, v = line.split("=", 1)
                     os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
 
+
 _load_local_env()
 
 # Configurações de API
@@ -34,8 +36,18 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 OLLAMA_URL = os.getenv("ZEUS_LLM_URL", "http://127.0.0.1:11434/api/chat")
 OLLAMA_API_KEY = os.getenv("ZEUS_LLM_API_KEY", os.getenv("OLLAMA_API_KEY", ""))
 MODEL = os.getenv("ZEUS_LLM_MODEL", "gemma4:31b-cloud")
-DISABLE_OLLAMA = os.getenv("ZEUS_DISABLE_OLLAMA", "0").strip().lower() in {"1", "true", "yes", "on"}
-PREFER_OLLAMA = os.getenv("ZEUS_PREFER_OLLAMA", "0").strip().lower() in {"1", "true", "yes", "on"}
+DISABLE_OLLAMA = os.getenv("ZEUS_DISABLE_OLLAMA", "0").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+PREFER_OLLAMA = os.getenv("ZEUS_PREFER_OLLAMA", "0").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 MAX_PROMPT_CHARS = int(os.getenv("ZEUS_MAX_PROMPT_CHARS", "16000") or "16000")
 
 GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
@@ -48,7 +60,10 @@ if GEMINI_API_KEY and genai:
     except Exception as e:
         print(f" [ZEUS] Erro ao inicializar cliente Gemini: {e}")
 elif GEMINI_API_KEY:
-    print(" [ZEUS] google-genai não está instalado; Gemini desativado, usando fallback.")
+    print(
+        " [ZEUS] google-genai não está instalado; Gemini desativado, usando fallback."
+    )
+
 
 def _extract_message_content(data):
     """Aceita formatos estilo Ollama e compatíveis com OpenAI."""
@@ -78,11 +93,14 @@ def _extract_message_content(data):
 
     return None
 
+
 try:
     from zeus_state import BlackboardRust
+
     RUST_STATE_AVAILABLE = True
 except ImportError:
     RUST_STATE_AVAILABLE = False
+
 
 class Blackboard:
     """Estado global compartilhado entre os agentes."""
@@ -122,6 +140,7 @@ class Blackboard:
             return None
         return self.state.get(key)
 
+
 class CloudAgent:
     """Classe base para agentes que consomem a LLM."""
 
@@ -133,6 +152,7 @@ class CloudAgent:
             ]
         )
 
+
 def _format_messages_for_genai(messages):
     """Converte formato OpenAI/Ollama para o formato nativo do novo SDK google-genai."""
     if types is None:
@@ -140,18 +160,22 @@ def _format_messages_for_genai(messages):
 
     system_instruction = None
     contents = []
-    
+
     for m in messages:
         role = m["role"]
         content = m["content"]
-        
+
         if role == "system":
             system_instruction = content
         elif role == "user":
-            contents.append(types.Content(role="user", parts=[types.Part(text=content)]))
+            contents.append(
+                types.Content(role="user", parts=[types.Part(text=content)])
+            )
         elif role in ["assistant", "model"]:
-            contents.append(types.Content(role="model", parts=[types.Part(text=content)]))
-            
+            contents.append(
+                types.Content(role="model", parts=[types.Part(text=content)])
+            )
+
     return system_instruction, contents
 
 
@@ -184,13 +208,20 @@ def _trim_messages(messages):
 
     return list(reversed(trimmed)) or [{"role": "user", "content": "Continue."}]
 
+
 def _use_openai() -> bool:
     if LLM_PROVIDER == "openai":
         return True
-    return bool(OPENAI_API_KEY and not GEMINI_API_KEY and LLM_PROVIDER not in {"gemini", "ollama"})
+    return bool(
+        OPENAI_API_KEY
+        and not GEMINI_API_KEY
+        and LLM_PROVIDER not in {"gemini", "ollama"}
+    )
+
 
 def _use_ollama() -> bool:
     return (LLM_PROVIDER == "ollama" or PREFER_OLLAMA) and not DISABLE_OLLAMA
+
 
 def _active_llm_provider() -> str:
     if _use_openai():
@@ -202,6 +233,7 @@ def _active_llm_provider() -> str:
     if not DISABLE_OLLAMA:
         return "ollama"
     return LLM_PROVIDER or "none"
+
 
 def get_llm_status() -> dict:
     provider = _active_llm_provider()
@@ -226,8 +258,13 @@ def get_llm_status() -> dict:
             "gemini_configured": bool(GEMINI_API_KEY and _GEMINI_CLIENT),
             "ollama_enabled": not DISABLE_OLLAMA,
         },
-        "base_url": OPENAI_BASE_URL if provider == "openai" else OLLAMA_URL if provider == "ollama" else None,
+        "base_url": OPENAI_BASE_URL
+        if provider == "openai"
+        else OLLAMA_URL
+        if provider == "ollama"
+        else None,
     }
+
 
 def _format_openai_error(response) -> str:
     try:
@@ -249,6 +286,7 @@ def _format_openai_error(response) -> str:
         return f"Modelo OpenAI não encontrado ou sem acesso: {OPENAI_MODEL}."
     return f"OpenAI API retornou {response.status_code}: {message}"
 
+
 def _format_messages_for_openai(messages):
     """Mantém compatibilidade com Chat Completions."""
     formatted = []
@@ -263,6 +301,7 @@ def _format_messages_for_openai(messages):
             role = "user"
         formatted.append({"role": role, "content": str(content)})
     return formatted or [{"role": "user", "content": "Continue."}]
+
 
 def _call_openai_chat(messages, *, stream: bool = False):
     if not OPENAI_API_KEY:
@@ -285,6 +324,7 @@ def _call_openai_chat(messages, *, stream: bool = False):
         timeout=300,
     )
 
+
 def call_cloud_llm(messages):
     messages = _trim_messages(messages)
     if _use_openai():
@@ -306,19 +346,19 @@ def call_cloud_llm(messages):
     if GEMINI_API_KEY and _GEMINI_CLIENT:
         try:
             sys_inst, contents = _format_messages_for_genai(messages)
-            
+
             # Debug parameters
-            print(f"DEBUG GEMINI: model={GEMINI_MODEL_NAME} sys_inst={sys_inst[:50] if sys_inst else None} history_len={len(contents)}")
+            print(
+                f"DEBUG GEMINI: model={GEMINI_MODEL_NAME} sys_inst={sys_inst[:50] if sys_inst else None} history_len={len(contents)}"
+            )
 
             config = None
             if sys_inst:
                 config = types.GenerateContentConfig(system_instruction=sys_inst)
-            
+
             if contents:
                 response = _GEMINI_CLIENT.models.generate_content(
-                    model=GEMINI_MODEL_NAME,
-                    contents=contents,
-                    config=config
+                    model=GEMINI_MODEL_NAME, contents=contents, config=config
                 )
             else:
                 return "Error: No messages to process."
@@ -329,10 +369,13 @@ def call_cloud_llm(messages):
             err_msg = str(e)
             if "429" in err_msg or "quota" in err_msg.lower():
                 print(f"\n[ZEUS WARNING] Quota do Gemini excedida (429).")
-                print(f"Considere ativar o Ollama (.env: ZEUS_DISABLE_OLLAMA=0) ou aguardar o reset da quota.\n")
+                print(
+                    f"Considere ativar o Ollama (.env: ZEUS_DISABLE_OLLAMA=0) ou aguardar o reset da quota.\n"
+                )
                 return f"Error: Gemini Quota Exceeded (429). {err_msg[:100]}"
-            
+
             import traceback
+
             traceback.print_exc()
             print(f" [ZEUS] Erro no Gemini, fallback para Ollama: {e}")
 
@@ -341,11 +384,12 @@ def call_cloud_llm(messages):
 
     return _call_ollama_chat(messages)
 
+
 def _call_ollama_chat(messages):
     headers = {
         "Content-Type": "application/json",
     }
-    
+
     if OLLAMA_API_KEY:
         headers["Authorization"] = f"Bearer {OLLAMA_API_KEY}"
 
@@ -367,12 +411,10 @@ def _call_ollama_chat(messages):
             "messages": messages,
             "stream": False,
         }
-    
+
     try:
-        response = requests.post(
-            OLLAMA_URL, json=payload, headers=headers, timeout=300
-        )
-        
+        response = requests.post(OLLAMA_URL, json=payload, headers=headers, timeout=300)
+
         if response.status_code == 200:
             data = response.json()
             if use_generate_endpoint:
@@ -387,6 +429,7 @@ def _call_ollama_chat(messages):
         return f"Error: {_format_ollama_error(response)}"
     except Exception as e:
         return f"Connection Error: {str(e)}"
+
 
 def _format_ollama_error(response):
     body = response.text[:300]
@@ -403,6 +446,7 @@ def _format_ollama_error(response):
         )
     return f"API returned {response.status_code} - {body}"
 
+
 def call_cloud_llm_stream(messages):
     """Versão streaming para interação em tempo real."""
     messages = _trim_messages(messages)
@@ -416,12 +460,14 @@ def call_cloud_llm_stream(messages):
             for raw_line in response.iter_lines(decode_unicode=True):
                 if not raw_line or not raw_line.startswith("data: "):
                     continue
-                data = raw_line[len("data: "):].strip()
+                data = raw_line[len("data: ") :].strip()
                 if data == "[DONE]":
                     return
                 try:
                     payload = json.loads(data)
-                    delta = ((payload.get("choices") or [{}])[0].get("delta") or {}).get("content")
+                    delta = (
+                        (payload.get("choices") or [{}])[0].get("delta") or {}
+                    ).get("content")
                     if delta:
                         yield delta
                 except Exception:
@@ -438,16 +484,14 @@ def call_cloud_llm_stream(messages):
     if GEMINI_API_KEY and _GEMINI_CLIENT:
         try:
             sys_inst, contents = _format_messages_for_genai(messages)
-            
+
             config = None
             if sys_inst:
                 config = types.GenerateContentConfig(system_instruction=sys_inst)
-            
+
             if contents:
                 response = _GEMINI_CLIENT.models.generate_content_stream(
-                    model=GEMINI_MODEL_NAME,
-                    contents=contents,
-                    config=config
+                    model=GEMINI_MODEL_NAME, contents=contents, config=config
                 )
                 for chunk in response:
                     if chunk.text:
@@ -458,8 +502,9 @@ def call_cloud_llm_stream(messages):
             if "429" in err_msg or "quota" in err_msg.lower():
                 yield f"[QUOTA EXCEEDED] O limite de uso do Gemini foi atingido. Por favor, aguarde ou ative o Ollama."
                 return
-                
+
             import traceback
+
             traceback.print_exc()
             print(f" [ZEUS] Erro no Gemini Stream: {e}")
 
@@ -471,8 +516,6 @@ def call_cloud_llm_stream(messages):
     yield call_cloud_llm(messages)
 
 
-
-
 class LibrarianAgent:
     """Agente responsável pela gestão de memória e filtragem de contexto (RAG Lite)."""
 
@@ -482,13 +525,15 @@ class LibrarianAgent:
 
     def get_relevant_context(self, query):
         relevant_data = []
-        
+
         # 1. Busca semântica real usando ChromaDB (RAG Verdadeiro)
         if self.vector_memory:
             try:
                 rag_context = self.vector_memory.search_context(query, top_k=5)
                 if rag_context:
-                    relevant_data.append(f"--- MEMÓRIA SEMÂNTICA (RAG) ---\n{rag_context}\n------------------------------")
+                    relevant_data.append(
+                        f"--- MEMÓRIA SEMÂNTICA (RAG) ---\n{rag_context}\n------------------------------"
+                    )
             except Exception as e:
                 print(f"RAG Error: {e}")
 
@@ -531,7 +576,14 @@ class OperatorAgent(CloudAgent):
 
     def _validate_commands(self, commands: str) -> bool:
         """Verifica a presença de comandos destrutivos."""
-        blacklist = ["rm -rf /", "rm -rf *", "mkfs", "dd if=", "chmod 777", "chown -R root"]
+        blacklist = [
+            "rm -rf /",
+            "rm -rf *",
+            "mkfs",
+            "dd if=",
+            "chmod 777",
+            "chown -R root",
+        ]
         cmd_lower = commands.lower()
         for bad_cmd in blacklist:
             if bad_cmd in cmd_lower:
@@ -552,7 +604,7 @@ class OperatorAgent(CloudAgent):
         user_prompt = f"Plano: {blackboard.get('plan')}"
 
         commands = self._call_llm(system_prompt, user_prompt)
-        
+
         # O Operator propõe. A execução será gerenciada pela engine ReAct do agent.py ou pelo SudoBroker.
         result = {
             "mode": "PROPOSAL",
@@ -588,48 +640,52 @@ class CriticAgent(CloudAgent):
 
         metric = self._call_llm(system_prompt, user_prompt)
         first_line = metric.strip().split("\n")[0].upper()
-        
+
         status = "UNKNOWN"
         for kw in ["SUCCESS", "REVISE", "BLOCK", "NEED_USER_CONFIRMATION"]:
             if kw in first_line:
                 status = kw
                 break
-                
+
         if status == "UNKNOWN":
             status = "REVISE"
 
         blackboard.update("status", status)
         blackboard.update("metrics", metric)
         return metric
+
+
 class ObserverAgent(CloudAgent):
     """Agente de Vigilância: Analisa o contexto visual do sistema."""
 
     def __init__(self, core_path):
         self.core_path = core_path
 
-    def observe_screen(self, blackboard, question="O que está acontecendo na tela agora?"):
+    def observe_screen(
+        self, blackboard, question="O que está acontecendo na tela agora?"
+    ):
         try:
             from zeus_core.vision import capture_screen, analyze_image_with_llm
-            
+
             # 1. Captura a tela
             shot = capture_screen()
             path = shot.get("path")
-            
+
             if not path:
                 return "Erro ao capturar tela."
 
             # 2. Analisa com LLM Vision
             analysis = analyze_image_with_llm(path, question=question)
             answer = analysis.get("answer", "Sem resposta da visão.")
-            
+
             # 3. Atualiza Blackboard
             visual_context = {
                 "last_observation": answer,
                 "timestamp": datetime.datetime.now().isoformat(),
-                "screen_path": path
+                "screen_path": path,
             }
             blackboard.update("visual_context", visual_context)
-            
+
             return answer
         except Exception as e:
             return f"Erro na visão contextual: {e}"

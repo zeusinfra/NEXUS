@@ -86,7 +86,9 @@ class CommandPolicyTests(unittest.TestCase):
         self._log_patcher.stop()
         with patch("zeus_core.command_policy.log_event") as log_event:
             with patch.dict(os.environ, {"ZEUS_CMD_ALLOWLIST": "python3"}, clear=False):
-                validate_command("python3 --version", ["python3", "--version"], confirmed=False)
+                validate_command(
+                    "python3 --version", ["python3", "--version"], confirmed=False
+                )
                 with self.assertRaises(ToolError):
                     validate_command("git status", ["git", "status"], confirmed=False)
 
@@ -96,18 +98,34 @@ class CommandPolicyTests(unittest.TestCase):
         self._log_patcher.start()
 
     def test_interpreter_execution_flags_require_confirmation(self):
-        with patch.dict(os.environ, {"ZEUS_CMD_ALLOWLIST": "python3,node"}, clear=False):
+        with patch.dict(
+            os.environ, {"ZEUS_CMD_ALLOWLIST": "python3,node"}, clear=False
+        ):
             with self.assertRaisesRegex(ToolError, "confirmação"):
-                validate_command("python3 -c print(1)", ["python3", "-c", "print(1)"], confirmed=False)
+                validate_command(
+                    "python3 -c print(1)",
+                    ["python3", "-c", "print(1)"],
+                    confirmed=False,
+                )
             with self.assertRaisesRegex(ToolError, "confirmação"):
-                validate_command("python3 script.py", ["python3", "script.py"], confirmed=False)
+                validate_command(
+                    "python3 script.py", ["python3", "script.py"], confirmed=False
+                )
             with self.assertRaisesRegex(ToolError, "confirmação"):
-                validate_command("node -e console.log(1)", ["node", "-e", "console.log(1)"], confirmed=False)
+                validate_command(
+                    "node -e console.log(1)",
+                    ["node", "-e", "console.log(1)"],
+                    confirmed=False,
+                )
 
-            py_decision = validate_command("python3 -c print(1)", ["python3", "-c", "print(1)"], confirmed=True)
+            py_decision = validate_command(
+                "python3 -c print(1)", ["python3", "-c", "print(1)"], confirmed=True
+            )
             self.assertEqual(py_decision.category, "exec")
 
-    @unittest.skipUnless(RUST_POLICY_AVAILABLE, "zeus_policy Rust extension is not installed")
+    @unittest.skipUnless(
+        RUST_POLICY_AVAILABLE, "zeus_policy Rust extension is not installed"
+    )
     def test_rust_policy_matches_python_guarded_corpus(self):
         from zeus_core.command_policy import _RUST_POLICY
 
@@ -119,7 +137,12 @@ class CommandPolicyTests(unittest.TestCase):
             ("mkdir out", ["mkdir", "out"], False, False),
             ("mkdir out", ["mkdir", "out"], True, True),
             ("rm something", ["rm", "something"], True, False),
-            ("python3 --version && git status", ["python3", "--version", "&&", "git", "status"], False, False),
+            (
+                "python3 --version && git status",
+                ["python3", "--version", "&&", "git", "status"],
+                False,
+                False,
+            ),
         ]
         env = {
             "ZEUS_AUTONOMY_LEVEL": "GUARDED",
@@ -127,7 +150,9 @@ class CommandPolicyTests(unittest.TestCase):
         }
         with patch.dict(os.environ, env, clear=False):
             for command, tokens, confirmed, expected_ok in cases:
-                rust_ok, rust_reason = _RUST_POLICY.validate_command(command, tokens, confirmed)
+                rust_ok, rust_reason = _RUST_POLICY.validate_command(
+                    command, tokens, confirmed
+                )
                 try:
                     validate_command(command, tokens, confirmed=confirmed)
                     python_ok = True

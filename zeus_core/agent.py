@@ -2,7 +2,7 @@ import asyncio
 import datetime as _dt
 import json
 import os
-from typing import Any, Awaitable, Callable, Dict, Optional, Tuple
+from typing import Awaitable, Callable, Dict, Optional, Tuple
 
 from zeus_core.core_system import call_cloud_llm, call_cloud_llm_stream
 from zeus_core.executor import PlanExecutor
@@ -51,11 +51,11 @@ def _extract_tool_call(text: str) -> Tuple[Optional[dict], str]:
         payload = json.loads(payload_str)
     except Exception:
         # Fallback: tenta recortar do primeiro "{" ao último "}".
-        l = payload_str.find("{")
-        r = payload_str.rfind("}")
-        if l != -1 and r != -1 and r > l:
+        left = payload_str.find("{")
+        right = payload_str.rfind("}")
+        if left != -1 and right != -1 and right > left:
             try:
-                payload = json.loads(payload_str[l : r + 1])
+                payload = json.loads(payload_str[left : right + 1])
             except Exception:
                 payload = None
 
@@ -104,11 +104,23 @@ class Agent:
 
     def _get_dynamic_max_steps(self, user_prompt: str) -> int:
         prompt_lower = user_prompt.lower()
-        if "melhorar zeus" in prompt_lower or "refatorar si mesmo" in prompt_lower or "patch" in prompt_lower:
+        if (
+            "melhorar zeus" in prompt_lower
+            or "refatorar si mesmo" in prompt_lower
+            or "patch" in prompt_lower
+        ):
             return int(os.getenv("ZEUS_MAX_STEPS_SELF_IMPROVEMENT", "18"))
-        if "sudo" in prompt_lower or "root" in prompt_lower or "apt install" in prompt_lower:
+        if (
+            "sudo" in prompt_lower
+            or "root" in prompt_lower
+            or "apt install" in prompt_lower
+        ):
             return int(os.getenv("ZEUS_MAX_STEPS_ADMIN", "14"))
-        if "arquitetura" in prompt_lower or "design" in prompt_lower or "planejar" in prompt_lower:
+        if (
+            "arquitetura" in prompt_lower
+            or "design" in prompt_lower
+            or "planejar" in prompt_lower
+        ):
             return int(os.getenv("ZEUS_MAX_STEPS_COMPLEX", "12"))
         if "erro crítico" in prompt_lower or "falha grave" in prompt_lower:
             return int(os.getenv("ZEUS_MAX_STEPS_CRITICAL", "16"))
@@ -661,7 +673,7 @@ Se não precisar agir, responda normalmente em PT-BR.
         for m in messages:
             content = m.get("content", "")
             sanitized_messages.append({**m, "content": privacy_guard.sanitize(content)})
-        
+
         return await asyncio.to_thread(call_cloud_llm, sanitized_messages)
 
     async def _call_llm_stream(self, messages: list):
@@ -681,7 +693,7 @@ Se não precisar agir, responda normalmente em PT-BR.
 
         loop = asyncio.get_running_loop()
         it = call_cloud_llm_stream(sanitized_messages)
-        
+
         while True:
             # Em Python 3.11+, StopIteration não pode ser levantado em um Future (run_in_executor)
             # Usamos uma flag 'done' para sinalizar o fim de forma segura.
@@ -780,14 +792,22 @@ Se não precisar agir, responda normalmente em PT-BR.
                     tool=pending.get("name"),
                     details=_summarize_tool_result(tool_out),
                 )
-                original_prompt = pending.get("original_prompt") or "O usuário confirmou a execução."
-                
+                original_prompt = (
+                    pending.get("original_prompt") or "O usuário confirmou a execução."
+                )
+
                 # Finalizing with tool output (streaming)
                 messages = [
                     {"role": "system", "content": self._system_prompt()},
                     {"role": "user", "content": original_prompt},
-                    {"role": "user", "content": f"A ferramenta '{pending['name']}' já foi executada. Agora responda ao usuário com base no output."},
-                    {"role": "user", "content": f"Tool output ({pending['name']}): {json.dumps(tool_out, ensure_ascii=False)}"},
+                    {
+                        "role": "user",
+                        "content": f"A ferramenta '{pending['name']}' já foi executada. Agora responda ao usuário com base no output.",
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Tool output ({pending['name']}): {json.dumps(tool_out, ensure_ascii=False)}",
+                    },
                 ]
                 async for chunk in self._call_llm_stream(messages):
                     if token_callback:
@@ -818,17 +838,19 @@ Se não precisar agir, responda normalmente em PT-BR.
                 total_steps=dynamic_steps,
             )
             full_assistant = ""
-            
+
             # Buffer the model turn until we know if it is a tool call. This avoids
             # leaking partial "<tool_call>" tags into the user-visible stream.
             async for chunk in self._call_llm_stream(messages):
                 full_assistant += chunk
-            
+
             tool_payload, remaining = _extract_tool_call(full_assistant)
             if not tool_payload:
                 if token_callback:
                     await token_callback(full_assistant)
-                await self._broadcast(broadcast, {"type": "CHUNK_AI", "chunk": full_assistant})
+                await self._broadcast(
+                    broadcast, {"type": "CHUNK_AI", "chunk": full_assistant}
+                )
                 yield full_assistant
                 await self._progress(
                     broadcast,
@@ -837,14 +859,19 @@ Se não precisar agir, responda normalmente em PT-BR.
                     step=step_no,
                     total_steps=dynamic_steps,
                 )
-                return # Já terminamos de yieldar os chunks
+                return  # Já terminamos de yieldar os chunks
 
             name = tool_payload.get("name")
             args = tool_payload.get("args") or {}
-            
+
             if not isinstance(name, str) or not isinstance(args, dict):
                 messages.append({"role": "assistant", "content": full_assistant})
-                messages.append({"role": "user", "content": "Tool call inválido. Retorne apenas um <tool_call> JSON válido."})
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": "Tool call inválido. Retorne apenas um <tool_call> JSON válido.",
+                    }
+                )
                 await self._progress(
                     broadcast,
                     "tool_invalid",
@@ -871,7 +898,15 @@ Se não precisar agir, responda normalmente em PT-BR.
                     tool=name,
                     details={"command": cmd},
                 )
-                await self._broadcast(broadcast, {"type": "TOOL_LOG", "stage": "awaiting_confirmation", "tool": name, "args": {"command": cmd}})
+                await self._broadcast(
+                    broadcast,
+                    {
+                        "type": "TOOL_LOG",
+                        "stage": "awaiting_confirmation",
+                        "tool": name,
+                        "args": {"command": cmd},
+                    },
+                )
                 yield f"\n[Trava de segurança ativa]\nConfirme com 'Sim' para eu executar este comando:\n`{cmd}`"
                 return
 
@@ -884,9 +919,17 @@ Se não precisar agir, responda normalmente em PT-BR.
                 tool=name,
                 details={"args": args},
             )
-            await self._broadcast(broadcast, {"type": "TOOL_LOG", "stage": "running", "tool": name, "args": args})
-            tool_out = await self._execute_pending({"name": name, "args": args}, broadcast=broadcast)
-            await self._broadcast(broadcast, {"type": "TOOL_LOG", "stage": "done", "tool": name, "result": tool_out})
+            await self._broadcast(
+                broadcast,
+                {"type": "TOOL_LOG", "stage": "running", "tool": name, "args": args},
+            )
+            tool_out = await self._execute_pending(
+                {"name": name, "args": args}, broadcast=broadcast
+            )
+            await self._broadcast(
+                broadcast,
+                {"type": "TOOL_LOG", "stage": "done", "tool": name, "result": tool_out},
+            )
             await self._progress(
                 broadcast,
                 "tool_done",
@@ -899,7 +942,9 @@ Se não precisar agir, responda normalmente em PT-BR.
 
             tool_out_str = json.dumps(tool_out, ensure_ascii=False)
             messages.append({"role": "assistant", "content": full_assistant})
-            messages.append({"role": "user", "content": f"Tool output ({name}): {tool_out_str}"})
+            messages.append(
+                {"role": "user", "content": f"Tool output ({name}): {tool_out_str}"}
+            )
             if remaining:
                 messages.append({"role": "user", "content": remaining})
 
@@ -937,7 +982,9 @@ Se não precisar agir, responda normalmente em PT-BR.
         except Exception:
             pass
 
-    async def _execute_pending(self, pending: dict, *, broadcast: Optional[BroadcastFn]) -> dict:
+    async def _execute_pending(
+        self, pending: dict, *, broadcast: Optional[BroadcastFn]
+    ) -> dict:
         name = pending.get("name")
         args = pending.get("args") or {}
         try:
@@ -947,12 +994,20 @@ Se não precisar agir, responda normalmente em PT-BR.
         except Exception as e:
             return {"ok": False, "error": f"Erro interno: {e}", "tool": name}
 
-    async def _finalize_with_tool_output(self, *, user_prompt: str, tool_name: str, tool_out: dict) -> str:
+    async def _finalize_with_tool_output(
+        self, *, user_prompt: str, tool_name: str, tool_out: dict
+    ) -> str:
         messages = [
             {"role": "system", "content": self._system_prompt()},
             {"role": "user", "content": user_prompt},
-            {"role": "user", "content": f"A ferramenta '{tool_name}' já foi executada. Agora responda ao usuário com base no output."},
-            {"role": "user", "content": f"Tool output ({tool_name}): {json.dumps(tool_out, ensure_ascii=False)}"},
+            {
+                "role": "user",
+                "content": f"A ferramenta '{tool_name}' já foi executada. Agora responda ao usuário com base no output.",
+            },
+            {
+                "role": "user",
+                "content": f"Tool output ({tool_name}): {json.dumps(tool_out, ensure_ascii=False)}",
+            },
         ]
         assistant = await self._call_llm(messages)
         tool_payload, _ = _extract_tool_call(assistant)

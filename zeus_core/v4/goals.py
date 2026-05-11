@@ -57,11 +57,15 @@ class GoalsEngine:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         payload = [asdict(goal) for goal in self.list()]
         tmp = self.path.with_suffix(self.path.suffix + ".tmp")
-        tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
         os.replace(tmp, self.path)
 
     def list(self) -> list[Goal]:
-        return sorted(self.goals.values(), key=lambda g: (g.estado != "ativo", -g.prioridade))
+        return sorted(
+            self.goals.values(), key=lambda g: (g.estado != "ativo", -g.prioridade)
+        )
 
     def upsert(self, goal: Goal) -> None:
         self.goals[goal.id] = goal
@@ -92,7 +96,9 @@ class GoalsEngine:
         if goal.progresso >= 1.0 and goal.estado == "ativo":
             goal.estado = "concluido"
 
-    def auto_create_from_patterns(self, suggestions: Iterable[tuple[str, float]]) -> list[Goal]:
+    def auto_create_from_patterns(
+        self, suggestions: Iterable[tuple[str, float]]
+    ) -> list[Goal]:
         created: list[Goal] = []
         for desc, prio in suggestions:
             desc = str(desc or "").strip()
@@ -101,7 +107,14 @@ class GoalsEngine:
             gid = f"goal_auto_{abs(hash(desc)) % 100000:05d}"
             if gid in self.goals:
                 continue
-            g = Goal(id=gid, descricao=desc, prioridade=_clamp01(prio), estado="ativo", progresso=0.0, meta={"source": "pattern"})
+            g = Goal(
+                id=gid,
+                descricao=desc,
+                prioridade=_clamp01(prio),
+                estado="ativo",
+                progresso=0.0,
+                meta={"source": "pattern"},
+            )
             self.upsert(g)
             created.append(g)
         if created:

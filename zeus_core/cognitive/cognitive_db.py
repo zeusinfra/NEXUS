@@ -15,6 +15,7 @@ Manages the cognitive tables inside the shared zeus_events.db:
 
 All tables are created lazily via ``init_cognitive_tables()``.
 """
+
 from __future__ import annotations
 
 import os
@@ -30,7 +31,9 @@ DB_PATH = os.getenv("ZEUS_DB_PATH", "./zeus_events.db")
 
 
 @contextmanager
-def get_connection(db_path: str | None = None) -> Generator[sqlite3.Connection, None, None]:
+def get_connection(
+    db_path: str | None = None,
+) -> Generator[sqlite3.Connection, None, None]:
     """Yield an auto-committing SQLite connection."""
     conn = sqlite3.connect(db_path or DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -191,29 +194,61 @@ def init_cognitive_tables(db_path: str | None = None) -> None:
         """)
 
         # Indexes for common query patterns
-        c.execute("CREATE INDEX IF NOT EXISTS idx_goals_status ON cognitive_goals(status)")
-        c.execute("CREATE INDEX IF NOT EXISTS idx_goals_priority ON cognitive_goals(priority DESC)")
-        c.execute("CREATE INDEX IF NOT EXISTS idx_reflections_type ON cognitive_reflections(type)")
-        c.execute("CREATE INDEX IF NOT EXISTS idx_actions_status ON cognitive_actions(status)")
-        c.execute("CREATE INDEX IF NOT EXISTS idx_actions_plan ON cognitive_actions(plan_id)")
-        c.execute("CREATE INDEX IF NOT EXISTS idx_lessons_source ON cognitive_lessons(source)")
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_goals_status ON cognitive_goals(status)"
+        )
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_goals_priority ON cognitive_goals(priority DESC)"
+        )
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_reflections_type ON cognitive_reflections(type)"
+        )
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_actions_status ON cognitive_actions(status)"
+        )
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_actions_plan ON cognitive_actions(plan_id)"
+        )
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_lessons_source ON cognitive_lessons(source)"
+        )
 
         # User profile indexes
-        c.execute("CREATE INDEX IF NOT EXISTS idx_interactions_type ON user_interactions(type)")
-        c.execute("CREATE INDEX IF NOT EXISTS idx_interactions_hour ON user_interactions(hour)")
-        c.execute("CREATE INDEX IF NOT EXISTS idx_interactions_created ON user_interactions(created_at)")
-        c.execute("CREATE INDEX IF NOT EXISTS idx_interactions_session ON user_interactions(session_id)")
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_interactions_type ON user_interactions(type)"
+        )
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_interactions_hour ON user_interactions(hour)"
+        )
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_interactions_created ON user_interactions(created_at)"
+        )
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_interactions_session ON user_interactions(session_id)"
+        )
         c.execute("CREATE INDEX IF NOT EXISTS idx_habits_name ON user_habits(name)")
-        c.execute("CREATE INDEX IF NOT EXISTS idx_workflows_name ON user_workflows(name)")
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_workflows_name ON user_workflows(name)"
+        )
 
         # Privacy indexes
-        c.execute("CREATE INDEX IF NOT EXISTS idx_consents_resource ON privacy_consents(resource)")
-        c.execute("CREATE INDEX IF NOT EXISTS idx_privacy_audit_event ON privacy_audit_log(event_type)")
-        c.execute("CREATE INDEX IF NOT EXISTS idx_privacy_audit_created ON privacy_audit_log(created_at)")
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_consents_resource ON privacy_consents(resource)"
+        )
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_privacy_audit_event ON privacy_audit_log(event_type)"
+        )
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_privacy_audit_created ON privacy_audit_log(created_at)"
+        )
 
         # Attention indexes
-        c.execute("CREATE INDEX IF NOT EXISTS idx_attention_state ON cognitive_attention_history(state)")
-        c.execute("CREATE INDEX IF NOT EXISTS idx_attention_created ON cognitive_attention_history(created_at)")
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_attention_state ON cognitive_attention_history(state)"
+        )
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_attention_created ON cognitive_attention_history(created_at)"
+        )
 
 
 # Auto-initialize on import

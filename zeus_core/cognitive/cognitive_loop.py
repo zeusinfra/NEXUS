@@ -7,12 +7,12 @@ The autonomous brain loop that continuously:
 
 Runs as an asyncio task with configurable interval and clean shutdown.
 """
+
 from __future__ import annotations
 
 import asyncio
 import os
 import sqlite3
-import time
 import uuid
 from datetime import datetime, timezone, date
 from typing import Any
@@ -38,11 +38,12 @@ logger = get_logger("zeus.cognitive.loop")
 
 # Configuration
 from zeus_core.runtime.resource_governor import resource_governor
-from zeus_core.events.event_bus import event_bus, EventType
+
 DB_PATH = os.getenv("ZEUS_DB_PATH", "./zeus_events.db")
 MEMORY_DB_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-    "data", "zeus_memory.db",
+    "data",
+    "zeus_memory.db",
 )
 
 
@@ -71,13 +72,20 @@ class CognitiveLoop:
         self.orchestrator = PriorityOrchestrator(db_path=db_path)
         self.predictive = PredictiveEngine(db_path=db_path)
         from zeus_core.security.privacy_guard import PrivacyGuard
+
         self.privacy = PrivacyGuard(db_path=db_path)
         from zeus_core.cognitive.self_healing import SelfHealingEngine
+
         self.self_healing = SelfHealingEngine(db_path=db_path)
-        
+
         # New Observer Agent
         from zeus_core.core_system import ObserverAgent
-        self.observer = ObserverAgent(core_path=os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+        self.observer = ObserverAgent(
+            core_path=os.path.dirname(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            )
+        )
         self._cycle_count = 0
 
         # Track daily reflection
@@ -93,9 +101,13 @@ class CognitiveLoop:
         self._running = True
         self._stop_event.clear()
         cognitive_state_manager.mark_started()
-        log_event(logger, 20, "cognitive_loop_started",
-                  interval=int(os.getenv("ZEUS_COGNITIVE_INTERVAL_DEFAULT", "20")),
-                  mode=cognitive_state_manager.state.mode)
+        log_event(
+            logger,
+            20,
+            "cognitive_loop_started",
+            interval=int(os.getenv("ZEUS_COGNITIVE_INTERVAL_DEFAULT", "20")),
+            mode=cognitive_state_manager.state.mode,
+        )
 
         try:
             await self._run()
@@ -135,11 +147,13 @@ class CognitiveLoop:
                 if mode == "idle":
                     base_interval = int(os.getenv("ZEUS_COGNITIVE_INTERVAL_IDLE", "60"))
                 elif mode == "active":
-                    base_interval = int(os.getenv("ZEUS_COGNITIVE_INTERVAL_ACTIVE", "10"))
-                
+                    base_interval = int(
+                        os.getenv("ZEUS_COGNITIVE_INTERVAL_ACTIVE", "10")
+                    )
+
                 # Governor override
                 interval = resource_governor.get_cognitive_interval(base_interval)
-                
+
                 await asyncio.wait_for(
                     self._stop_event.wait(),
                     timeout=interval,
@@ -155,7 +169,7 @@ class CognitiveLoop:
 
         # Phase 1: Perceive
         perception = self._perceive()
-        
+
         # 🛡️ Pillar 3: Privacy Shield (Cognitive Shielding)
         # Mask secrets in perception BEFORE analysis or planning
         perception = self.privacy.sanitize_perception(perception)
@@ -211,11 +225,20 @@ class CognitiveLoop:
 
                     self.goal_engine.link_plan(goal.id, plan.id)
                     actions_executed += sum(1 for r in results if r.status == "success")
-                    actions_blocked += sum(1 for r in results if r.status in {"blocked", "requires_confirmation"})
+                    actions_blocked += sum(
+                        1
+                        for r in results
+                        if r.status in {"blocked", "requires_confirmation"}
+                    )
 
                 except Exception as e:
-                    log_event(logger, 40, "goal_processing_error",
-                              goal_id=goal.id, error=str(e))
+                    log_event(
+                        logger,
+                        40,
+                        "goal_processing_error",
+                        goal_id=goal.id,
+                        error=str(e),
+                    )
                     self.goal_engine.update_status(goal.id, "failed")
 
         # Cycle reflection
@@ -249,21 +272,28 @@ class CognitiveLoop:
             health_score=health,
             attention=perception.get("attention"),
             active_goals_list=[
-                {"title": self._goal_value(g, "title"), "type": self._goal_value(g, "type")}
+                {
+                    "title": self._goal_value(g, "title"),
+                    "type": self._goal_value(g, "type"),
+                }
                 for g in orch_result.selected_goals
             ],
             privacy_status={
                 "shield": "active",
-                "masked_count": self.privacy.session_masked_count
-            }
+                "masked_count": self.privacy.session_masked_count,
+            },
         )
 
-        log_event(logger, 20, "cycle_complete",
-                  cycle_id=cycle_id,
-                  goals_created=goals_created,
-                  actions_executed=actions_executed,
-                  actions_blocked=actions_blocked,
-                  health=health)
+        log_event(
+            logger,
+            20,
+            "cycle_complete",
+            cycle_id=cycle_id,
+            goals_created=goals_created,
+            actions_executed=actions_executed,
+            actions_blocked=actions_blocked,
+            health=health,
+        )
 
     # ------------------------------------------------------------------
     # Phase implementations
@@ -319,7 +349,9 @@ class CognitiveLoop:
             c.execute("SELECT COUNT(*) as cnt FROM nodes")
             node_count = c.fetchone()["cnt"]
             c.execute("SELECT path, weight FROM nodes ORDER BY weight DESC LIMIT 5")
-            hot_nodes = [{"path": r["path"], "weight": r["weight"]} for r in c.fetchall()]
+            hot_nodes = [
+                {"path": r["path"], "weight": r["weight"]} for r in c.fetchall()
+            ]
             mem_conn.close()
             perception["memory"] = {
                 "total_nodes": node_count,
@@ -332,7 +364,9 @@ class CognitiveLoop:
         try:
             attention = self.attention_engine.get_current_attention()
             perception["attention"] = attention.to_dict()
-            perception["temporal"] = self.user_profile.build_temporal_context().to_dict()
+            perception["temporal"] = (
+                self.user_profile.build_temporal_context().to_dict()
+            )
             perception["user_session"] = self.user_profile.get_current_session_summary()
         except Exception:
             perception["attention"] = {"state": "idle"}
@@ -342,18 +376,26 @@ class CognitiveLoop:
         # Visual Context (Pillar 1)
         # Capture screen every 10 cycles (approx 5 mins at 30s interval) or if user is active
         self._cycle_count += 1
-        if self._cycle_count % 10 == 0 or perception.get("user_session", {}).get("active"):
-             try:
-                 # Fazemos a observação em uma thread separada para não travar o loop
-                 visual_desc = self.observer.observe_screen(self.goal_engine.blackboard, question="Descreva brevemente as janelas ativas e o que o usuário parece estar fazendo.")
-                 perception["visual_context"] = visual_desc
-             except Exception as e:
-                 logger.error(f"Vision error in loop: {e}")
+        if self._cycle_count % 10 == 0 or perception.get("user_session", {}).get(
+            "active"
+        ):
+            try:
+                # Fazemos a observação em uma thread separada para não travar o loop
+                visual_desc = self.observer.observe_screen(
+                    self.goal_engine.blackboard,
+                    question="Descreva brevemente as janelas ativas e o que o usuário parece estar fazendo.",
+                )
+                perception["visual_context"] = visual_desc
+            except Exception as e:
+                logger.error(f"Vision error in loop: {e}")
 
         # Silent Mode / Deep Work Detection (Phase 4)
         active = perception.get("user_session", {}).get("active", False)
         # Se o usuário está ativo por mais de 10 min com janelas de 'dev', entramos em Deep Work
-        is_dev_window = any(x in str(perception.get("visual_context", "")).lower() for x in ["code", "terminal", "nvim", "cursor"])
+        is_dev_window = any(
+            x in str(perception.get("visual_context", "")).lower()
+            for x in ["code", "terminal", "nvim", "cursor"]
+        )
         if active and is_dev_window:
             perception["cognitive_mode"] = "deep_work"
             logger.info("Deep Work detected. Activating Cognitive Firewall.")
@@ -369,7 +411,9 @@ class CognitiveLoop:
             summary_parts.append(f"RAM alta ({sys['ram_percent']}%)")
         if perception.get("pending_events", 0) > 50:
             summary_parts.append(f"{perception['pending_events']} eventos pendentes")
-        perception["summary"] = "; ".join(summary_parts) if summary_parts else "Sistema estável"
+        perception["summary"] = (
+            "; ".join(summary_parts) if summary_parts else "Sistema estável"
+        )
 
         return perception
 
@@ -431,25 +475,36 @@ class CognitiveLoop:
         hot_nodes = perception.get("memory", {}).get("hot_nodes", [])
         for node in hot_nodes:
             if node.get("weight", 0) > 500:
-                analysis["patterns"].append({
-                    "type": "hot_node",
-                    "path": node["path"],
-                    "weight": node["weight"],
-                })
+                analysis["patterns"].append(
+                    {
+                        "type": "hot_node",
+                        "path": node["path"],
+                        "weight": node["weight"],
+                    }
+                )
 
         # Opportunities
         if not analysis["anomalies"] and not analysis["patterns"]:
-            analysis["opportunities"].append("Sistema ocioso — boa hora para reflexão profunda")
+            analysis["opportunities"].append(
+                "Sistema ocioso — boa hora para reflexão profunda"
+            )
 
         # User-Aware Analysis
         temporal = perception.get("temporal", {})
         if temporal.get("is_deep_focus"):
             # Reduce importance score during deep focus to avoid interrupting user
             analysis["importance_score"] = int(analysis["importance_score"] * 0.5)
-            analysis["patterns"].append({"type": "deep_focus_active", "label": "Usuário em foco profundo"})
+            analysis["patterns"].append(
+                {"type": "deep_focus_active", "label": "Usuário em foco profundo"}
+            )
 
         if temporal.get("is_late_night"):
-            analysis["patterns"].append({"type": "late_night_active", "label": "Operação noturna (baixa prioridade)"})
+            analysis["patterns"].append(
+                {
+                    "type": "late_night_active",
+                    "label": "Operação noturna (baixa prioridade)",
+                }
+            )
 
         # Modulate by Attention
         attention = perception.get("attention", {})
@@ -460,7 +515,10 @@ class CognitiveLoop:
             analysis["importance_score"] *= bias.get("performance", 1.0)
 
         # Suppression of noise
-        if attention.get("suggestion_suppression") and analysis["importance_score"] < 50:
+        if (
+            attention.get("suggestion_suppression")
+            and analysis["importance_score"] < 50
+        ):
             analysis["importance_score"] *= 0.5
             analysis["summary"] = "Ruído suprimido por foco ativo."
         elif not analysis["summary"]:
@@ -474,9 +532,11 @@ class CognitiveLoop:
         # Self-Healing Analysis (Pillar 3)
         issues = self.self_healing.scan_for_issues()
         if issues:
-            analysis["anomalies"].append({"type": "system_errors", "count": len(issues)})
+            analysis["anomalies"].append(
+                {"type": "system_errors", "count": len(issues)}
+            )
             analysis["importance_score"] += 20
-            
+
         return analysis
 
     def _generate_goals(self, analysis: dict, perception: dict | None = None) -> int:
@@ -557,7 +617,7 @@ class CognitiveLoop:
                 origin="predictive_engine",
                 priority=suggestion["priority"],
                 description=suggestion["description"],
-                risk=suggestion["risk"]
+                risk=suggestion["risk"],
             )
             if goal:
                 created += 1
@@ -582,20 +642,20 @@ class CognitiveLoop:
         """Generate daily reflection if not already done today."""
         try:
             state = cognitive_state_manager.state
-            
+
             # Build user summary for reflection
             profile = self.user_profile.build_temporal_context()
             user_summary = f"Sessão de {profile.session_duration_min}min ativa. Hábitos: {', '.join(profile.expected_habits)}."
-            
+
             self.reflection_engine.daily_reflection(
                 cycle_count=state.cycle_count,
                 health_score=state.health_score,
                 user_summary=user_summary,
             )
-            
+
             # Run Memory Compression (Pillar 3)
             self.memory_compression.compress_all()
-            
+
             self._last_daily_date = today
             log_event(logger, 20, "daily_reflection_generated", date=today)
 

@@ -1,5 +1,4 @@
 import os
-import asyncio
 import base64
 
 from zeus_core.response_text import speech_text
@@ -12,6 +11,7 @@ except ImportError:
 # Configuração da voz do ZEUS
 # Sugestão: pt-BR-AntonioNeural (Masculino, Profundo, Autoritário)
 VOICE = "pt-BR-AntonioNeural"
+
 
 class VoiceService:
     def __init__(self, output_dir="data/voice_temp"):
@@ -37,7 +37,7 @@ class VoiceService:
 
             with open(temp_file, "rb") as f:
                 audio_data = f.read()
-            
+
             # Retorna como base64 para clientes locais tocarem.
             return base64.b64encode(audio_data).decode("utf-8")
         except Exception as e:
@@ -52,5 +52,6 @@ class VoiceService:
         if not base64_str:
             return b""
         return base64.b64decode(base64_str)
+
 
 voice_service = VoiceService()

@@ -74,7 +74,9 @@ def cmd_control(parameters: dict) -> dict:
             check=False,
         )
     except FileNotFoundError as e:
-        raise ToolError(f"Comando não encontrado: {tokens[0] if tokens else command}") from e
+        raise ToolError(
+            f"Comando não encontrado: {tokens[0] if tokens else command}"
+        ) from e
     except subprocess.TimeoutExpired as e:
         raise ToolError(f"Timeout ao executar comando após {timeout_s}s.") from e
 
@@ -183,10 +185,20 @@ def file_controller(parameters: dict) -> dict:
             rel = str(child.relative_to(target))
             if glob and not fnmatch.fnmatch(child.name, glob):
                 continue
-            if needle and needle not in child.name.lower() and needle not in rel.lower():
+            if (
+                needle
+                and needle not in child.name.lower()
+                and needle not in rel.lower()
+            ):
                 continue
-            results.append({"path": str(child), "type": "dir" if child.is_dir() else "file"})
-        return {"path": str(target), "results": results, "truncated": len(results) >= max_results}
+            results.append(
+                {"path": str(child), "type": "dir" if child.is_dir() else "file"}
+            )
+        return {
+            "path": str(target),
+            "results": results,
+            "truncated": len(results) >= max_results,
+        }
 
     if action == "disk_usage":
         if not target.exists():
@@ -245,7 +257,9 @@ def screen_process(parameters: dict) -> dict:
 
         if analysis.get("mode") != "llm" and (do_ocr or auto):
             try:
-                analysis["ocr_fallback"] = analyze_with_ocr_fallback(cap["path"], question=question, ocr_lang=ocr_lang)
+                analysis["ocr_fallback"] = analyze_with_ocr_fallback(
+                    cap["path"], question=question, ocr_lang=ocr_lang
+                )
                 analysis["mode"] = analysis.get("mode") or "ocr"
             except Exception as e:
                 analysis["ocr_fallback_error"] = str(e)
@@ -285,7 +299,9 @@ def install_tesseract(parameters: dict) -> dict:
 
     instructions = []
     instructions.append("Ubuntu/Debian:")
-    instructions.append(f"  sudo apt update && sudo apt install -y tesseract-ocr tesseract-ocr-{lang}")
+    instructions.append(
+        f"  sudo apt update && sudo apt install -y tesseract-ocr tesseract-ocr-{lang}"
+    )
     instructions.append("Fedora:")
     instructions.append(f"  sudo dnf install -y tesseract tesseract-langpack-{lang}")
     instructions.append("Arch:")
@@ -295,7 +311,11 @@ def install_tesseract(parameters: dict) -> dict:
     instructions.append("Windows (Chocolatey):")
     instructions.append("  choco install tesseract")
 
-    return {**common, "distro_id": distro_id or None, "instructions": "\n".join(instructions)}
+    return {
+        **common,
+        "distro_id": distro_id or None,
+        "instructions": "\n".join(instructions),
+    }
 
 
 def system_capabilities(parameters: dict) -> dict:
@@ -336,7 +356,10 @@ def system_capabilities(parameters: dict) -> dict:
             "progress_events": os.getenv("ZEUS_AGENT_PROGRESS_EVENTS", "1"),
         },
         "privileged_actions": {
-            "root_daemon_enabled": os.getenv("ZEUS_ROOT_DAEMON_ENABLED", "0").strip().lower() in {"1", "true", "yes", "on"},
+            "root_daemon_enabled": os.getenv("ZEUS_ROOT_DAEMON_ENABLED", "0")
+            .strip()
+            .lower()
+            in {"1", "true", "yes", "on"},
             "socket": root_daemon_socket,
             "socket_exists": Path(root_daemon_socket).exists(),
         },
@@ -378,16 +401,17 @@ def obsidian_write_insight(parameters: dict) -> dict:
 
 def obsidian_mirror_filesystem(parameters: dict) -> dict:
     from apps.web_gui import memory_manager
+
     path = str((parameters or {}).get("path") or ".").strip()
     max_depth = int((parameters or {}).get("max_depth") or 3)
-    
+
     # Resolvendo o caminho. Se for ".", usa o root do projeto.
     # Se for absoluto, verifica se existe.
     root = _project_root()
     target = Path(path).expanduser()
     if not target.is_absolute():
         target = (root / target).resolve()
-    
+
     if not target.exists():
         raise ToolError(f"Caminho não encontrado: {target}")
 

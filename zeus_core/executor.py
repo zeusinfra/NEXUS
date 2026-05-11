@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from typing import Any, Awaitable, Callable, Dict, Optional
 
 from zeus_core.actions import get_actions
@@ -84,7 +83,11 @@ class PlanExecutor:
                     )
                 except Exception as e:
                     err = str(e)
-                    results[int(step_no) if step_no else -1] = {"ok": False, "tool": tool, "error": err}
+                    results[int(step_no) if step_no else -1] = {
+                        "ok": False,
+                        "tool": tool,
+                        "error": err,
+                    }
                     await self._broadcast(
                         broadcast,
                         {

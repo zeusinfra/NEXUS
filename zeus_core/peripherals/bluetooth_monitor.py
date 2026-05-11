@@ -1,4 +1,3 @@
-import asyncio
 import json
 import os
 import threading
@@ -9,6 +8,7 @@ from zeus_core.observability import get_logger
 
 logger = get_logger("zeus.peripherals.bluetooth_monitor")
 BACKEND = os.getenv("ZEUS_BACKEND_URL", "http://127.0.0.1:8080").rstrip("/")
+
 
 class BluetoothMonitor:
     """Monitora Bluetooth usando 'bluetoothctl monitor' (sem dependência de DBus/GI)."""
@@ -31,14 +31,14 @@ class BluetoothMonitor:
                 ["bluetoothctl", "monitor"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                text=True
+                text=True,
             )
-            
+
             while self._running:
                 line = self._process.stdout.readline()
                 if not line:
                     break
-                
+
                 # Detectar conexões e desconexões via Regex simples
                 # Exemplo: [CHG] Device 00:00:00:00:00:00 Connected: yes
                 if "Connected: yes" in line:
@@ -55,7 +55,7 @@ class BluetoothMonitor:
         # Tentar extrair o endereço MAC
         mac_match = re.search(r"([0-9A-F]{2}:){5}[0-9A-F]{2}", line, re.I)
         address = mac_match.group(0) if mac_match else "Desconhecido"
-        
+
         msg = f"🛡️ BLUETOOTH: Dispositivo {address} está agora {status}."
         logger.info(msg)
         self._announce(msg)
@@ -64,17 +64,32 @@ class BluetoothMonitor:
         def worker():
             try:
                 # Chat
-                payload = {"message": text, "source": "system_peripherals", "client_id": "bluetooth_monitor"}
-                req = urllib.request.Request(f"{BACKEND}/api/chat", data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"}, method="POST")
+                payload = {
+                    "message": text,
+                    "source": "system_peripherals",
+                    "client_id": "bluetooth_monitor",
+                }
+                req = urllib.request.Request(
+                    f"{BACKEND}/api/chat",
+                    data=json.dumps(payload).encode(),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
                 urllib.request.urlopen(req, timeout=5)
 
                 # TTS
                 tts_payload = {"text": text.replace("🛡️ ", "")}
-                tts_req = urllib.request.Request(f"{BACKEND}/api/tts", data=json.dumps(tts_payload).encode(), headers={"Content-Type": "application/json"}, method="POST")
+                tts_req = urllib.request.Request(
+                    f"{BACKEND}/api/tts",
+                    data=json.dumps(tts_payload).encode(),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
                 urllib.request.urlopen(tts_req, timeout=5)
-            except Exception as e:
+            except Exception:
                 pass
 
         threading.Thread(target=worker, daemon=True).start()
+
 
 bluetooth_monitor = BluetoothMonitor()

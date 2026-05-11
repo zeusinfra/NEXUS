@@ -1,8 +1,9 @@
 """Tests for the goal engine."""
+
 import pytest
 
 from zeus_core.cognitive.cognitive_db import init_cognitive_tables
-from zeus_core.cognitive.goal_engine import GoalEngine, CognitiveGoal
+from zeus_core.cognitive.goal_engine import GoalEngine
 
 
 @pytest.fixture
@@ -14,7 +15,9 @@ def engine(tmp_path):
 
 class TestGoalEngine:
     def test_create_goal(self, engine):
-        goal = engine.create_goal("Test goal", description="A test", goal_type="operational")
+        goal = engine.create_goal(
+            "Test goal", description="A test", goal_type="operational"
+        )
         assert goal is not None
         assert goal.title == "Test goal"
         assert goal.status == "pending"
@@ -34,7 +37,9 @@ class TestGoalEngine:
 
     def test_deduplication_substring(self, engine):
         g1 = engine.create_goal("Investigar uso elevado de CPU no servidor principal")
-        g2 = engine.create_goal("Investigar uso elevado de CPU no servidor principal extra")
+        g2 = engine.create_goal(
+            "Investigar uso elevado de CPU no servidor principal extra"
+        )
         assert g1 is not None
         assert g2 is None  # Substring match
 

@@ -17,7 +17,9 @@ class ConfigGuardTests(unittest.TestCase):
             validate_jwt_secret("", allow_insecure_dev_secret=True, production=True)
 
     def test_allows_dev_secret_only_outside_production(self):
-        secret = validate_jwt_secret("", allow_insecure_dev_secret=True, production=False)
+        secret = validate_jwt_secret(
+            "", allow_insecure_dev_secret=True, production=False
+        )
         self.assertEqual(secret, "dev_only_change_me_zeus_jwt_secret")
 
     def test_rejects_remote_bind_without_lan_auth(self):
@@ -50,7 +52,11 @@ class ConfigGuardTests(unittest.TestCase):
         validate_lan_security(config)
 
     def test_openai_provider_requires_key(self):
-        with patch.dict(os.environ, {"ZEUS_LLM_PROVIDER": "openai", "OPENAI_API_KEY": ""}, clear=True):
+        with patch.dict(
+            os.environ,
+            {"ZEUS_LLM_PROVIDER": "openai", "OPENAI_API_KEY": ""},
+            clear=True,
+        ):
             with self.assertRaisesRegex(RuntimeError, "OPENAI_API_KEY"):
                 validate_llm_config()
 

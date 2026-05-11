@@ -16,6 +16,7 @@ Request:
 Response:
     {"status": "success|blocked|requires_approval|error", ...}
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -29,11 +30,12 @@ import subprocess
 import uuid
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 # ---------------------------------------------------------------------------
 # Risk levels
 # ---------------------------------------------------------------------------
+
 
 class RiskLevel(str, Enum):
     READ_ONLY = "READ_ONLY"
@@ -71,7 +73,10 @@ FORBIDDEN_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"\biptables\b"), "iptables — firewall"),
     (re.compile(r"\bnftables\b|\bnft\b"), "nftables — firewall"),
     # Shutdown / reboot
-    (re.compile(r"\bshutdown\b|\breboot\b|\bpoweroff\b|\bhalt\b"), "interrupção do sistema"),
+    (
+        re.compile(r"\bshutdown\b|\breboot\b|\bpoweroff\b|\bhalt\b"),
+        "interrupção do sistema",
+    ),
     # Permissões perigosas
     (re.compile(r"\bchmod\b.*\b777\b.*\s+/"), "chmod 777 no root"),
     (re.compile(r"\bchown\b.*-R\b.*\s+/"), "chown -R no root"),
@@ -79,14 +84,54 @@ FORBIDDEN_PATTERNS: list[tuple[re.Pattern, str]] = [
 
 # Comandos READ_ONLY conhecidos
 READ_ONLY_COMMANDS = {
-    "ls", "pwd", "echo", "cat", "head", "tail", "wc", "file", "stat",
-    "find", "rg", "grep", "awk", "sed",
-    "df", "free", "uptime", "lscpu", "lsblk", "lspci", "lsusb",
-    "ip", "ss", "hostname", "uname", "whoami", "id", "groups",
-    "systemctl", "journalctl", "ps", "top", "htop", "neofetch",
-    "dpkg", "apt",
-    "git", "python3", "node", "npm", "cargo",
-    "date", "cal", "which", "whereis", "type", "env", "printenv",
+    "ls",
+    "pwd",
+    "echo",
+    "cat",
+    "head",
+    "tail",
+    "wc",
+    "file",
+    "stat",
+    "find",
+    "rg",
+    "grep",
+    "awk",
+    "sed",
+    "df",
+    "free",
+    "uptime",
+    "lscpu",
+    "lsblk",
+    "lspci",
+    "lsusb",
+    "ip",
+    "ss",
+    "hostname",
+    "uname",
+    "whoami",
+    "id",
+    "groups",
+    "systemctl",
+    "journalctl",
+    "ps",
+    "top",
+    "htop",
+    "neofetch",
+    "dpkg",
+    "apt",
+    "git",
+    "python3",
+    "node",
+    "npm",
+    "cargo",
+    "date",
+    "cal",
+    "which",
+    "whereis",
+    "type",
+    "env",
+    "printenv",
 }
 
 # Comandos de serviço permitidos explicitamente
@@ -95,9 +140,26 @@ ZEUS_SERVICES = {"zeus_core", "zeus-root-daemon", "zeus-gtk-chat", "zeus"}
 
 # Subcomandos que tornam um comando read-only em escrita
 WRITE_SUBCOMMANDS = {
-    "apt": {"install", "remove", "purge", "upgrade", "dist-upgrade", "autoremove", "full-upgrade"},
+    "apt": {
+        "install",
+        "remove",
+        "purge",
+        "upgrade",
+        "dist-upgrade",
+        "autoremove",
+        "full-upgrade",
+    },
     "dpkg": {"-i", "--install", "-r", "--remove", "-P", "--purge"},
-    "systemctl": {"start", "stop", "restart", "enable", "disable", "mask", "unmask", "reload"},
+    "systemctl": {
+        "start",
+        "stop",
+        "restart",
+        "enable",
+        "disable",
+        "mask",
+        "unmask",
+        "reload",
+    },
     "git": {"push", "commit", "merge", "rebase", "reset", "checkout", "branch", "tag"},
     "pip": {"install", "uninstall"},
     "pip3": {"install", "uninstall"},
@@ -115,9 +177,7 @@ APT_ALLOWLIST_DEFAULT = (
 
 # Caminhos permitidos para edição
 ALLOWED_EDIT_PATHS_DEFAULT = (
-    "/home/zeus/Documentos/ZEUS_SYSTEM,"
-    "/home/zeus/Documentos/Brain,"
-    "/tmp/zeus_"
+    "/home/zeus/Documentos/ZEUS_SYSTEM,/home/zeus/Documentos/Brain,/tmp/zeus_"
 )
 
 
@@ -125,28 +185,36 @@ ALLOWED_EDIT_PATHS_DEFAULT = (
 # Configuration
 # ---------------------------------------------------------------------------
 
+
 def _get_socket_path() -> str:
     return os.getenv("ZEUS_DAEMON_SOCKET", "/tmp/zeus/daemon.sock")
+
 
 def _get_approval_socket_path() -> str:
     return os.getenv("ZEUS_DAEMON_APPROVAL_SOCKET", "/tmp/zeus/approval.sock")
 
+
 def _get_vault_path() -> str:
     return os.getenv("ZEUS_VAULT_PATH", "/home/zeus/Documentos/Brain")
 
+
 def _get_autonomy_level() -> str:
     return os.getenv("ZEUS_AUTONOMY_LEVEL", "GUARDED").upper()
+
 
 def _get_apt_allowlist() -> set[str]:
     raw = os.getenv("ZEUS_APT_ALLOWLIST", APT_ALLOWLIST_DEFAULT)
     return {p.strip() for p in raw.split(",") if p.strip()}
 
+
 def _get_allowed_edit_paths() -> list[str]:
     raw = os.getenv("ZEUS_ALLOWED_EDIT_PATHS", ALLOWED_EDIT_PATHS_DEFAULT)
     return [p.strip() for p in raw.split(",") if p.strip()]
 
+
 def _get_backup_root() -> Path:
     return Path(_get_vault_path()) / "backups" / "daemon"
+
 
 def _get_audit_path() -> Path:
     return Path(_get_vault_path()) / "logs" / "daemon_audit.jsonl"
@@ -155,6 +223,7 @@ def _get_audit_path() -> Path:
 # ---------------------------------------------------------------------------
 # Risk Classifier (absorvido do antigo SudoBroker)
 # ---------------------------------------------------------------------------
+
 
 def classify_risk(command: str) -> tuple[RiskLevel, str]:
     """Classifica o risco de um comando. Retorna (nível, motivo)."""
@@ -175,7 +244,10 @@ def classify_risk(command: str) -> tuple[RiskLevel, str]:
         if len(parts) > 1:
             dest = parts[-1].strip().split()[0] if parts[-1].strip() else ""
             if dest and not any(dest.startswith(p) for p in allowed_paths):
-                return RiskLevel.FORBIDDEN, f"edição fora dos caminhos permitidos: {dest}"
+                return (
+                    RiskLevel.FORBIDDEN,
+                    f"edição fora dos caminhos permitidos: {dest}",
+                )
 
     # 3. Extrair executável base
     try:
@@ -229,6 +301,7 @@ def classify_risk(command: str) -> tuple[RiskLevel, str]:
 # Audit Logger
 # ---------------------------------------------------------------------------
 
+
 class AuditLogger:
     """Grava eventos de auditoria em JSONL."""
 
@@ -274,6 +347,7 @@ class AuditLogger:
 # Backup Manager (integrado ao daemon)
 # ---------------------------------------------------------------------------
 
+
 class BackupManager:
     """Gerencia backups antes de ações de escrita."""
 
@@ -283,11 +357,19 @@ class BackupManager:
 
     def create(self, paths: list[str]) -> str:
         """Cria backup dos arquivos. Retorna backup_id."""
-        backup_id = datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex[:6]
+        backup_id = (
+            datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            + "_"
+            + uuid.uuid4().hex[:6]
+        )
         target_dir = self._root / backup_id
         target_dir.mkdir(parents=True, exist_ok=True)
 
-        manifest = {"id": backup_id, "ts": datetime.datetime.now().isoformat(), "files": []}
+        manifest = {
+            "id": backup_id,
+            "ts": datetime.datetime.now().isoformat(),
+            "files": [],
+        }
 
         for path_str in paths:
             src = Path(path_str)
@@ -299,11 +381,13 @@ class BackupManager:
                 dest = target_dir / rel
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(src, dest)
-                manifest["files"].append({
-                    "original": str(src),
-                    "backup": str(dest),
-                    "size": src.stat().st_size,
-                })
+                manifest["files"].append(
+                    {
+                        "original": str(src),
+                        "backup": str(dest),
+                        "size": src.stat().st_size,
+                    }
+                )
 
         # Salvar manifest
         (target_dir / "manifest.json").write_text(
@@ -341,11 +425,13 @@ class BackupManager:
                 if manifest_path.exists():
                     try:
                         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-                        backups.append({
-                            "id": manifest.get("id", d.name),
-                            "ts": manifest.get("ts"),
-                            "file_count": len(manifest.get("files", [])),
-                        })
+                        backups.append(
+                            {
+                                "id": manifest.get("id", d.name),
+                                "ts": manifest.get("ts"),
+                                "file_count": len(manifest.get("files", [])),
+                            }
+                        )
                     except Exception:
                         backups.append({"id": d.name, "ts": None, "file_count": 0})
         return backups
@@ -369,6 +455,7 @@ class BackupManager:
 # ---------------------------------------------------------------------------
 # Approval System
 # ---------------------------------------------------------------------------
+
 
 class ApprovalManager:
     """Gerencia pedidos de aprovação pendentes."""
@@ -420,6 +507,7 @@ class ApprovalManager:
 # Command Executor
 # ---------------------------------------------------------------------------
 
+
 def _run_command(command: str, timeout: int = 60) -> Dict[str, Any]:
     """Executa um comando e retorna resultado."""
     try:
@@ -446,6 +534,7 @@ def _run_command(command: str, timeout: int = 60) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 # RootDaemon Server
 # ---------------------------------------------------------------------------
+
 
 class RootDaemon:
     """Daemon principal do ZEUS. Único processo com capacidades elevadas."""
@@ -503,8 +592,14 @@ class RootDaemon:
                     backup_id=backup_id,
                     rollback_plan=rollback_plan,
                 )
-                self.audit.log(command, risk, "PENDING_APPROVAL", risk_reason, caller,
-                               {"approval_id": approval_id})
+                self.audit.log(
+                    command,
+                    risk,
+                    "PENDING_APPROVAL",
+                    risk_reason,
+                    caller,
+                    {"approval_id": approval_id},
+                )
                 return {
                     "status": "requires_approval",
                     "message": "Comando de alto risco requer aprovação humana.",
@@ -526,8 +621,14 @@ class RootDaemon:
             result["backup_id"] = backup_id
 
         # 6. Auditoria
-        self.audit.log(command, risk, result["status"], reason, caller,
-                       {"backup_id": backup_id} if backup_id else None)
+        self.audit.log(
+            command,
+            risk,
+            result["status"],
+            reason,
+            caller,
+            {"backup_id": backup_id} if backup_id else None,
+        )
 
         return result
 
@@ -537,7 +638,9 @@ class RootDaemon:
         if not paths:
             return {"status": "error", "message": "Nenhum path fornecido."}
         backup_id = self.backup.create(paths)
-        self.audit.log("backup", RiskLevel.READ_ONLY, "SUCCESS", f"Backup criado: {backup_id}")
+        self.audit.log(
+            "backup", RiskLevel.READ_ONLY, "SUCCESS", f"Backup criado: {backup_id}"
+        )
         return {"status": "success", "backup_id": backup_id}
 
     async def handle_rollback(self, payload: dict) -> dict:
@@ -546,8 +649,12 @@ class RootDaemon:
         if not backup_id:
             return {"status": "error", "message": "backup_id não fornecido."}
         result = self.backup.restore(backup_id)
-        self.audit.log("rollback", RiskLevel.MEDIUM_RISK, result["status"],
-                       f"Rollback: {backup_id}")
+        self.audit.log(
+            "rollback",
+            RiskLevel.MEDIUM_RISK,
+            result["status"],
+            f"Rollback: {backup_id}",
+        )
         return result
 
     async def handle_list_backups(self, payload: dict) -> dict:
@@ -566,19 +673,35 @@ class RootDaemon:
 
         req = self.approval.resolve(approval_id, allowed)
         if not req:
-            return {"status": "error", "message": "Aprovação não encontrada ou já resolvida."}
+            return {
+                "status": "error",
+                "message": "Aprovação não encontrada ou já resolvida.",
+            }
 
         if allowed:
             # Executar o comando aprovado
-            self.audit.log(req["command"], RiskLevel.HIGH_RISK, "APPROVED", "Aprovado pelo usuário")
+            self.audit.log(
+                req["command"], RiskLevel.HIGH_RISK, "APPROVED", "Aprovado pelo usuário"
+            )
             result = await asyncio.to_thread(_run_command, req["command"])
             result["approval_id"] = approval_id
             result["risk_level"] = req["risk"]
-            self.audit.log(req["command"], RiskLevel.HIGH_RISK, result["status"], "Execução pós-aprovação")
+            self.audit.log(
+                req["command"],
+                RiskLevel.HIGH_RISK,
+                result["status"],
+                "Execução pós-aprovação",
+            )
             return result
         else:
-            self.audit.log(req["command"], RiskLevel.HIGH_RISK, "DENIED", "Negado pelo usuário")
-            return {"status": "denied", "message": "Comando negado pelo usuário.", "approval_id": approval_id}
+            self.audit.log(
+                req["command"], RiskLevel.HIGH_RISK, "DENIED", "Negado pelo usuário"
+            )
+            return {
+                "status": "denied",
+                "message": "Comando negado pelo usuário.",
+                "approval_id": approval_id,
+            }
 
     async def handle_pending_approvals(self, payload: dict) -> dict:
         """Retorna aprovações pendentes."""
@@ -589,35 +712,37 @@ class RootDaemon:
         commands = payload.get("commands") or []
         reason = payload.get("reason", "Batch execution")
         context = payload.get("context") or {}
-        
+
         results = []
         for cmd_entry in commands:
             # Se for apenas string, converte pra dict
             if isinstance(cmd_entry, str):
                 cmd_entry = {"command": cmd_entry}
-            
+
             # Executa usando o handle_execute existente
-            res = await self.handle_execute({
-                "command": cmd_entry.get("command"),
-                "reason": reason,
-                "context": context
-            })
+            res = await self.handle_execute(
+                {
+                    "command": cmd_entry.get("command"),
+                    "reason": reason,
+                    "context": context,
+                }
+            )
             results.append(res)
-            
+
             # Se um falhar em modo transacional, para (opcional)
             if res.get("status") in ("failed", "blocked", "requires_approval"):
                 break
-                
+
         return {"status": "success", "results": results}
 
     async def handle_service_control(self, payload: dict) -> dict:
         """Controla serviços do ZEUS de forma segura."""
         service = payload.get("service")
         action = payload.get("service_action")
-        
+
         if service not in ZEUS_SERVICES or action not in SERVICE_COMMANDS:
             return {"status": "blocked", "message": "Serviço ou ação não permitida."}
-            
+
         cmd = f"systemctl --user {action} {service}"
         return await asyncio.to_thread(_run_command, cmd)
 
@@ -645,7 +770,9 @@ class RootDaemon:
 
     # --- Server ---
 
-    async def handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+    async def handle_client(
+        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ):
         try:
             data = await asyncio.wait_for(reader.readline(), timeout=30.0)
             if not data:
@@ -685,7 +812,9 @@ class RootDaemon:
         if socket_path.exists():
             socket_path.unlink()
 
-        server = await asyncio.start_unix_server(self.handle_client, path=str(socket_path))
+        server = await asyncio.start_unix_server(
+            self.handle_client, path=str(socket_path)
+        )
 
         # Permissões restritas: owner + group
         os.chmod(str(socket_path), 0o660)
@@ -712,6 +841,7 @@ class RootDaemon:
 # ---------------------------------------------------------------------------
 # Entrypoint
 # ---------------------------------------------------------------------------
+
 
 async def main():
     daemon = RootDaemon()

@@ -4,6 +4,7 @@ ZEUS Cognitive Core — Learning Engine.
 Learns from execution results, stores operational lessons,
 detects repeated failures, and adjusts goal priorities.
 """
+
 from __future__ import annotations
 
 import json
@@ -56,7 +57,6 @@ class CognitiveLearningEngine:
     ) -> Lesson | None:
         """Evaluate execution results and extract a lesson."""
         goal_dict = goal.to_dict() if hasattr(goal, "to_dict") else goal
-        plan_dict = plan.to_dict() if hasattr(plan, "to_dict") else plan
 
         # Count outcomes
         successes = sum(1 for r in results if self._status(r) == "success")
@@ -104,7 +104,9 @@ class CognitiveLearningEngine:
             confidence = 0.5
             tags = [goal_type, "mixed"]
 
-        return self.store_lesson(lesson_text, source=source, confidence=confidence, tags=tags)
+        return self.store_lesson(
+            lesson_text, source=source, confidence=confidence, tags=tags
+        )
 
     # ------------------------------------------------------------------
     # Goal priority adjustment
@@ -146,10 +148,12 @@ class CognitiveLearningEngine:
 
         failures = []
         for row in rows:
-            failures.append({
-                "lesson": row["lesson"],
-                "count": row["cnt"],
-            })
+            failures.append(
+                {
+                    "lesson": row["lesson"],
+                    "count": row["cnt"],
+                }
+            )
 
         if failures:
             log_event(logger, 30, "repeated_failures_detected", count=len(failures))
@@ -182,15 +186,29 @@ class CognitiveLearningEngine:
             conn.execute(
                 "INSERT INTO cognitive_lessons (id, lesson, source, confidence, tags, created_at) "
                 "VALUES (?, ?, ?, ?, ?, ?)",
-                (entry.id, entry.lesson, entry.source, entry.confidence,
-                 json.dumps(entry.tags), entry.created_at),
+                (
+                    entry.id,
+                    entry.lesson,
+                    entry.source,
+                    entry.confidence,
+                    json.dumps(entry.tags),
+                    entry.created_at,
+                ),
             )
 
-        log_event(logger, 20, "lesson_stored",
-                  lesson_id=entry.id, source=source, confidence=confidence)
+        log_event(
+            logger,
+            20,
+            "lesson_stored",
+            lesson_id=entry.id,
+            source=source,
+            confidence=confidence,
+        )
         return entry
 
-    def list_lessons(self, *, limit: int = 20, source: str | None = None) -> list[Lesson]:
+    def list_lessons(
+        self, *, limit: int = 20, source: str | None = None
+    ) -> list[Lesson]:
         query = "SELECT * FROM cognitive_lessons WHERE 1=1"
         params: list = []
         if source:

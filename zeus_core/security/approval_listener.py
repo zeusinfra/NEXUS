@@ -5,6 +5,7 @@ Roda como thread/task dentro do zeus-gtk-chat ou como processo standalone.
 Faz polling no daemon a cada 2s por aprovações pendentes.
 Quando encontra uma, mostra o ApprovalDialog e envia a resolução de volta ao daemon.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -13,12 +14,12 @@ import os
 import subprocess
 import sys
 import threading
-from typing import Optional
 
 # Importação condicional do GTK (pode rodar sem GUI em modo headless)
 _GTK_AVAILABLE = False
 try:
     import gi
+
     gi.require_version("Gtk", "4.0")
     _GTK_AVAILABLE = True
 except (ImportError, ValueError):
@@ -40,6 +41,7 @@ class ApprovalListener:
     def _get_client(self):
         if self._daemon_client is None:
             from zeus_core.security.daemon_client import DaemonClient
+
             self._daemon_client = DaemonClient()
         return self._daemon_client
 
@@ -68,7 +70,8 @@ class ApprovalListener:
             data_json = json.dumps(approval_data)
             result = subprocess.run(
                 [
-                    sys.executable, "-m",
+                    sys.executable,
+                    "-m",
                     "zeus_core.security.approval_dialog",
                     data_json,
                 ],
@@ -136,11 +139,12 @@ approval_listener = ApprovalListener()
 # GLib integration (para usar dentro do zeus-gtk-chat)
 # ---------------------------------------------------------------------------
 
+
 def start_approval_listener_glib(on_pending_callback=None):
     """
     Inicia o listener de aprovações integrado ao GLib main loop.
     Usado pelo zeus-gtk-chat para mostrar dialogs inline.
-    
+
     on_pending_callback: chamado com (approval_data) quando há aprovação pendente.
                          Se None, usa subprocess para mostrar dialog.
     """
@@ -156,6 +160,7 @@ def start_approval_listener_glib(on_pending_callback=None):
     def _check():
         try:
             import asyncio
+
             loop = asyncio.new_event_loop()
             pending = loop.run_until_complete(listener.poll_once())
             loop.close()

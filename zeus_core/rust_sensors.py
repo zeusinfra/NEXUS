@@ -23,7 +23,13 @@ def _load_sensor_engine():
     except Exception as exc:
         log_event(logger, 30, "rust_sensors_import_failed", error=str(exc))
 
-    local_extension = Path(__file__).resolve().parents[1] / "core-rust" / "target" / "release" / "libzeus_sensors.so"
+    local_extension = (
+        Path(__file__).resolve().parents[1]
+        / "core-rust"
+        / "target"
+        / "release"
+        / "libzeus_sensors.so"
+    )
     if not local_extension.exists():
         return None
 

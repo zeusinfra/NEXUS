@@ -1,17 +1,18 @@
 import os
-import re
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 from zeus_core.path_filters import is_runtime_noise_path
 from zeus_core.memory_manager import MemoryManager
+
 
 class FilesystemMirror:
     """
     ZEUS Filesystem Mirror
     Maps OS directories and files into Obsidian markdown notes with hierarchical and synaptic links.
     """
+
     def __init__(self, memory_manager: Optional[MemoryManager] = None):
         self.memory_manager = memory_manager
         self.vault_path = os.getenv("ZEUS_VAULT_PATH", "/home/zeus/Documentos/Brain")
@@ -37,10 +38,10 @@ class FilesystemMirror:
         if current_path.is_dir():
             if depth > max_depth:
                 return 0
-            
+
             self._create_folder_note(current_path)
             processed_count = 1
-            
+
             try:
                 for item in current_path.iterdir():
                     processed_count += self._process_node(item, depth + 1, max_depth)
@@ -58,10 +59,10 @@ class FilesystemMirror:
         # Se for a raiz, usamos um nome especial
         if str(original_path) == "/":
             return os.path.join(self.mirror_root, "root.md")
-        
+
         # Remove a barra inicial para construir o caminho relativo dentro do mirror_root
         rel_path = str(original_path).lstrip("/")
-        
+
         if original_path.is_dir():
             # Para diretórios, criamos uma pasta e uma nota com o mesmo nome dentro dela (padrão Folder Note)
             return os.path.join(self.mirror_root, rel_path, f"{original_path.name}.md")
@@ -73,7 +74,7 @@ class FilesystemMirror:
         """Generates a note for a directory."""
         mirror_path = self._get_mirror_file_path(path)
         os.makedirs(os.path.dirname(mirror_path), exist_ok=True)
-        
+
         children = []
         try:
             for item in path.iterdir():
@@ -90,7 +91,7 @@ class FilesystemMirror:
             f"**Data de Mapeamento:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
             "",
             "## Conteúdo",
-            ""
+            "",
         ]
 
         # Parent link
@@ -111,7 +112,7 @@ class FilesystemMirror:
                 content.append("")
                 content.append("## Inteligência ZEUS")
                 content.append(f"- **Peso Sináptico:** `{weight}`")
-                
+
                 related = self.memory_manager.get_working_context(str(path), limit=5)
                 if related:
                     content.append("- **Nós Relacionados (Sinapses):**")
@@ -120,14 +121,14 @@ class FilesystemMirror:
                         r_mirror = Path(self._get_mirror_file_path(r_path)).stem
                         content.append(f"  - [[{r_mirror}|{r_path.name}]]")
 
-        with open(mirror_path, 'w', encoding='utf-8') as f:
+        with open(mirror_path, "w", encoding="utf-8") as f:
             f.write("\n".join(content))
 
     def _create_file_note(self, path: Path):
         """Generates a note for a file."""
         mirror_path = self._get_mirror_file_path(path)
         os.makedirs(os.path.dirname(mirror_path), exist_ok=True)
-        
+
         size_bytes = 0
         try:
             size_bytes = path.stat().st_size
@@ -147,7 +148,9 @@ class FilesystemMirror:
         # Parent link
         if path.parent:
             parent_mirror = Path(self._get_mirror_file_path(path.parent)).stem
-            content.append(f"**Localização:** [[{parent_mirror}|📁 {path.parent.name}]]")
+            content.append(
+                f"**Localização:** [[{parent_mirror}|📁 {path.parent.name}]]"
+            )
 
         # Synaptic Context
         if self.memory_manager:
@@ -156,7 +159,7 @@ class FilesystemMirror:
                 content.append("")
                 content.append("## Inteligência ZEUS")
                 content.append(f"- **Peso Sináptico:** `{weight}`")
-                
+
                 related = self.memory_manager.get_working_context(str(path), limit=5)
                 if related:
                     content.append("- **Conexões Sinápticas:**")
@@ -165,7 +168,7 @@ class FilesystemMirror:
                         r_mirror = Path(self._get_mirror_file_path(r_path)).stem
                         content.append(f"  - [[{r_mirror}|{r_path.name}]]")
 
-        with open(mirror_path, 'w', encoding='utf-8') as f:
+        with open(mirror_path, "w", encoding="utf-8") as f:
             f.write("\n".join(content))
 
     def _get_synaptic_weight(self, path: str) -> int:
@@ -173,10 +176,11 @@ class FilesystemMirror:
         if not self.memory_manager:
             return 0
         import sqlite3
+
         try:
             conn = sqlite3.connect(self.memory_manager.db_path)
             cursor = conn.cursor()
-            cursor.execute('SELECT weight FROM nodes WHERE path = ?', (path,))
+            cursor.execute("SELECT weight FROM nodes WHERE path = ?", (path,))
             row = cursor.fetchone()
             conn.close()
             return row[0] if row else 0

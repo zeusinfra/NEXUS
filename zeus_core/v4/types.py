@@ -89,4 +89,3 @@ class Decision:
     expected_reward: float
     plan: Plan | None = None
     requires_confirmation: bool = False
-

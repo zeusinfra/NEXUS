@@ -9,7 +9,11 @@ from zeus_core.cognitive.classifier import decide_action
 from zeus_core.cognitive.context_engine import _area_from_tags
 from zeus_core.events.sync_engine import _format_operational_status_for_notion
 from zeus_core.integrations import notion
-from zeus_core.integrations.obsidian import extract_internal_links, extract_tags, read_note
+from zeus_core.integrations.obsidian import (
+    extract_internal_links,
+    extract_tags,
+    read_note,
+)
 
 
 class SecondBrainTests(unittest.TestCase):
@@ -46,12 +50,21 @@ class SecondBrainTests(unittest.TestCase):
         import zeus_core.integrations.linear as linear
         import zeus_core.integrations.notion as notion
 
-        with patch.dict(os.environ, {"ZEUS_ENABLE_NOTION": "0", "ZEUS_ENABLE_LINEAR": "0"}, clear=False):
+        with patch.dict(
+            os.environ,
+            {"ZEUS_ENABLE_NOTION": "0", "ZEUS_ENABLE_LINEAR": "0"},
+            clear=False,
+        ):
             notion = importlib.reload(notion)
             linear = importlib.reload(linear)
 
-            self.assertEqual(notion.create_notion_page("T", "C", [], "x")["error"], "Disabled")
-            self.assertEqual(linear.create_linear_issue("T", "D", [], "medium", "x")["error"], "Disabled")
+            self.assertEqual(
+                notion.create_notion_page("T", "C", [], "x")["error"], "Disabled"
+            )
+            self.assertEqual(
+                linear.create_linear_issue("T", "D", [], "medium", "x")["error"],
+                "Disabled",
+            )
 
         importlib.reload(notion)
         importlib.reload(linear)
@@ -70,14 +83,16 @@ class SecondBrainTests(unittest.TestCase):
         self.assertEqual(_area_from_tags('["#zeus-memory"]'), "memória")
 
     def test_operational_status_page_formats_sync_data(self):
-        content = _format_operational_status_for_notion({
-            "total_events": 3,
-            "pending": 1,
-            "processed": 2,
-            "error": 0,
-            "total_sync_ops": 8,
-            "last_sync_op": "2026-05-04 10:00:00",
-        })
+        content = _format_operational_status_for_notion(
+            {
+                "total_events": 3,
+                "pending": 1,
+                "processed": 2,
+                "error": 0,
+                "total_sync_ops": 8,
+                "last_sync_op": "2026-05-04 10:00:00",
+            }
+        )
 
         self.assertIn("ZEUS — Estado Operacional", content)
         self.assertIn("Eventos totais: 3", content)

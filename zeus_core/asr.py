@@ -36,14 +36,18 @@ def _get_whisper_model(model_name: str, *, device: str, compute_type: str):
         try:
             from faster_whisper import WhisperModel  # type: ignore
         except Exception as e:
-            raise ToolError("Dependência ausente: instale 'faster-whisper' para ASR local.") from e
+            raise ToolError(
+                "Dependência ausente: instale 'faster-whisper' para ASR local."
+            ) from e
 
         model = WhisperModel(model_name, device=device, compute_type=compute_type)
         _MODEL_CACHE[key] = model
         return model
 
 
-def transcribe_audio_bytes(data: bytes, *, mime: str = "audio/webm", language: str = "pt") -> dict:
+def transcribe_audio_bytes(
+    data: bytes, *, mime: str = "audio/webm", language: str = "pt"
+) -> dict:
     """
     Transcreve um clipe de áudio curto.
     Entrada típica: WebM/Opus do MediaRecorder no navegador.
@@ -55,7 +59,9 @@ def transcribe_audio_bytes(data: bytes, *, mime: str = "audio/webm", language: s
 
     ffmpeg = _which("ffmpeg")
     if not ffmpeg:
-        raise ToolError("ffmpeg não encontrado. Instale ffmpeg para decodificar áudio do navegador.")
+        raise ToolError(
+            "ffmpeg não encontrado. Instale ffmpeg para decodificar áudio do navegador."
+        )
 
     model_name = os.getenv("ZEUS_ASR_MODEL", "small").strip()
     device = os.getenv("ZEUS_ASR_DEVICE", "cpu").strip()

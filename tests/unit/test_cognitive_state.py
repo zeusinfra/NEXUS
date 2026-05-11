@@ -1,7 +1,8 @@
 """Tests for the cognitive state manager."""
+
 import pytest
 
-from zeus_core.cognitive.cognitive_state import CognitiveState, CognitiveStateManager
+from zeus_core.cognitive.cognitive_state import CognitiveStateManager
 
 
 class TestCognitiveState:

@@ -21,7 +21,9 @@ def is_local_request(request: Request) -> bool:
     return bool(client and is_local_host(client.host))
 
 
-def is_trusted_host(host: str | None, *, allow_lan: bool, trusted_ips: str | None = None) -> bool:
+def is_trusted_host(
+    host: str | None, *, allow_lan: bool, trusted_ips: str | None = None
+) -> bool:
     if not host:
         return False
     if is_local_host(host):
@@ -29,7 +31,11 @@ def is_trusted_host(host: str | None, *, allow_lan: bool, trusted_ips: str | Non
 
     trusted = {
         item.strip()
-        for item in (trusted_ips if trusted_ips is not None else os.getenv("ZEUS_TRUSTED_IPS", "")).split(",")
+        for item in (
+            trusted_ips
+            if trusted_ips is not None
+            else os.getenv("ZEUS_TRUSTED_IPS", "")
+        ).split(",")
         if item.strip()
     }
     if host in trusted:
@@ -62,7 +68,10 @@ def extract_bearer_token(value: str | None) -> str | None:
 
 
 def require_lan_token_for_request(request: Request, *, lan: LanSecurityConfig) -> None:
-    if not (remote_auth_required(allow_lan=lan.allow_lan, bind_host=lan.bind_host) and lan.lan_auth_enabled):
+    if not (
+        remote_auth_required(allow_lan=lan.allow_lan, bind_host=lan.bind_host)
+        and lan.lan_auth_enabled
+    ):
         return
 
     client = request.client
@@ -71,13 +80,19 @@ def require_lan_token_for_request(request: Request, *, lan: LanSecurityConfig) -
         return
 
     if not lan.lan_token:
-        raise HTTPException(status_code=500, detail="LAN token not configured on server.")
+        raise HTTPException(
+            status_code=500, detail="LAN token not configured on server."
+        )
 
     header_token = extract_bearer_token(request.headers.get("authorization"))
-    header_token = header_token or extract_bearer_token(request.headers.get("x-zeus-token"))
+    header_token = header_token or extract_bearer_token(
+        request.headers.get("x-zeus-token")
+    )
     query_token = extract_bearer_token(request.query_params.get("token"))
     if (header_token or query_token) != lan.lan_token:
-        raise HTTPException(status_code=401, detail="Invalid or missing ZEUS LAN token.")
+        raise HTTPException(
+            status_code=401, detail="Invalid or missing ZEUS LAN token."
+        )
 
 
 def host_from_socketio_environ(environ: dict) -> str | None:
@@ -96,8 +111,13 @@ def host_from_socketio_environ(environ: dict) -> str | None:
         return None
 
 
-def require_lan_token_for_socketio(environ: dict, auth_payload: dict | None, *, lan: LanSecurityConfig) -> bool:
-    if not (remote_auth_required(allow_lan=lan.allow_lan, bind_host=lan.bind_host) and lan.lan_auth_enabled):
+def require_lan_token_for_socketio(
+    environ: dict, auth_payload: dict | None, *, lan: LanSecurityConfig
+) -> bool:
+    if not (
+        remote_auth_required(allow_lan=lan.allow_lan, bind_host=lan.bind_host)
+        and lan.lan_auth_enabled
+    ):
         return True
 
     host = host_from_socketio_environ(environ)
@@ -117,7 +137,7 @@ def require_lan_token_for_socketio(environ: dict, auth_payload: dict | None, *, 
         except Exception:
             provided = None
     if not provided:
-        provided = extract_bearer_token(environ.get("HTTP_X_ZEUS_TOKEN")) or extract_bearer_token(
-            environ.get("HTTP_AUTHORIZATION")
-        )
+        provided = extract_bearer_token(
+            environ.get("HTTP_X_ZEUS_TOKEN")
+        ) or extract_bearer_token(environ.get("HTTP_AUTHORIZATION"))
     return provided == lan.lan_token

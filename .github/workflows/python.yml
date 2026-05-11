@@ -48,8 +48,8 @@ jobs:
 
       - name: Lint
         run: |
-          python -m ruff check zeus_core apps communication tests
-          python -m flake8 zeus_core apps communication tests --count --select=E9,F63,F7,F82 --show-source --statistics
+          python -m ruff check .
+          python -m ruff format --check .
 
       - name: Test
         env:

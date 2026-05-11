@@ -1,12 +1,18 @@
 import time
 import json
 import os
-from zeus_core.memory.sqlite_memory import get_connection, insert_event, get_file_hash, update_file_hash
+from zeus_core.memory.sqlite_memory import (
+    get_connection,
+    insert_event,
+    get_file_hash,
+    update_file_hash,
+)
 from zeus_core.integrations.obsidian import read_note
 
 # Simple in-memory debounce cache: {file_path: last_trigger_timestamp}
 _debounce_cache = {}
 DEBOUNCE_MS = int(os.getenv("ZEUS_WATCHER_DEBOUNCE_MS", "1200") or "1200")
+
 
 def publish_file_event(file_path: str, source: str = "obsidian"):
     """
@@ -15,80 +21,94 @@ def publish_file_event(file_path: str, source: str = "obsidian"):
     """
     current_time = time.time() * 1000
     last_trigger = _debounce_cache.get(file_path, 0)
-    
+
     if current_time - last_trigger < DEBOUNCE_MS:
         # Ignora evento muito próximo (debounce)
         return False
-        
+
     _debounce_cache[file_path] = current_time
-    
+
     try:
         note_data = read_note(file_path)
     except Exception as e:
         print(f"[EventBus] Erro ao ler nota {file_path}: {e}")
         return False
 
-    current_hash = note_data['hash']
+    current_hash = note_data["hash"]
     stored_hash = get_file_hash(file_path)
-    
+
     if current_hash != stored_hash:
         # Arquivo realmente mudou
-        update_file_hash(file_path, current_hash, note_data['tags'])
-        
+        update_file_hash(file_path, current_hash, note_data["tags"])
+
         # Insere evento para processamento assíncrono
         event_id = insert_event(
             event_type="FILE_MODIFIED",
             source=source,
             source_path=file_path,
-            payload=note_data
+            payload=note_data,
         )
         print(f"[EventBus] Novo evento registrado (ID: {event_id}) para {file_path}")
         return True
-        
+
     return False
+
 
 def get_pending_events(limit: int = 10):
     """Retorna os próximos eventos pendentes."""
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute('''
+    cursor.execute(
+        """
         SELECT id, event_type, source, source_path, payload_json 
         FROM events 
         WHERE status = 'pending' 
         ORDER BY created_at ASC 
         LIMIT ?
-    ''', (limit,))
+    """,
+        (limit,),
+    )
     rows = cursor.fetchall()
     conn.close()
-    
+
     events = []
     for row in rows:
-        events.append({
-            "id": row[0],
-            "event_type": row[1],
-            "source": row[2],
-            "source_path": row[3],
-            "payload": json.loads(row[4])
-        })
+        events.append(
+            {
+                "id": row[0],
+                "event_type": row[1],
+                "source": row[2],
+                "source_path": row[3],
+                "payload": json.loads(row[4]),
+            }
+        )
     return events
 
-def mark_event_processed(event_id: int, status: str = 'processed', error_message: str = None):
+
+def mark_event_processed(
+    event_id: int, status: str = "processed", error_message: str = None
+):
     """Atualiza o status de um evento após processamento."""
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute('''
+    cursor.execute(
+        """
         UPDATE events 
         SET status = ?, processed_at = CURRENT_TIMESTAMP, error_message = ?
         WHERE id = ?
-    ''', (status, error_message, event_id))
+    """,
+        (status, error_message, event_id),
+    )
     conn.commit()
     conn.close()
 
+
 # --- NOVO SISTEMA DE EVENTOS ASYNC (PUB/SUB) ---
 import asyncio
-from typing import Callable, Dict, List, Any, Awaitable
+from typing import Callable, Dict, List, Awaitable
 from datetime import datetime
 from enum import Enum
+
 
 class EventType(str, Enum):
     FILE_CHANGED = "FILE_CHANGED"
@@ -118,6 +138,7 @@ class EventType(str, Enum):
     CONTEXT_TOO_LARGE = "CONTEXT_TOO_LARGE"
     RESPONSE_DUPLICATED = "RESPONSE_DUPLICATED"
 
+
 class Event:
     def __init__(self, event_type: EventType | str, payload: dict | None = None):
         self.type = event_type if isinstance(event_type, str) else event_type.value
@@ -125,11 +146,7 @@ class Event:
         self.timestamp = datetime.now().isoformat()
 
     def to_dict(self):
-        return {
-            "type": self.type,
-            "payload": self.payload,
-            "timestamp": self.timestamp
-        }
+        return {"type": self.type, "payload": self.payload, "timestamp": self.timestamp}
 
     def __str__(self):
         return json.dumps(self.to_dict())
@@ -137,7 +154,7 @@ class Event:
 
 class EventBus:
     """Pub/Sub mechanism for ZEUS components."""
-    
+
     _instance = None
 
     def __new__(cls):
@@ -155,7 +172,9 @@ class EventBus:
         self._task = None
         self._initialized = True
 
-    def subscribe(self, event_type: str | EventType, callback: Callable[[Event], Awaitable[None]]):
+    def subscribe(
+        self, event_type: str | EventType, callback: Callable[[Event], Awaitable[None]]
+    ):
         event_str = event_type if isinstance(event_type, str) else event_type.value
         if event_str not in self._subscribers:
             self._subscribers[event_str] = []
@@ -172,16 +191,18 @@ class EventBus:
             if loop.is_running():
                 loop.create_task(self._queue.put(event))
         except RuntimeError:
-            pass # Sem loop
+            pass  # Sem loop
 
-    async def publish_async(self, event_type: str | EventType, payload: dict | None = None):
+    async def publish_async(
+        self, event_type: str | EventType, payload: dict | None = None
+    ):
         event = Event(event_type, payload)
         await self._queue.put(event)
 
     async def _dispatch_loop(self):
         while True:
             event = await self._queue.get()
-            
+
             for callback in self._global_subscribers:
                 try:
                     await callback(event)
@@ -194,7 +215,7 @@ class EventBus:
                         await callback(event)
                     except Exception as e:
                         print(f"Erro no subscriber de {event.type}: {e}")
-            
+
             self._queue.task_done()
 
     def start(self):
@@ -205,6 +226,7 @@ class EventBus:
         if self._task:
             self._task.cancel()
             self._task = None
+
 
 # Singleton instance exportada
 event_bus = EventBus()

@@ -4,7 +4,6 @@ import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 import psutil
 
@@ -17,9 +16,11 @@ def _now() -> float:
 
 try:
     from zeus_sensors import SensorEngineRust
+
     RUST_SENSORS_AVAILABLE = True
 except ImportError:
     RUST_SENSORS_AVAILABLE = False
+
 
 @dataclass(slots=True)
 class OsMetricsSensor:
@@ -63,7 +64,7 @@ class FilePollSensor:
         self._mtimes: dict[str, float] = {}
         self.max_checked = int(os.getenv("ZEUS_V4_FS_MAX_CHECKED", "1200"))
         self.max_seconds = float(os.getenv("ZEUS_V4_FS_MAX_SECONDS", "0.35"))
-        
+
         if RUST_SENSORS_AVAILABLE:
             self.rust_engine = SensorEngineRust()
         else:
@@ -71,7 +72,7 @@ class FilePollSensor:
 
     def poll(self) -> list[Event]:
         evs: list[Event] = []
-        
+
         if self.rust_engine:
             for root in self.roots:
                 if not root.exists():
@@ -104,7 +105,16 @@ class FilePollSensor:
                 dirnames[:] = [
                     d
                     for d in dirnames
-                    if d not in {".git", ".venv", "__pycache__", "node_modules", "target", "dist", "build"}
+                    if d
+                    not in {
+                        ".git",
+                        ".venv",
+                        "__pycache__",
+                        "node_modules",
+                        "target",
+                        "dist",
+                        "build",
+                    }
                 ]
                 for fn in filenames:
                     checked += 1
@@ -154,7 +164,13 @@ class UserInboxSensor:
         if not new:
             return []
         return [
-            Event(kind="user", ts=_now(), summary=f"User inbox: {new[:80]}", data={"text": new}, relevance=0.8)
+            Event(
+                kind="user",
+                ts=_now(),
+                summary=f"User inbox: {new[:80]}",
+                data={"text": new},
+                relevance=0.8,
+            )
         ]
 
 

@@ -1,4 +1,5 @@
 """Tests for the reflection engine."""
+
 import pytest
 
 from zeus_core.cognitive.cognitive_db import init_cognitive_tables

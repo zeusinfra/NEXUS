@@ -12,16 +12,15 @@ Mostra:
 
 Auto-fecha em 60s com Deny por padrão (timeout safety).
 """
+
 from __future__ import annotations
 
 import json
-import os
 import sys
-import threading
-from datetime import datetime
-from typing import Callable, Optional
+from typing import Callable
 
 import gi
+
 gi.require_version("Gdk", "4.0")
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
@@ -57,6 +56,7 @@ RISK_LABELS = {
 # ---------------------------------------------------------------------------
 # Approval Dialog Window
 # ---------------------------------------------------------------------------
+
 
 class ApprovalDialog(Adw.ApplicationWindow):
     """Janela de aprovação para ações administrativas do ZEUS."""
@@ -211,7 +211,9 @@ class ApprovalDialog(Adw.ApplicationWindow):
     ) -> None:
         # Header
         header = Adw.HeaderBar()
-        title = Adw.WindowTitle(title="⚠ Aprovação Requerida", subtitle="ZEUS RootDaemon")
+        title = Adw.WindowTitle(
+            title="⚠ Aprovação Requerida", subtitle="ZEUS RootDaemon"
+        )
         header.set_title_widget(title)
 
         # Content
@@ -240,7 +242,9 @@ class ApprovalDialog(Adw.ApplicationWindow):
         badge_css.load_from_string(
             f".risk-badge {{ color: {risk_color}; border: 1px solid {risk_color}; }}"
         )
-        risk_label.get_style_context().add_provider(badge_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        risk_label.get_style_context().add_provider(
+            badge_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
         title_row.append(risk_label)
         card.append(title_row)
 
@@ -282,7 +286,9 @@ class ApprovalDialog(Adw.ApplicationWindow):
                 file_label.set_halign(Gtk.Align.START)
                 card.append(file_label)
             if len(affected_files) > 10:
-                more = Gtk.Label(label=f"  ... e mais {len(affected_files) - 10} arquivos")
+                more = Gtk.Label(
+                    label=f"  ... e mais {len(affected_files) - 10} arquivos"
+                )
                 more.add_css_class("approval-file")
                 card.append(more)
 
@@ -365,6 +371,7 @@ class ApprovalDialog(Adw.ApplicationWindow):
 # ---------------------------------------------------------------------------
 # Standalone approval app (pode ser chamado como processo separado)
 # ---------------------------------------------------------------------------
+
 
 class ApprovalApp(Adw.Application):
     """Aplicação GTK4 standalone para mostrar approval dialog."""

@@ -5,15 +5,14 @@ Policy-gated executor with full SQLite audit trail.
 Only executes actions approved by the simulator; high-risk actions
 become proposals that require user confirmation.
 """
+
 from __future__ import annotations
 
-import json
 import shlex
 import subprocess
 import uuid
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
-from typing import Any
 
 from zeus_core.cognitive.cognitive_db import get_connection
 from zeus_core.command_policy import validate_command
@@ -55,7 +54,11 @@ class CognitiveExecutionEngine:
 
     def execute_plan(self, plan, simulation_result) -> list[ActionResult]:
         """Execute all steps of a simulated plan that passed approval."""
-        sim_dict = simulation_result.to_dict() if hasattr(simulation_result, "to_dict") else simulation_result
+        sim_dict = (
+            simulation_result.to_dict()
+            if hasattr(simulation_result, "to_dict")
+            else simulation_result
+        )
         plan_dict = plan.to_dict() if hasattr(plan, "to_dict") else plan
 
         plan_id = plan_dict.get("id", "unknown")
@@ -81,8 +84,9 @@ class CognitiveExecutionEngine:
 
             # Stop on failure
             if result.status == "failed":
-                log_event(logger, 30, "plan_execution_halted",
-                          plan_id=plan_id, failed_step=i)
+                log_event(
+                    logger, 30, "plan_execution_halted", plan_id=plan_id, failed_step=i
+                )
                 break
 
         return results
@@ -129,16 +133,28 @@ class CognitiveExecutionEngine:
         except ToolError as e:
             result.status = "blocked"
             result.error = str(e)
-            log_event(logger, 30, "step_blocked_by_policy",
-                      plan_id=plan_id, step=step_index, error=str(e))
+            log_event(
+                logger,
+                30,
+                "step_blocked_by_policy",
+                plan_id=plan_id,
+                step=step_index,
+                error=str(e),
+            )
         except subprocess.TimeoutExpired:
             result.status = "failed"
             result.error = "Timeout ao executar comando"
         except Exception as e:
             result.status = "failed"
             result.error = str(e)
-            log_event(logger, 40, "step_execution_error",
-                      plan_id=plan_id, step=step_index, error=str(e))
+            log_event(
+                logger,
+                40,
+                "step_execution_error",
+                plan_id=plan_id,
+                step=step_index,
+                error=str(e),
+            )
 
         return result
 
@@ -155,8 +171,14 @@ class CognitiveExecutionEngine:
             output=f"Proposta: {step.get('description', '')}. Comando: {step.get('command', 'N/A')}",
             created_at=_now_iso(),
         )
-        log_event(logger, 20, "action_proposed",
-                  action_id=result.id, plan_id=plan_id, step=step_index)
+        log_event(
+            logger,
+            20,
+            "action_proposed",
+            action_id=result.id,
+            plan_id=plan_id,
+            step=step_index,
+        )
         return result
 
     def approve_action(self, action_id: str) -> ActionResult | None:
@@ -187,8 +209,13 @@ class CognitiveExecutionEngine:
                 (result.status, result.output, result.error, action_id),
             )
 
-        log_event(logger, 20, "action_approved_and_executed",
-                  action_id=action_id, status=result.status)
+        log_event(
+            logger,
+            20,
+            "action_approved_and_executed",
+            action_id=action_id,
+            status=result.status,
+        )
         return result
 
     def audit_action(self, result: ActionResult) -> None:
@@ -199,10 +226,17 @@ class CognitiveExecutionEngine:
                 "(id, plan_id, step_index, action_type, description, command, status, output, error, risk, created_at) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
-                    result.id, result.plan_id, result.step_index,
-                    result.action_type, result.description, None,
-                    result.status, result.output, result.error,
-                    result.risk, result.created_at,
+                    result.id,
+                    result.plan_id,
+                    result.step_index,
+                    result.action_type,
+                    result.description,
+                    None,
+                    result.status,
+                    result.output,
+                    result.error,
+                    result.risk,
+                    result.created_at,
                 ),
             )
 
@@ -211,7 +245,10 @@ class CognitiveExecutionEngine:
     # ------------------------------------------------------------------
 
     def list_actions(
-        self, *, status: str | None = None, limit: int = 50,
+        self,
+        *,
+        status: str | None = None,
+        limit: int = 50,
     ) -> list[ActionResult]:
         query = "SELECT * FROM cognitive_actions WHERE 1=1"
         params: list = []
@@ -246,13 +283,18 @@ class CognitiveExecutionEngine:
         )
 
         if proc.returncode != 0 and proc.stderr:
-            log_event(logger, 30, "command_stderr",
-                      command=command, stderr=proc.stderr[:200])
+            log_event(
+                logger, 30, "command_stderr", command=command, stderr=proc.stderr[:200]
+            )
 
         return proc.stdout[:2000] if proc.stdout else f"(exit code: {proc.returncode})"
 
     def _create_blocked_result(
-        self, plan_id: str, step_index: int, step: dict, sim: dict,
+        self,
+        plan_id: str,
+        step_index: int,
+        step: dict,
+        sim: dict,
     ) -> ActionResult:
         reasons = sim.get("blocked_reasons", ["Bloqueado por política de segurança"])
         return ActionResult(

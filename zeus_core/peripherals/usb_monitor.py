@@ -20,7 +20,9 @@ from zeus_core.observability import get_logger
 
 BACKEND = os.getenv("ZEUS_BACKEND_URL", "http://127.0.0.1:8080").rstrip("/")
 DEBOUNCE_SEC = float(os.getenv("ZEUS_USB_DEBOUNCE_SEC", "8.0") or "8.0")
-GLOBAL_ANNOUNCE_COOLDOWN_SEC = float(os.getenv("ZEUS_USB_GLOBAL_COOLDOWN_SEC", "4.0") or "4.0")
+GLOBAL_ANNOUNCE_COOLDOWN_SEC = float(
+    os.getenv("ZEUS_USB_GLOBAL_COOLDOWN_SEC", "4.0") or "4.0"
+)
 
 logger = get_logger("zeus.peripherals.usb_monitor")
 
@@ -109,7 +111,9 @@ class USBMonitor:
         serial = _first(props, "ID_SERIAL_SHORT", "ID_SERIAL", default="sem-serial")
         interfaces = _first(props, "ID_USB_INTERFACES", default="").lower()
         driver = _first(props, "ID_USB_DRIVER", default="").lower()
-        devtype = _first(props, "DEVTYPE", default=getattr(device, "device_type", "") or "").lower()
+        devtype = _first(
+            props, "DEVTYPE", default=getattr(device, "device_type", "") or ""
+        ).lower()
         subsystem = (getattr(device, "subsystem", "") or "").lower()
         fingerprint = self._fingerprint_from_props(props)
 
@@ -121,7 +125,9 @@ class USBMonitor:
         if driver == "usb-storage" or devtype in {"partition", "disk"}:
             device_type = "Armazenamento USB"
             risk = "MEDIUM"
-            reason = "Midia removivel pode carregar malware, scripts ou arquivos suspeitos."
+            reason = (
+                "Midia removivel pode carregar malware, scripts ou arquivos suspeitos."
+            )
             action = "Registrar a midia, evitar auto-execucao e recomendar varredura antes de abrir arquivos."
         elif _has_interface_class(interfaces, "03") or subsystem == "input":
             device_type = "HID USB"
@@ -142,7 +148,9 @@ class USBMonitor:
             risk = "MEDIUM"
             reason = "Interface USB Mass Storage detectada."
             action = "Registrar a midia, evitar auto-execucao e recomendar varredura antes de abrir arquivos."
-        elif _has_interface_class(interfaces, "0e") or _has_interface_class(interfaces, "01"):
+        elif _has_interface_class(interfaces, "0e") or _has_interface_class(
+            interfaces, "01"
+        ):
             device_type = "Audio ou video USB"
             risk = "LOW"
             reason = "Dispositivo de captura/reproducao detectado."
@@ -199,7 +207,11 @@ class USBMonitor:
         if not self._is_primary_usb_event(device):
             return
         props = _props(device)
-        model = _clean(_first(props, "ID_MODEL_FROM_DATABASE", "ID_MODEL", default="Dispositivo USB"))
+        model = _clean(
+            _first(
+                props, "ID_MODEL_FROM_DATABASE", "ID_MODEL", default="Dispositivo USB"
+            )
+        )
         fingerprint = self._fingerprint_from_props(props)
         if self._is_duplicate(f"remove:{fingerprint}") or self._is_global_duplicate():
             return
@@ -210,7 +222,9 @@ class USBMonitor:
 
     def _is_primary_usb_event(self, device: Any) -> bool:
         props = _props(device)
-        devtype = _first(props, "DEVTYPE", default=getattr(device, "device_type", "") or "").lower()
+        devtype = _first(
+            props, "DEVTYPE", default=getattr(device, "device_type", "") or ""
+        ).lower()
         if devtype and devtype != "usb_device":
             logger.debug("Evento USB auxiliar ignorado: DEVTYPE=%s", devtype)
             return False
@@ -238,11 +252,14 @@ class USBMonitor:
     def _publish(self, event_type: EventType, payload: dict[str, Any]):
         if self._loop and self._loop.is_running():
             self._loop.call_soon_threadsafe(
-                lambda: asyncio.create_task(event_bus.publish_async(event_type, payload))
+                lambda: asyncio.create_task(
+                    event_bus.publish_async(event_type, payload)
+                )
             )
 
     def _announce(self, title: str, text: str, severity: str):
         """Envia alerta local para a Web GUI e TTS."""
+
         def worker():
             payload = {
                 "title": title,
@@ -298,7 +315,9 @@ def _clean(value: str) -> str:
 
 def _has_interface_class(interfaces: str, class_code: str) -> bool:
     wanted = class_code.lower()
-    return any(part.lower().startswith(wanted) for part in interfaces.split(":") if part)
+    return any(
+        part.lower().startswith(wanted) for part in interfaces.split(":") if part
+    )
 
 
 usb_monitor = USBMonitor()

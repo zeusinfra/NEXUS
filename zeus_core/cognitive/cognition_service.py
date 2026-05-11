@@ -8,6 +8,7 @@ Can be invoked via:
 
 Also provides ``CognitionService`` for programmatic control from FastAPI.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -82,14 +83,20 @@ class CognitionService:
     async def run_forever(self) -> None:
         """Run the cognitive loop until interrupted. For standalone daemon use."""
         setup_logging(os.getenv("ZEUS_LOG_LEVEL", "INFO"))
-        log_event(logger, 20, "cognition_daemon_starting",
-                  db_path=self.db_path or os.getenv("ZEUS_DB_PATH", "./zeus_events.db"))
+        log_event(
+            logger,
+            20,
+            "cognition_daemon_starting",
+            db_path=self.db_path or os.getenv("ZEUS_DB_PATH", "./zeus_events.db"),
+        )
 
         loop = asyncio.get_running_loop()
 
         # Handle SIGTERM/SIGINT for clean daemon shutdown
         for sig in (signal.SIGTERM, signal.SIGINT):
-            loop.add_signal_handler(sig, lambda: asyncio.create_task(self._shutdown(sig)))
+            loop.add_signal_handler(
+                sig, lambda: asyncio.create_task(self._shutdown(sig))
+            )
 
         init_cognitive_tables(self.db_path)
         await self.loop.start()
@@ -101,7 +108,11 @@ class CognitionService:
 
 def main() -> None:
     """CLI entry point for the cognition daemon."""
-    enabled = os.getenv("ZEUS_COGNITIVE_LOOP_ENABLED", "0").strip().lower() in {"1", "true", "yes"}
+    enabled = os.getenv("ZEUS_COGNITIVE_LOOP_ENABLED", "0").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }
     if not enabled:
         print(
             "[ZEUS] Cognitive loop is disabled. "

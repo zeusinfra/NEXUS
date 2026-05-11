@@ -39,7 +39,9 @@ class RealtimeHub:
                 print(f"[Socket.io] REJECTED connect from untrusted host: {host}")
                 return False
             if not deps.require_lan_token_for_socketio(environ, auth_payload):
-                print(f"[Socket.io] REJECTED connect (invalid/missing token) host={host}")
+                print(
+                    f"[Socket.io] REJECTED connect (invalid/missing token) host={host}"
+                )
                 return False
             self.socketio_clients.add(sid)
             print(f"[Socket.io] Client connected: {sid}")
@@ -58,7 +60,9 @@ class RealtimeHub:
             try:
                 if isinstance(data, dict) and "audio" in data:
                     chunk = data["audio"]
-                    print(f"[Socket.io] Received audio chunk from {sid} (size: {len(chunk)} bytes)")
+                    print(
+                        f"[Socket.io] Received audio chunk from {sid} (size: {len(chunk)} bytes)"
+                    )
                 else:
                     print(f"[Socket.io] Invalid audio stream payload from {sid}")
             except Exception as e:
@@ -107,10 +111,18 @@ class RealtimeHub:
         if not deps.is_trusted_host(host):
             await websocket.close(code=1008)
             return
-        if deps.remote_auth_required() and deps.lan_auth_enabled and not deps.is_local_host(host):
+        if (
+            deps.remote_auth_required()
+            and deps.lan_auth_enabled
+            and not deps.is_local_host(host)
+        ):
             provided = deps.extract_bearer_token(websocket.query_params.get("token"))
-            provided = provided or deps.extract_bearer_token(websocket.query_params.get("lan"))
-            provided = provided or deps.extract_bearer_token(websocket.query_params.get("lan_token"))
+            provided = provided or deps.extract_bearer_token(
+                websocket.query_params.get("lan")
+            )
+            provided = provided or deps.extract_bearer_token(
+                websocket.query_params.get("lan_token")
+            )
             if not deps.lan_token or provided != deps.lan_token:
                 await websocket.close(code=1008)
                 return
@@ -120,7 +132,9 @@ class RealtimeHub:
         print(f"[WS] Client connected: {websocket.client}")
 
         try:
-            await websocket.send_text(json.dumps(deps.build_init_payload(), ensure_ascii=False))
+            await websocket.send_text(
+                json.dumps(deps.build_init_payload(), ensure_ascii=False)
+            )
         except Exception as e:
             print(f"[WS] Failed to send init payload: {e}")
 
@@ -140,7 +154,9 @@ class RealtimeHub:
                             {
                                 "type": "ack",
                                 "event_id": event_id,
-                                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                                "timestamp": time.strftime(
+                                    "%Y-%m-%dT%H:%M:%SZ", time.gmtime()
+                                ),
                                 "payload": {},
                             }
                         )
@@ -157,7 +173,9 @@ class RealtimeHub:
 
                 elif msg_type == "ping":
                     await websocket.send_text(
-                        json.dumps({"type": "pong", "payload": {"ts": int(time.time() * 1000)}})
+                        json.dumps(
+                            {"type": "pong", "payload": {"ts": int(time.time() * 1000)}}
+                        )
                     )
 
                 elif msg_type == "arm_voice":

@@ -9,7 +9,9 @@ from typing import Awaitable, Callable
 
 class OverflowEventQueue:
     def __init__(self, maxsize: int):
-        self.queue: asyncio.Queue = asyncio.Queue(maxsize=maxsize if maxsize and maxsize > 0 else 0)
+        self.queue: asyncio.Queue = asyncio.Queue(
+            maxsize=maxsize if maxsize and maxsize > 0 else 0
+        )
 
     async def enqueue(self, event: dict) -> None:
         try:
@@ -61,7 +63,9 @@ class RustWatcherRunner:
     async def run(self, enqueue: Callable[[dict], Awaitable[None]]) -> None:
         binary_path = self.resolve_binary()
         if not binary_path:
-            print("Rust watcher binary not found. Build watcher_rs before starting the GUI.")
+            print(
+                "Rust watcher binary not found. Build watcher_rs before starting the GUI."
+            )
             return
 
         process = await asyncio.create_subprocess_exec(
@@ -71,7 +75,9 @@ class RustWatcherRunner:
         )
         self.process = process
         self.started_at = time.time()
-        stderr_task = asyncio.create_task(log_subprocess_stream(process.stderr, "watcher_rs"))
+        stderr_task = asyncio.create_task(
+            log_subprocess_stream(process.stderr, "watcher_rs")
+        )
         while True:
             line = await process.stdout.readline()
             if not line:
@@ -80,7 +86,9 @@ class RustWatcherRunner:
                 data = json.loads(line.decode())
                 event = {
                     "type": "FILE_EVENT",
-                    "event": data.get("event_type") or data.get("event_kind") or "Update",
+                    "event": data.get("event_type")
+                    or data.get("event_kind")
+                    or "Update",
                     "path": data["path"],
                     "project": data["project"],
                 }

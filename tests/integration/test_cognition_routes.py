@@ -1,4 +1,5 @@
 """Tests for the cognition API routes."""
+
 import pytest
 from types import SimpleNamespace
 
@@ -11,7 +12,9 @@ from apps.routes.cognition_routes import CognitionRouteDeps, create_cognition_ro
 
 def _endpoint(router, path: str, method: str):
     for route in router.routes:
-        if getattr(route, "path", None) == path and method in getattr(route, "methods", set()):
+        if getattr(route, "path", None) == path and method in getattr(
+            route, "methods", set()
+        ):
             return route.endpoint
     raise AssertionError(f"endpoint not found: {method} {path}")
 
@@ -62,7 +65,9 @@ class TestCognitionRoutes:
 
     @pytest.mark.asyncio
     async def test_approve_nonexistent_action(self, router):
-        endpoint = _endpoint(router, "/api/cognition/actions/{action_id}/approve", "POST")
+        endpoint = _endpoint(
+            router, "/api/cognition/actions/{action_id}/approve", "POST"
+        )
         with pytest.raises(HTTPException) as exc:
             await endpoint(SimpleNamespace(), "nonexistent")
         assert exc.value.status_code == 404

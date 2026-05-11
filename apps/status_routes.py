@@ -22,7 +22,9 @@ def create_status_router(deps: StatusRouteDeps) -> APIRouter:
 
     def require_access(request: Request) -> None:
         if not deps.is_trusted_request(request):
-            raise HTTPException(status_code=403, detail="Only trusted (local/LAN) requests are allowed.")
+            raise HTTPException(
+                status_code=403, detail="Only trusted (local/LAN) requests are allowed."
+            )
         deps.require_lan_token_for_request(request)
 
     @router.get("/api/status")
@@ -49,11 +51,10 @@ def create_status_router(deps: StatusRouteDeps) -> APIRouter:
     async def get_api_applet_status(request: Request):
         require_access(request)
         from zeus_core.cognitive.cognitive_state import cognitive_state_manager
-        from zeus_core.cognitive.goal_engine import GoalEngine
-        
+
         # Add cognitive state
         state = cognitive_state_manager.state
-        
+
         health = deps.build_api_health()
         llm = health.get("llm", {})
         metrics = health.get("metrics", {})
@@ -73,7 +74,7 @@ def create_status_router(deps: StatusRouteDeps) -> APIRouter:
                 "attention": state.attention.get("state", "idle"),
                 "focus_score": state.attention.get("focus_score", 0.0),
                 "active_goals": state.active_goals_list,
-                "privacy_shield": state.privacy_status.get("shield")
+                "privacy_shield": state.privacy_status.get("shield"),
             },
             "voice": health.get("voice", {}),
             "vision": health.get("vision", {}),

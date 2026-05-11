@@ -1,4 +1,5 @@
 """Tests for the cognitive planner."""
+
 import pytest
 
 from zeus_core.cognitive.planner import CognitivePlanner, CognitivePlan, PlanStep
@@ -50,7 +51,8 @@ class TestCognitivePlanner:
 
     def test_max_risk_property(self, planner):
         plan = CognitivePlan(
-            id="p1", goal_id="g1",
+            id="p1",
+            goal_id="g1",
             steps=[
                 PlanStep(step=1, risk="low"),
                 PlanStep(step=2, risk="high"),

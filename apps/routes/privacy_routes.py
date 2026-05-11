@@ -1,6 +1,7 @@
 """
 ZEUS Privacy Guard — FastAPI Routes.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -17,18 +18,22 @@ class ConsentRequest(BaseModel):
     scope: str = "session"
     duration_min: int = 30
 
+
 @dataclass(frozen=True)
 class PrivacyRouteDeps:
     is_trusted_request: Callable[[Request], bool]
     require_lan_token_for_request: Callable[[Request], None]
     privacy_guard: PrivacyGuard
 
+
 def create_privacy_router(deps: PrivacyRouteDeps) -> APIRouter:
     router = APIRouter(prefix="/api/privacy", tags=["privacy"])
 
     def require_access(request: Request) -> None:
         if not deps.is_trusted_request(request):
-            raise HTTPException(status_code=403, detail="Only trusted (local/LAN) requests are allowed.")
+            raise HTTPException(
+                status_code=403, detail="Only trusted (local/LAN) requests are allowed."
+            )
         deps.require_lan_token_for_request(request)
 
     @router.get("/status")
@@ -37,7 +42,7 @@ def create_privacy_router(deps: PrivacyRouteDeps) -> APIRouter:
         return {
             "mode": deps.privacy_guard.mode,
             "audit_enabled": True,
-            "active_consents_count": 0, # Could be expanded
+            "active_consents_count": 0,  # Could be expanded
         }
 
     @router.get("/audit")

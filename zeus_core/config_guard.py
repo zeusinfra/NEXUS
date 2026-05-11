@@ -27,14 +27,18 @@ def env_flag(name: str, default: str = "0") -> bool:
 
 
 def zeus_env() -> str:
-    return os.getenv("ZEUS_ENV", os.getenv("APP_ENV", "local")).strip().lower() or "local"
+    return (
+        os.getenv("ZEUS_ENV", os.getenv("APP_ENV", "local")).strip().lower() or "local"
+    )
 
 
 def is_production() -> bool:
     return zeus_env() in PRODUCTION_ENVS
 
 
-def validate_jwt_secret(secret: str, *, allow_insecure_dev_secret: bool, production: bool | None = None) -> str:
+def validate_jwt_secret(
+    secret: str, *, allow_insecure_dev_secret: bool, production: bool | None = None
+) -> str:
     production = is_production() if production is None else production
     secret = (secret or "").strip()
     if not secret:
@@ -64,7 +68,9 @@ def validate_lan_security(config: LanSecurityConfig) -> None:
     if not config.lan_auth_enabled:
         raise RuntimeError("ZEUS_LAN_AUTH=1 is required when remote access is enabled.")
     if not config.lan_token or len(config.lan_token) < 16:
-        raise RuntimeError("ZEUS_LAN_TOKEN must be set (>=16 chars) when remote access is enabled.")
+        raise RuntimeError(
+            "ZEUS_LAN_TOKEN must be set (>=16 chars) when remote access is enabled."
+        )
 
 
 def validate_llm_config() -> None:
@@ -80,11 +86,16 @@ def validate_llm_config() -> None:
 
     llm_url = os.getenv("ZEUS_LLM_URL", "").strip()
     parsed = urlparse(llm_url)
-    using_ollama_cloud_api = provider == "ollama" and parsed.netloc.endswith("ollama.com")
+    using_ollama_cloud_api = provider == "ollama" and parsed.netloc.endswith(
+        "ollama.com"
+    )
     if using_ollama_cloud_api and not (
-        os.getenv("OLLAMA_API_KEY", "").strip() or os.getenv("ZEUS_LLM_API_KEY", "").strip()
+        os.getenv("OLLAMA_API_KEY", "").strip()
+        or os.getenv("ZEUS_LLM_API_KEY", "").strip()
     ):
-        raise RuntimeError("OLLAMA_API_KEY or ZEUS_LLM_API_KEY must be set when using the hosted Ollama API.")
+        raise RuntimeError(
+            "OLLAMA_API_KEY or ZEUS_LLM_API_KEY must be set when using the hosted Ollama API."
+        )
 
 
 def validate_startup_config(*, lan: LanSecurityConfig) -> None:
@@ -97,7 +108,9 @@ def build_config_diagnostics(*, lan: LanSecurityConfig) -> dict:
     llm_url = os.getenv("ZEUS_LLM_URL", "").strip()
     parsed = urlparse(llm_url)
     hosted_ollama_api = provider == "ollama" and parsed.netloc.endswith("ollama.com")
-    remote_required = remote_auth_required(allow_lan=lan.allow_lan, bind_host=lan.bind_host)
+    remote_required = remote_auth_required(
+        allow_lan=lan.allow_lan, bind_host=lan.bind_host
+    )
 
     warnings: list[str] = []
     if is_production() and env_flag("ZEUS_ALLOW_INSECURE_DEV_SECRET", "0"):
@@ -107,7 +120,8 @@ def build_config_diagnostics(*, lan: LanSecurityConfig) -> dict:
     if remote_required and len(lan.lan_token or "") < 16:
         warnings.append("lan_token_missing_or_weak")
     if hosted_ollama_api and not (
-        os.getenv("OLLAMA_API_KEY", "").strip() or os.getenv("ZEUS_LLM_API_KEY", "").strip()
+        os.getenv("OLLAMA_API_KEY", "").strip()
+        or os.getenv("ZEUS_LLM_API_KEY", "").strip()
     ):
         warnings.append("ollama_hosted_api_missing_key")
 

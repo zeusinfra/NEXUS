@@ -23,7 +23,9 @@ class JsonFormatter(logging.Formatter):
             "logger": record.name,
             "message": record.getMessage(),
         }
-        correlation_id = getattr(record, "correlation_id", None) or correlation_id_var.get()
+        correlation_id = (
+            getattr(record, "correlation_id", None) or correlation_id_var.get()
+        )
         if correlation_id:
             payload["correlation_id"] = correlation_id
         extra = getattr(record, "extra_fields", None)
@@ -61,8 +63,12 @@ def get_metrics_snapshot() -> dict[str, int]:
 
 
 async def correlation_id_middleware(request: Request, call_next):
-    incoming = request.headers.get("x-correlation-id") or request.headers.get("x-request-id")
-    correlation_id = incoming.strip() if incoming and incoming.strip() else uuid.uuid4().hex
+    incoming = request.headers.get("x-correlation-id") or request.headers.get(
+        "x-request-id"
+    )
+    correlation_id = (
+        incoming.strip() if incoming and incoming.strip() else uuid.uuid4().hex
+    )
     token = correlation_id_var.set(correlation_id)
     start = time.time()
     logger = get_logger("zeus.http")

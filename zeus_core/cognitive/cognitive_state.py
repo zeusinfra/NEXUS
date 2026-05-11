@@ -4,6 +4,7 @@ ZEUS Cognitive Core — Global Cognitive State.
 Thread-safe singleton holding the current cognitive state of the system.
 Updated atomically after each loop cycle and exposed via API.
 """
+
 from __future__ import annotations
 
 import os
@@ -34,9 +35,13 @@ class CognitiveState:
     error_count: int = 0
 
     # 🧠 Cognitive Maturity Pillars (v3.1)
-    attention: dict = field(default_factory=lambda: {"state": "idle", "focus_score": 0.0})
+    attention: dict = field(
+        default_factory=lambda: {"state": "idle", "focus_score": 0.0}
+    )
     active_goals_list: list = field(default_factory=list)
-    privacy_status: dict = field(default_factory=lambda: {"shield": "active", "masked_count": 0})
+    privacy_status: dict = field(
+        default_factory=lambda: {"shield": "active", "masked_count": 0}
+    )
 
     def to_dict(self) -> dict:
         return asdict(self)

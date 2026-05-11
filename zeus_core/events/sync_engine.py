@@ -9,17 +9,21 @@ Orchestrates 3 independent async workers:
 
 import asyncio
 import os
-import json
 from datetime import datetime
 
 from zeus_core.integrations.obsidian import write_sync_note, update_daily_log
 from zeus_core.integrations.notion import upsert_notion_page
 from zeus_core.integrations.linear import create_insight_issue
-from zeus_core.memory.sqlite_memory import get_sync_status, log_sync_event, was_already_synced
+from zeus_core.memory.sqlite_memory import (
+    get_sync_status,
+    log_sync_event,
+    was_already_synced,
+)
 from zeus_core.long_term_memory import load_memory as load_long_term_memory
 
 
 # ---------- Worker 1: Synaptic → Obsidian ----------
+
 
 async def sync_synaptic_to_obsidian(memory_manager, interval: float = 60.0):
     """
@@ -27,11 +31,11 @@ async def sync_synaptic_to_obsidian(memory_manager, interval: float = 60.0):
     Creates: ZEUS_Sync/Synaptic/neural_map.md, ZEUS_Sync/Patterns/*.md, ZEUS_Sync/Daily/*.md
     """
     print("[SyncEngine] Worker Sináptico→Obsidian iniciado.")
-    
+
     while True:
         try:
             snapshot = memory_manager.export_sync_snapshot()
-            
+
             if snapshot["total_nodes"] == 0:
                 await asyncio.sleep(interval)
                 continue
@@ -42,16 +46,22 @@ async def sync_synaptic_to_obsidian(memory_manager, interval: float = 60.0):
 
             # 2. Daily Log entry
             daily_entries = []
-            daily_entries.append(f"**Nós ativos:** {snapshot['total_nodes']} | **Sinapses:** {snapshot['total_synapses']} | **Buffer sensorial:** {snapshot['sensory_buffer_size']}")
-            
+            daily_entries.append(
+                f"**Nós ativos:** {snapshot['total_nodes']} | **Sinapses:** {snapshot['total_synapses']} | **Buffer sensorial:** {snapshot['sensory_buffer_size']}"
+            )
+
             if snapshot["top_nodes"]:
                 top = snapshot["top_nodes"][0]
-                daily_entries.append(f"**Foco principal:** `{os.path.basename(top['path'])}` (peso {top['weight']})")
-            
+                daily_entries.append(
+                    f"**Foco principal:** `{os.path.basename(top['path'])}` (peso {top['weight']})"
+                )
+
             if snapshot["recent_patterns"]:
                 pattern = snapshot["recent_patterns"][0]
-                daily_entries.append(f"**Último padrão:** {pattern['type']} — {pattern.get('context', 'N/A')}")
-            
+                daily_entries.append(
+                    f"**Último padrão:** {pattern['type']} — {pattern.get('context', 'N/A')}"
+                )
+
             update_daily_log(daily_entries)
 
             log_sync_event(
@@ -59,7 +69,7 @@ async def sync_synaptic_to_obsidian(memory_manager, interval: float = 60.0):
                 target="obsidian",
                 source_path="memory_manager.export_sync_snapshot",
                 target_id="ZEUS_Sync/Synaptic/neural_map.md",
-                status="success"
+                status="success",
             )
 
         except Exception as e:
@@ -70,7 +80,7 @@ async def sync_synaptic_to_obsidian(memory_manager, interval: float = 60.0):
                     target="obsidian",
                     source_path="memory_manager",
                     status="error",
-                    error_message=str(e)
+                    error_message=str(e),
                 )
             except Exception:
                 pass
@@ -79,6 +89,7 @@ async def sync_synaptic_to_obsidian(memory_manager, interval: float = 60.0):
 
 
 # ---------- Worker 2: Long-Term → Notion ----------
+
 
 async def sync_longterm_to_notion(interval: float = 300.0):
     """
@@ -90,12 +101,19 @@ async def sync_longterm_to_notion(interval: float = 300.0):
     while True:
         try:
             memory = load_long_term_memory()
-            
+
             # Sync profile when long-term memory exists; otherwise publish an operational status page
             # so the Notion workspace receives visible ZEUS data immediately.
             has_content = any(
                 isinstance(memory.get(section), dict) and memory[section]
-                for section in ["identity", "preferences", "projects", "relationships", "wishes", "notes"]
+                for section in [
+                    "identity",
+                    "preferences",
+                    "projects",
+                    "relationships",
+                    "wishes",
+                    "notes",
+                ]
             )
 
             if has_content:
@@ -114,7 +132,7 @@ async def sync_longterm_to_notion(interval: float = 300.0):
                 title=title,
                 content=content,
                 tags=tags,
-                source_path=source_path
+                source_path=source_path,
             )
 
             if "id" in result:
@@ -123,17 +141,20 @@ async def sync_longterm_to_notion(interval: float = 300.0):
                     target="notion",
                     source_path=source_path,
                     target_id=result["id"],
-                    status="success"
+                    status="success",
                 )
                 action = result.get("action", "synced")
                 print(f"[SyncEngine] {title} {action} no Notion (ID: {result['id']})")
-            elif "error" in result and result["error"] not in ("Disabled", "Not configured"):
+            elif "error" in result and result["error"] not in (
+                "Disabled",
+                "Not configured",
+            ):
                 log_sync_event(
                     source="long_term_memory" if has_content else "operational_status",
                     target="notion",
                     source_path=source_path,
                     status="error",
-                    error_message=str(result["error"])
+                    error_message=str(result["error"]),
                 )
 
         except Exception as e:
@@ -144,7 +165,7 @@ async def sync_longterm_to_notion(interval: float = 300.0):
                     target="notion",
                     source_path="memory/long_term.json",
                     status="error",
-                    error_message=str(e)
+                    error_message=str(e),
                 )
             except Exception:
                 pass
@@ -153,6 +174,7 @@ async def sync_longterm_to_notion(interval: float = 300.0):
 
 
 # ---------- Worker 3: Anomalies → Linear ----------
+
 
 async def sync_insights_to_linear(memory_manager, interval: float = 300.0):
     """
@@ -164,12 +186,14 @@ async def sync_insights_to_linear(memory_manager, interval: float = 300.0):
     while True:
         try:
             anomalies = memory_manager.get_anomalies()
-            
+
             for anomaly in anomalies:
                 # Build a unique dedup key from the anomaly
                 dedup_key = f"anomaly:{anomaly['type']}:{anomaly.get('path', anomaly.get('source', 'unknown'))}"
-                
-                if was_already_synced(source="anomaly_detector", target="linear", source_path=dedup_key):
+
+                if was_already_synced(
+                    source="anomaly_detector", target="linear", source_path=dedup_key
+                ):
                     continue
 
                 result = await asyncio.to_thread(
@@ -177,7 +201,7 @@ async def sync_insights_to_linear(memory_manager, interval: float = 300.0):
                     title=anomaly["title"],
                     description=anomaly["description"],
                     priority=anomaly.get("priority", "medium"),
-                    source=dedup_key
+                    source=dedup_key,
                 )
 
                 if isinstance(result, dict) and result.get("id"):
@@ -186,16 +210,19 @@ async def sync_insights_to_linear(memory_manager, interval: float = 300.0):
                         target="linear",
                         source_path=dedup_key,
                         target_id=result.get("identifier", result.get("id")),
-                        status="success"
+                        status="success",
                     )
                     print(f"[SyncEngine] Issue criada no Linear: {anomaly['title']}")
-                elif isinstance(result, dict) and result.get("error") not in ("Disabled", "Not configured"):
+                elif isinstance(result, dict) and result.get("error") not in (
+                    "Disabled",
+                    "Not configured",
+                ):
                     log_sync_event(
                         source="anomaly_detector",
                         target="linear",
                         source_path=dedup_key,
                         status="error",
-                        error_message=str(result.get("error"))
+                        error_message=str(result.get("error")),
                     )
 
         except Exception as e:
@@ -205,6 +232,7 @@ async def sync_insights_to_linear(memory_manager, interval: float = 300.0):
 
 
 # ---------- Formatters ----------
+
 
 def _format_neural_map(snapshot: dict) -> str:
     """Formats a synaptic snapshot into a readable Obsidian markdown note."""
@@ -229,15 +257,19 @@ def _format_neural_map(snapshot: dict) -> str:
 
     for node in snapshot["top_nodes"]:
         basename = os.path.basename(node["path"])
-        lines.append(f"| `{basename}` | {node['weight']} | {node.get('last_accessed', 'N/A')} |")
+        lines.append(
+            f"| `{basename}` | {node['weight']} | {node.get('last_accessed', 'N/A')} |"
+        )
 
-    lines.extend([
-        f"",
-        f"## Sinapses Mais Fortes",
-        f"",
-        f"| Origem | Destino | Peso |",
-        f"|---|---|---|",
-    ])
+    lines.extend(
+        [
+            f"",
+            f"## Sinapses Mais Fortes",
+            f"",
+            f"| Origem | Destino | Peso |",
+            f"|---|---|---|",
+        ]
+    )
 
     for syn in snapshot["top_synapses"]:
         src = os.path.basename(syn["source"])
@@ -245,20 +277,29 @@ def _format_neural_map(snapshot: dict) -> str:
         lines.append(f"| `{src}` | `{tgt}` | {syn['weight']} |")
 
     if snapshot["recent_patterns"]:
-        lines.extend([
-            f"",
-            f"## Padrões Recentes",
-            f"",
-        ])
+        lines.extend(
+            [
+                f"",
+                f"## Padrões Recentes",
+                f"",
+            ]
+        )
         for pat in snapshot["recent_patterns"]:
-            lines.append(f"- **{pat['type']}**: {pat.get('context', 'N/A')} (importância: {pat.get('importance', 'N/A')})")
+            lines.append(
+                f"- **{pat['type']}**: {pat.get('context', 'N/A')} (importância: {pat.get('importance', 'N/A')})"
+            )
 
     return "\n".join(lines)
 
 
 def _format_memory_for_notion(memory: dict) -> str:
     """Formats long-term memory into structured text for Notion page content."""
-    lines = [f"# ZEUS — Perfil Cognitivo", f"", f"> Última sincronização: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", f""]
+    lines = [
+        f"# ZEUS — Perfil Cognitivo",
+        f"",
+        f"> Última sincronização: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        f"",
+    ]
 
     section_labels = {
         "identity": "🧬 Identidade",
@@ -273,17 +314,17 @@ def _format_memory_for_notion(memory: dict) -> str:
         block = memory.get(section, {})
         if not isinstance(block, dict) or not block:
             continue
-        
+
         lines.append(f"## {label}")
         lines.append("")
-        
+
         for key, value in list(block.items())[:15]:
             val = value.get("value") if isinstance(value, dict) else value
             updated = value.get("updated", "") if isinstance(value, dict) else ""
             if val:
                 date_suffix = f" _(atualizado: {updated})_" if updated else ""
                 lines.append(f"- **{key}**: {val}{date_suffix}")
-        
+
         lines.append("")
 
     return "\n".join(lines)
@@ -291,22 +332,24 @@ def _format_memory_for_notion(memory: dict) -> str:
 
 def _format_operational_status_for_notion(sync_status: dict) -> str:
     """Formats a minimal operational status page for Notion when long-term memory is empty."""
-    generated_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    return "\n".join([
-        "# ZEUS — Estado Operacional",
-        "",
-        f"> Última sincronização: {generated_at}",
-        "",
-        "## Second Brain",
-        "",
-        f"- Eventos totais: {sync_status.get('total_events', 0)}",
-        f"- Eventos pendentes: {sync_status.get('pending', 0)}",
-        f"- Eventos processados: {sync_status.get('processed', 0)}",
-        f"- Eventos com erro: {sync_status.get('error', 0)}",
-        f"- Operações de sync registradas: {sync_status.get('total_sync_ops', 0)}",
-        f"- Última operação de sync: {sync_status.get('last_sync_op') or 'N/A'}",
-        "",
-        "## Observação",
-        "",
-        "A memória longa ainda não possui perfil cognitivo persistido. Esta página confirma que o ZEUS já está conectado ao Notion e pronto para sincronizar dados conforme a memória for sendo construída.",
-    ])
+    generated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return "\n".join(
+        [
+            "# ZEUS — Estado Operacional",
+            "",
+            f"> Última sincronização: {generated_at}",
+            "",
+            "## Second Brain",
+            "",
+            f"- Eventos totais: {sync_status.get('total_events', 0)}",
+            f"- Eventos pendentes: {sync_status.get('pending', 0)}",
+            f"- Eventos processados: {sync_status.get('processed', 0)}",
+            f"- Eventos com erro: {sync_status.get('error', 0)}",
+            f"- Operações de sync registradas: {sync_status.get('total_sync_ops', 0)}",
+            f"- Última operação de sync: {sync_status.get('last_sync_op') or 'N/A'}",
+            "",
+            "## Observação",
+            "",
+            "A memória longa ainda não possui perfil cognitivo persistido. Esta página confirma que o ZEUS já está conectado ao Notion e pronto para sincronizar dados conforme a memória for sendo construída.",
+        ]
+    )

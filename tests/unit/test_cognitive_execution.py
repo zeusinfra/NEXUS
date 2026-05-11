@@ -1,4 +1,5 @@
 """Tests for the cognitive execution engine."""
+
 import pytest
 
 from zeus_core.cognitive.cognitive_db import init_cognitive_tables
@@ -25,7 +26,11 @@ class TestCognitiveExecutionEngine:
         assert result.status == "success"
 
     def test_execute_suggestion_step(self, engine):
-        step = {"action_type": "suggestion", "description": "Suggest action", "risk": "low"}
+        step = {
+            "action_type": "suggestion",
+            "description": "Suggest action",
+            "risk": "low",
+        }
         result = engine.execute_step("plan-1", 0, step)
         assert result.status == "success"
 
@@ -47,7 +52,11 @@ class TestCognitiveExecutionEngine:
         assert result.status == "requires_confirmation"
 
     def test_propose_action(self, engine):
-        step = {"action_type": "command", "description": "Install package", "risk": "high"}
+        step = {
+            "action_type": "command",
+            "description": "Install package",
+            "risk": "high",
+        }
         result = engine.propose_action("plan-1", 0, step)
         assert result.status == "requires_confirmation"
         assert result.risk == "high"
@@ -69,10 +78,20 @@ class TestCognitiveExecutionEngine:
         assert actions[0].id == "test-action-1"
 
     def test_list_actions_filter_by_status(self, engine):
-        r1 = ActionResult(id="a1", plan_id="p1", step_index=0, status="success",
-                          created_at="2026-01-01T00:00:00Z")
-        r2 = ActionResult(id="a2", plan_id="p1", step_index=1, status="requires_confirmation",
-                          created_at="2026-01-01T00:00:01Z")
+        r1 = ActionResult(
+            id="a1",
+            plan_id="p1",
+            step_index=0,
+            status="success",
+            created_at="2026-01-01T00:00:00Z",
+        )
+        r2 = ActionResult(
+            id="a2",
+            plan_id="p1",
+            step_index=1,
+            status="requires_confirmation",
+            created_at="2026-01-01T00:00:01Z",
+        )
         engine.audit_action(r1)
         engine.audit_action(r2)
 
@@ -81,8 +100,13 @@ class TestCognitiveExecutionEngine:
         assert pending[0].id == "a2"
 
     def test_get_pending_confirmations(self, engine):
-        r1 = ActionResult(id="p1", plan_id="p1", step_index=0, status="requires_confirmation",
-                          created_at="2026-01-01T00:00:00Z")
+        r1 = ActionResult(
+            id="p1",
+            plan_id="p1",
+            step_index=0,
+            status="requires_confirmation",
+            created_at="2026-01-01T00:00:00Z",
+        )
         engine.audit_action(r1)
         pending = engine.get_pending_confirmations()
         assert len(pending) >= 1
@@ -91,15 +115,35 @@ class TestCognitiveExecutionEngine:
         plan = {
             "id": "plan-safe",
             "steps": [
-                {"step": 1, "action_type": "read", "description": "Check", "risk": "low"},
-                {"step": 2, "action_type": "suggestion", "description": "Suggest", "risk": "low"},
+                {
+                    "step": 1,
+                    "action_type": "read",
+                    "description": "Check",
+                    "risk": "low",
+                },
+                {
+                    "step": 2,
+                    "action_type": "suggestion",
+                    "description": "Suggest",
+                    "risk": "low",
+                },
             ],
         }
         simulation = {
             "approved_for_auto_execution": True,
             "step_results": [
-                {"step": 1, "risk": "low", "blocked": False, "requires_confirmation": False},
-                {"step": 2, "risk": "low", "blocked": False, "requires_confirmation": False},
+                {
+                    "step": 1,
+                    "risk": "low",
+                    "blocked": False,
+                    "requires_confirmation": False,
+                },
+                {
+                    "step": 2,
+                    "risk": "low",
+                    "blocked": False,
+                    "requires_confirmation": False,
+                },
             ],
         }
         results = engine.execute_plan(plan, simulation)

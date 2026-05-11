@@ -6,21 +6,28 @@ from typing import List, Dict, Tuple
 
 try:
     from zeus_memory import VectorMemoryRust
+
     RUST_AVAILABLE = True
 except ImportError:
     RUST_AVAILABLE = False
+
 
 class VectorMemory:
     """
     Memória Vetorial Simplificada para ZEUS.
     Utiliza embeddings do Ollama e armazena em JSON para máxima portabilidade.
     """
-    def __init__(self, storage_file: str = "data/vector_memory.bin", embedding_model: str = "all-minilm"):
+
+    def __init__(
+        self,
+        storage_file: str = "data/vector_memory.bin",
+        embedding_model: str = "all-minilm",
+    ):
         self.storage_file = storage_file
         self.model = embedding_model
         self.url = "http://127.0.0.1:11434/api/embeddings"
         self.max_vectors = int(os.getenv("ZEUS_VECTOR_MAX", "5000") or "5000")
-        
+
         if RUST_AVAILABLE:
             print("🦀 ZEUS: Usando Backend Rust para Memória Vetorial.")
             self.rust_mem = VectorMemoryRust(storage_file)
@@ -30,12 +37,14 @@ class VectorMemory:
             self.rust_mem = None
             self.vectors: Dict[str, List[float]] = {}
             self.load()
-        
+
         self.service_url = "http://127.0.0.1:8082"
 
     def _call_service(self, endpoint: str, data: dict):
         try:
-            resp = requests.post(f"{self.service_url}/{endpoint}", json=data, timeout=0.5)
+            resp = requests.post(
+                f"{self.service_url}/{endpoint}", json=data, timeout=0.5
+            )
             if resp.status_code == 200:
                 return resp.json()
         except Exception:
@@ -62,9 +71,7 @@ class VectorMemory:
         """Solicita o vetor de embedding para um texto ao Ollama."""
         try:
             response = requests.post(
-                self.url, 
-                json={"model": self.model, "prompt": text}, 
-                timeout=10
+                self.url, json={"model": self.model, "prompt": text}, timeout=10
             )
             if response.status_code == 200:
                 return response.json().get("embedding", [])
@@ -123,7 +130,9 @@ class VectorMemory:
                 dot_product = np.dot(query_vector, vector)
                 norm_q = np.linalg.norm(query_vector)
                 norm_v = np.linalg.norm(vector)
-                similarity = dot_product / (norm_q * norm_v) if norm_q * norm_v > 0 else 0
+                similarity = (
+                    dot_product / (norm_q * norm_v) if norm_q * norm_v > 0 else 0
+                )
                 similarities.append((path, similarity))
             except Exception:
                 continue
@@ -144,7 +153,9 @@ class VectorMemory:
                 dot_product = np.dot(query_vector, vector)
                 norm_q = np.linalg.norm(query_vector)
                 norm_v = np.linalg.norm(vector)
-                similarity = dot_product / (norm_q * norm_v) if norm_q * norm_v > 0 else 0
+                similarity = (
+                    dot_product / (norm_q * norm_v) if norm_q * norm_v > 0 else 0
+                )
                 similarities.append((path, similarity))
             except Exception:
                 continue

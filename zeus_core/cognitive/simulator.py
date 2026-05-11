@@ -4,11 +4,11 @@ ZEUS Cognitive Core — Simulator.
 Risk assessment engine that evaluates plans against safety policies.
 Does NOT execute anything — pure analysis of command patterns and action types.
 """
+
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field, asdict
-from typing import Any
 
 from zeus_core.observability import get_logger, log_event
 
@@ -18,19 +18,19 @@ logger = get_logger("zeus.cognitive.simulator")
 # Dangerous command patterns that must ALWAYS be blocked
 BLOCKED_PATTERNS: list[re.Pattern] = [
     re.compile(r"\brm\s+(-[rRf]+\s+)*(/|\*|~|\.\.)"),  # rm -rf / or rm *
-    re.compile(r"\bchmod\s+(-R|--recursive)\s"),          # recursive chmod
-    re.compile(r"\bchown\s+(-R|--recursive)\s"),          # recursive chown
-    re.compile(r"\bcurl\b.*\|\s*(ba)?sh"),                # curl | bash
-    re.compile(r"\bwget\b.*\|\s*(ba)?sh"),                # wget | sh
-    re.compile(r"\bsudo\b"),                               # any sudo
-    re.compile(r"\bmkfs\b"),                               # filesystem format
-    re.compile(r"\bdd\s+if="),                             # disk destroyer
+    re.compile(r"\bchmod\s+(-R|--recursive)\s"),  # recursive chmod
+    re.compile(r"\bchown\s+(-R|--recursive)\s"),  # recursive chown
+    re.compile(r"\bcurl\b.*\|\s*(ba)?sh"),  # curl | bash
+    re.compile(r"\bwget\b.*\|\s*(ba)?sh"),  # wget | sh
+    re.compile(r"\bsudo\b"),  # any sudo
+    re.compile(r"\bmkfs\b"),  # filesystem format
+    re.compile(r"\bdd\s+if="),  # disk destroyer
     re.compile(r"\bshutdown\b"),
     re.compile(r"\breboot\b"),
     re.compile(r"\bpoweroff\b"),
-    re.compile(r"\bgit\s+push\b"),                         # no auto push
-    re.compile(r"\bgit\s+force"),                          # no force anything
-    re.compile(r">\s*\.env\b"),                          # redirecting into .env
+    re.compile(r"\bgit\s+push\b"),  # no auto push
+    re.compile(r"\bgit\s+force"),  # no force anything
+    re.compile(r">\s*\.env\b"),  # redirecting into .env
     re.compile(r"\bDROP\s+(TABLE|DATABASE)\b", re.IGNORECASE),  # SQL drops
     re.compile(r"\bTRUNCATE\b", re.IGNORECASE),
     re.compile(r"\bDELETE\s+FROM\b.*WHERE\s+1\s*=\s*1", re.IGNORECASE),
@@ -38,18 +38,18 @@ BLOCKED_PATTERNS: list[re.Pattern] = [
 
 # Patterns indicating elevated risk (not blocked, but requires confirmation)
 HIGH_RISK_PATTERNS: list[re.Pattern] = [
-    re.compile(r"\brm\b"),                # any rm
-    re.compile(r"\bmv\b"),                # file moves
-    re.compile(r"\bcp\b.*--force"),       # forced copy
-    re.compile(r"\bchmod\b"),             # any permission change
-    re.compile(r"\bchown\b"),             # any ownership change
-    re.compile(r"\bkill\b"),              # process killing
-    re.compile(r"\bpkill\b"),             # pattern killing
-    re.compile(r"\bgit\s+reset"),         # git reset
-    re.compile(r"\bgit\s+rebase"),        # git rebase
-    re.compile(r"\bnpm\s+install\b"),     # package installs
-    re.compile(r"\bpip\s+install\b"),     # pip installs
-    re.compile(r"\bcargo\s+install\b"),   # cargo installs
+    re.compile(r"\brm\b"),  # any rm
+    re.compile(r"\bmv\b"),  # file moves
+    re.compile(r"\bcp\b.*--force"),  # forced copy
+    re.compile(r"\bchmod\b"),  # any permission change
+    re.compile(r"\bchown\b"),  # any ownership change
+    re.compile(r"\bkill\b"),  # process killing
+    re.compile(r"\bpkill\b"),  # pattern killing
+    re.compile(r"\bgit\s+reset"),  # git reset
+    re.compile(r"\bgit\s+rebase"),  # git rebase
+    re.compile(r"\bnpm\s+install\b"),  # package installs
+    re.compile(r"\bpip\s+install\b"),  # pip installs
+    re.compile(r"\bcargo\s+install\b"),  # cargo installs
 ]
 
 RISK_ORDER = {"low": 0, "medium": 1, "high": 2, "critical": 3}
@@ -58,6 +58,7 @@ RISK_ORDER = {"low": 0, "medium": 1, "high": 2, "critical": 3}
 @dataclass
 class SimulationResult:
     """Result of simulating a plan."""
+
     plan_id: str
     approved_for_auto_execution: bool = False
     risk: str = "low"
@@ -107,7 +108,11 @@ class CognitiveSimulator:
         # For medium-risk, only auto-approve if all medium steps are read/diagnostic
         if max_risk == "medium" and not all_blocked:
             for sr in step_results:
-                if sr.get("risk") == "medium" and sr.get("action_type") not in {"read", "memory", "suggestion"}:
+                if sr.get("risk") == "medium" and sr.get("action_type") not in {
+                    "read",
+                    "memory",
+                    "suggestion",
+                }:
                     approved = False
                     break
 
@@ -116,14 +121,20 @@ class CognitiveSimulator:
             approved_for_auto_execution=approved,
             risk=max_risk,
             blocked_reasons=all_blocked,
-            safe_alternative=self._suggest_alternative(all_blocked) if all_blocked else "",
+            safe_alternative=self._suggest_alternative(all_blocked)
+            if all_blocked
+            else "",
             step_results=step_results,
         )
 
         log_event(
-            logger, 20, "plan_simulated",
-            plan_id=plan_id, approved=approved,
-            risk=max_risk, blocked_count=len(all_blocked),
+            logger,
+            20,
+            "plan_simulated",
+            plan_id=plan_id,
+            approved=approved,
+            risk=max_risk,
+            blocked_count=len(all_blocked),
         )
         return result
 
@@ -179,7 +190,9 @@ class CognitiveSimulator:
         reasons = []
         for pattern in BLOCKED_PATTERNS:
             if pattern.search(command):
-                reasons.append(f"Comando bloqueado por padrão destrutivo: {pattern.pattern}")
+                reasons.append(
+                    f"Comando bloqueado por padrão destrutivo: {pattern.pattern}"
+                )
         return reasons
 
     def _check_high_risk(self, command: str) -> bool:
@@ -194,7 +207,9 @@ class CognitiveSimulator:
         if any("rm" in r.lower() for r in blocked_reasons):
             return "Considere mover para uma pasta de quarentena em vez de deletar."
         if any("chmod" in r.lower() or "chown" in r.lower() for r in blocked_reasons):
-            return "Altere permissões apenas de arquivos específicos, não recursivamente."
+            return (
+                "Altere permissões apenas de arquivos específicos, não recursivamente."
+            )
         if any("sudo" in r.lower() for r in blocked_reasons):
             return "Execute sem sudo ou crie uma proposta para o operador aprovar."
         if any("push" in r.lower() for r in blocked_reasons):

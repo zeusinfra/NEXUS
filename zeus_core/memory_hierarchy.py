@@ -1,9 +1,9 @@
-
 import json
 import os
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any
 from datetime import datetime
+
 
 class MemoryHierarchy:
     """
@@ -13,24 +13,24 @@ class MemoryHierarchy:
     - Mid-Term: Pattern-based, persistent across cycles.
     - Long-Term: Vector-based, scalable knowledge store.
     """
+
     def __init__(self, blackboard, storage_path: str = "memory_hierarchy.json"):
         self.blackboard = blackboard
         self.storage_path = storage_path
         self.logger = logging.getLogger("ZEUS_MEMORY")
-        
+
         # Layers
-        self.short_term: Dict[str, Any] = {} # Contextual window
+        self.short_term: Dict[str, Any] = {}  # Contextual window
         self.mid_term: Dict[str, Any] = {}  # Pattern/Strategy history
-        self.long_term_path = os.path.join(os.path.dirname(__file__), "../vector_memory.json")
-        
+        self.long_term_path = os.path.join(
+            os.path.dirname(__file__), "../vector_memory.json"
+        )
+
         self.load_persistent_memory()
 
     def update_short_term(self, key: str, value: Any):
         """Updates the immediate volatile context."""
-        self.short_term[key] = {
-            "value": value,
-            "timestamp": datetime.now().isoformat()
-        }
+        self.short_term[key] = {"value": value, "timestamp": datetime.now().isoformat()}
         # Prevent overflow: Keep only the last 50 items
         if len(self.short_term) > 50:
             oldest_key = next(iter(self.short_term))
@@ -42,7 +42,7 @@ class MemoryHierarchy:
             self.mid_term[key] = {
                 "value": value,
                 "weight": importance,
-                "last_accessed": datetime.now().isoformat()
+                "last_accessed": datetime.now().isoformat(),
             }
             self.save_persistent_memory()
 
@@ -51,22 +51,30 @@ class MemoryHierarchy:
         # 1. Check Short-Term (Immediate match)
         if query in self.short_term:
             return {"layer": "short_term", "data": self.short_term[query]["value"]}
-        
+
         # 2. Check Mid-Term (Pattern match)
         if query in self.mid_term:
             return {"layer": "mid_term", "data": self.mid_term[query]["value"]}
-            
+
         # 3. Long-Term (Vector DB search handled by VectorMemory module)
-        return {"layer": "long_term", "data": None, "hint": "Consult VectorMemory for semantic match"}
+        return {
+            "layer": "long_term",
+            "data": None,
+            "hint": "Consult VectorMemory for semantic match",
+        }
 
     def compress_memory(self):
         """Automatic compression: Reduces Mid-Term noise."""
         # Prune Mid-Term items with weight <<  0.3
-        keys_to_prune = [k for k, v in self.mid_term.items() if v.get("weight", 1.0) <<  0.3]
+        keys_to_prune = [
+            k for k, v in self.mid_term.items() if v.get("weight", 1.0) << 0.3
+        ]
         for k in keys_to_prune:
             del self.mid_term[k]
         self.save_persistent_memory()
-        self.logger.info(f"Memory compression completed. Pruned {len(keys_to_prune)} items.")
+        self.logger.info(
+            f"Memory compression completed. Pruned {len(keys_to_prune)} items."
+        )
 
     def save_persistent_memory(self):
         """Saves Mid-Term layer to disk using atomic write."""

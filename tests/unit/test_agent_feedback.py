@@ -25,7 +25,11 @@ class AgentFeedbackTests(unittest.IsolatedAsyncioTestCase):
         reply = await agent.run("ping", broadcast=broadcast)
 
         self.assertEqual(reply, "Resposta final.")
-        stages = [event.get("stage") for event in events if event.get("type") == "AGENT_PROGRESS"]
+        stages = [
+            event.get("stage")
+            for event in events
+            if event.get("type") == "AGENT_PROGRESS"
+        ]
         self.assertIn("started", stages)
         self.assertIn("step_started", stages)
         self.assertIn("completed", stages)
@@ -36,14 +40,20 @@ class AgentFeedbackTests(unittest.IsolatedAsyncioTestCase):
         async def broadcast(payload):
             events.append(payload)
 
-        agent = ScriptedAgent([
-            '<tool_call>{"name":"system_capabilities","args":{}}</tool_call>',
-            "Capacidades verificadas.",
-        ])
+        agent = ScriptedAgent(
+            [
+                '<tool_call>{"name":"system_capabilities","args":{}}</tool_call>',
+                "Capacidades verificadas.",
+            ]
+        )
         reply = await agent.run("ver capacidades", broadcast=broadcast)
 
         self.assertEqual(reply, "Capacidades verificadas.")
-        stages = [event.get("stage") for event in events if event.get("type") == "AGENT_PROGRESS"]
+        stages = [
+            event.get("stage")
+            for event in events
+            if event.get("type") == "AGENT_PROGRESS"
+        ]
         self.assertIn("tool_running", stages)
         self.assertIn("tool_done", stages)
         self.assertIn("completed", stages)

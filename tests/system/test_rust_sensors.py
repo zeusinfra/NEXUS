@@ -4,7 +4,9 @@ from zeus_core.rust_sensors import RUST_SENSORS_AVAILABLE, get_os_snapshot
 
 
 class RustSensorsTests(unittest.TestCase):
-    @unittest.skipUnless(RUST_SENSORS_AVAILABLE, "zeus_sensors Rust extension is not installed")
+    @unittest.skipUnless(
+        RUST_SENSORS_AVAILABLE, "zeus_sensors Rust extension is not installed"
+    )
     def test_rust_os_snapshot_shape(self):
         snapshot = get_os_snapshot()
 
