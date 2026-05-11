@@ -7,7 +7,7 @@ from zeus_core.env import load_project_env
 
 load_project_env()
 
-VAULT_PATH = os.getenv("ZEUS_VAULT_PATH", "/home/zeus/Documentos/Brain")
+VAULT_PATH = os.getenv("NEXUS_VAULT_PATH", "/home/zeus/Documentos/Brain")
 
 
 def calculate_content_hash(content: str) -> str:
@@ -71,10 +71,10 @@ def write_obsidian_insight(title: str, content: str, folder: str = "Insights") -
 
 def write_sync_note(subfolder: str, filename: str, content: str) -> str:
     """
-    Escreve uma nota de sincronização na estrutura ZEUS_Sync/ do vault.
+    Escreve uma nota de sincronização na estrutura NEXUS_Sync/ do vault.
     Cria subpastas automaticamente. Sobrescreve o arquivo se existir.
     """
-    sync_folder = os.path.join(VAULT_PATH, "ZEUS_Sync", subfolder)
+    sync_folder = os.path.join(VAULT_PATH, "NEXUS_Sync", subfolder)
     os.makedirs(sync_folder, exist_ok=True)
 
     safe_name = re.sub(r'[\\/*?:"<>|]', "", filename)
@@ -94,13 +94,13 @@ def write_sync_note(subfolder: str, filename: str, content: str) -> str:
 
 def update_daily_log(entries: list[str], date_str: str = None) -> str:
     """
-    Append de entradas ao log diário em ZEUS_Sync/Daily/.
+    Append de entradas ao log diário em NEXUS_Sync/Daily/.
     Cria o arquivo se não existir, adicionando novas entradas sem apagar as antigas.
     """
     if date_str is None:
         date_str = datetime.now().strftime("%Y-%m-%d")
 
-    daily_folder = os.path.join(VAULT_PATH, "ZEUS_Sync", "Daily")
+    daily_folder = os.path.join(VAULT_PATH, "NEXUS_Sync", "Daily")
     os.makedirs(daily_folder, exist_ok=True)
 
     file_path = os.path.join(daily_folder, f"{date_str}.md")

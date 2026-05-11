@@ -29,7 +29,7 @@ def _now() -> float:
 
 
 def _env_mode() -> AutonomyMode:
-    m = os.getenv("ZEUS_MODE", os.getenv("ZEUS_V4_MODE", "SAFE")).strip().upper()
+    m = os.getenv("NEXUS_MODE", os.getenv("NEXUS_V4_MODE", "SAFE")).strip().upper()
     return (
         AutonomyMode(m) if m in {e.value for e in AutonomyMode} else AutonomyMode.SAFE
     )
@@ -41,19 +41,19 @@ class ZeusCognitiveCoreV4:
         self.short = ShortTermMemory()
         self.mid = MidTermMemory()
         self.long = LongTermMemory(
-            storage_file=os.getenv("ZEUS_V4_VECTOR_FILE", "data/vector_memory.json")
+            storage_file=os.getenv("NEXUS_V4_VECTOR_FILE", "data/vector_memory.json")
         )
         self.episodes = EpisodeLog(
-            path=os.getenv("ZEUS_V4_EPISODES_LOG", "logs/v4_episodes.jsonl")
+            path=os.getenv("NEXUS_V4_EPISODES_LOG", "logs/v4_episodes.jsonl")
         )
 
         self.goals = GoalsEngine(
-            storage_path=os.getenv("ZEUS_V4_GOALS_FILE", "configs/goals_v4.json")
+            storage_path=os.getenv("NEXUS_V4_GOALS_FILE", "configs/goals_v4.json")
         )
         self.goals.ensure_default_goals()
 
         self.planner = MultiStepPlanner(
-            llm_enabled=os.getenv("ZEUS_V4_LLM", "1").strip().lower()
+            llm_enabled=os.getenv("NEXUS_V4_LLM", "1").strip().lower()
             in {"1", "true", "yes", "on"}
         )
         self.exec = ShadowExecutor(mode=self.mode)
@@ -62,13 +62,13 @@ class ZeusCognitiveCoreV4:
         self.sensors = [
             OsMetricsSensor(),
             FilePollSensor(roots),
-            UserInboxSensor(os.getenv("ZEUS_V4_INBOX_FILE", "scratch/v4_inbox.txt")),
+            UserInboxSensor(os.getenv("NEXUS_V4_INBOX_FILE", "scratch/v4_inbox.txt")),
         ]
 
-        self.loop_delay_s = float(os.getenv("ZEUS_V4_LOOP_DELAY", "1.0"))
+        self.loop_delay_s = float(os.getenv("NEXUS_V4_LOOP_DELAY", "1.0"))
 
     async def run_forever(self) -> None:
-        max_cycles_env = os.getenv("ZEUS_V4_MAX_CYCLES", "").strip()
+        max_cycles_env = os.getenv("NEXUS_V4_MAX_CYCLES", "").strip()
         max_cycles = int(max_cycles_env) if max_cycles_env.isdigit() else None
         cycle = 0
 
@@ -95,7 +95,7 @@ class ZeusCognitiveCoreV4:
         # Se não há sinais relevantes, apenas mantém o loop vivo.
         top_rel = max((e.relevance for e in events), default=0.0)
         if (
-            top_rel < float(os.getenv("ZEUS_V4_MIN_RELEVANCE", "0.18"))
+            top_rel < float(os.getenv("NEXUS_V4_MIN_RELEVANCE", "0.18"))
             and situation.label == "idle"
         ):
             self._debug("WAIT", "Sem sinais relevantes. Mantendo vigilância.")
@@ -220,11 +220,11 @@ class ZeusCognitiveCoreV4:
         self.long.index_episode(goal.id, text)
 
     def _debug(self, stage: str, msg: str) -> None:
-        if os.getenv("ZEUS_V4_DEBUG", "1").strip().lower() not in {
+        if os.getenv("NEXUS_V4_DEBUG", "1").strip().lower() not in {
             "1",
             "true",
             "yes",
             "on",
         }:
             return
-        print(f"[ZEUS v4][{stage}] {msg}")
+        print(f"[NEXUS v4][{stage}] {msg}")

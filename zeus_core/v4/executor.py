@@ -35,15 +35,15 @@ class ShadowExecutor:
     def __init__(self, *, mode: AutonomyMode):
         self.mode = mode
         self.guardian = SemanticGuardian(mode=mode)
-        self.shadow_root = Path(os.getenv("ZEUS_SHADOW_ROOT", "/tmp/zeus_shadow"))
+        self.shadow_root = Path(os.getenv("NEXUS_SHADOW_ROOT", "/tmp/nexus_shadow"))
         self.shadow_root.mkdir(parents=True, exist_ok=True)
         self.enable_real = os.getenv(
-            "ZEUS_V4_ENABLE_REAL_EXECUTION", "0"
+            "NEXUS_V4_ENABLE_REAL_EXECUTION", "0"
         ).strip().lower() in {"1", "true", "yes", "on"}
         self.allowlist = {
             tok.strip()
             for tok in os.getenv(
-                "ZEUS_V4_CMD_ALLOWLIST", "ls,ps,du,df,free,uptime,whoami,id,uname"
+                "NEXUS_V4_CMD_ALLOWLIST", "ls,ps,du,df,free,uptime,whoami,id,uname"
             ).split(",")
             if tok.strip()
         }
@@ -171,7 +171,7 @@ class ShadowExecutor:
         if not argv:
             return False
         try:
-            timeout_s = float(os.getenv("ZEUS_V4_REAL_TIMEOUT_SEC", "12"))
+            timeout_s = float(os.getenv("NEXUS_V4_REAL_TIMEOUT_SEC", "12"))
         except Exception:
             timeout_s = 12.0
         try:
@@ -207,7 +207,7 @@ class ShadowExecutor:
 
     async def _simulate_command(self, command: str) -> dict[str, Any]:
         try:
-            timeout_s = float(os.getenv("ZEUS_V4_SHADOW_TIMEOUT_SEC", "10"))
+            timeout_s = float(os.getenv("NEXUS_V4_SHADOW_TIMEOUT_SEC", "10"))
         except Exception:
             timeout_s = 10.0
 

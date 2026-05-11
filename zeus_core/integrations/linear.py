@@ -10,7 +10,7 @@ privacy_guard = PrivacyGuard()
 
 LINEAR_API_KEY = os.getenv("LINEAR_API_KEY")
 LINEAR_TEAM_ID = os.getenv("LINEAR_TEAM_ID")
-LINEAR_ENABLED = os.getenv("ZEUS_ENABLE_LINEAR", "false").lower() in {
+LINEAR_ENABLED = os.getenv("NEXUS_ENABLE_LINEAR", "false").lower() in {
     "1",
     "true",
     "yes",
@@ -183,14 +183,14 @@ def create_insight_issue(
 ) -> dict:
     """
     Wrapper simplificado para criação automática de issues a partir de insights do sync engine.
-    Adiciona prefixo [ZEUS Insight] e metadata de origem.
+    Adiciona prefixo [NEXUS Insight] e metadata de origem.
     """
     if not LINEAR_ENABLED:
         return {"error": "Disabled"}
     if not LINEAR_API_KEY or not LINEAR_TEAM_ID:
         return {"error": "Not configured"}
 
-    prefixed_title = f"[ZEUS Insight] {title}"
+    prefixed_title = f"[NEXUS Insight] {title}"
     full_description = (
         f"{description}\n\n"
         f"---\n"

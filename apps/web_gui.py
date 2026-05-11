@@ -30,7 +30,7 @@ from zeus_core.cognitive.user_profile_engine import record_interaction
 from zeus_core.security.privacy_guard import PrivacyGuard
 from apps.lifecycle_manager import LifecycleManager
 from pattern_engine import PatternEngine
-from apps.zeus_evolution import ZeusBrain
+from apps.nexus_evolution import NexusBrain
 from zeus_core.core_system import call_cloud_llm, get_llm_status
 from zeus_core.agent import Agent
 from zeus_core.vector_memory import VectorMemory
@@ -107,8 +107,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from pydantic import BaseModel
 
-setup_logging(os.getenv("ZEUS_LOG_LEVEL", "INFO"))
-logger = get_logger("zeus.web")
+setup_logging(os.getenv("NEXUS_LOG_LEVEL", "INFO"))
+logger = get_logger("nexus.web")
 
 # --- CONFIGURAÇÕES ---
 WATCH_DIRS = [str(PROJECT_ROOT)]
@@ -121,43 +121,43 @@ DEFAULT_ALLOWED_ORIGINS = [
 ]
 _env_flag = env_flag
 
-ALLOW_LAN = _env_flag("ZEUS_ALLOW_LAN", "0")
-DISABLE_SSL = _env_flag("ZEUS_DISABLE_SSL", "0")
+ALLOW_LAN = _env_flag("NEXUS_ALLOW_LAN", "0")
+DISABLE_SSL = _env_flag("NEXUS_DISABLE_SSL", "0")
 print(f"DEBUG: ALLOW_LAN={ALLOW_LAN}, DISABLE_SSL={DISABLE_SSL}")
 
-ENABLE_VOICE = _env_flag("ZEUS_ENABLE_VOICE", "1")
-ENABLE_VOICE_SENSING = _env_flag("ZEUS_ENABLE_VOICE_SENSING", "0")
-ENABLE_BROWSER_SENSING = _env_flag("ZEUS_ENABLE_BROWSER_SENSING", "0")
-ENABLE_INTERNAL_WATCHER = _env_flag("ZEUS_ENABLE_INTERNAL_WATCHER", "0")
-ENABLE_AUTONOMOUS_TASKS = _env_flag("ZEUS_ENABLE_AUTONOMOUS_TASKS", "0")
-ENABLE_BOOT_GREETING = _env_flag("ZEUS_ENABLE_BOOT_GREETING", "0")
-ENABLE_RESOURCE_MONITOR = _env_flag("ZEUS_ENABLE_RESOURCE_MONITOR", "0")
-ENABLE_SECOND_BRAIN = _env_flag("ZEUS_ENABLE_SECOND_BRAIN", "0")
-ENABLE_SECOND_BRAIN_SYNC_ENGINE = _env_flag("ZEUS_ENABLE_SECOND_BRAIN_SYNC_ENGINE", "0")
-ENABLE_OBSIDIAN_AUTO_SYNC = _env_flag("ZEUS_ENABLE_OBSIDIAN_AUTO_SYNC", "0")
-ENABLE_NOTION_AUTO_SYNC = _env_flag("ZEUS_ENABLE_NOTION_AUTO_SYNC", "0")
-ENABLE_LINEAR_AUTO_SYNC = _env_flag("ZEUS_ENABLE_LINEAR_AUTO_SYNC", "0")
-ENABLE_OPEN_FILE = _env_flag("ZEUS_ENABLE_OPEN_FILE", "0")
-ENABLE_COGNITIVE_LOOP = _env_flag("ZEUS_COGNITIVE_LOOP_ENABLED", "0")
-LAN_AUTH_ENABLED = _env_flag("ZEUS_LAN_AUTH", "1" if ALLOW_LAN else "0")
-LAN_TOKEN = os.getenv("ZEUS_LAN_TOKEN", "").strip()
+ENABLE_VOICE = _env_flag("NEXUS_ENABLE_VOICE", "1")
+ENABLE_VOICE_SENSING = _env_flag("NEXUS_ENABLE_VOICE_SENSING", "0")
+ENABLE_BROWSER_SENSING = _env_flag("NEXUS_ENABLE_BROWSER_SENSING", "0")
+ENABLE_INTERNAL_WATCHER = _env_flag("NEXUS_ENABLE_INTERNAL_WATCHER", "0")
+ENABLE_AUTONOMOUS_TASKS = _env_flag("NEXUS_ENABLE_AUTONOMOUS_TASKS", "0")
+ENABLE_BOOT_GREETING = _env_flag("NEXUS_ENABLE_BOOT_GREETING", "0")
+ENABLE_RESOURCE_MONITOR = _env_flag("NEXUS_ENABLE_RESOURCE_MONITOR", "0")
+ENABLE_SECOND_BRAIN = _env_flag("NEXUS_ENABLE_SECOND_BRAIN", "0")
+ENABLE_SECOND_BRAIN_SYNC_ENGINE = _env_flag("NEXUS_ENABLE_SECOND_BRAIN_SYNC_ENGINE", "0")
+ENABLE_OBSIDIAN_AUTO_SYNC = _env_flag("NEXUS_ENABLE_OBSIDIAN_AUTO_SYNC", "0")
+ENABLE_NOTION_AUTO_SYNC = _env_flag("NEXUS_ENABLE_NOTION_AUTO_SYNC", "0")
+ENABLE_LINEAR_AUTO_SYNC = _env_flag("NEXUS_ENABLE_LINEAR_AUTO_SYNC", "0")
+ENABLE_OPEN_FILE = _env_flag("NEXUS_ENABLE_OPEN_FILE", "0")
+ENABLE_COGNITIVE_LOOP = _env_flag("NEXUS_COGNITIVE_LOOP_ENABLED", "0")
+LAN_AUTH_ENABLED = _env_flag("NEXUS_LAN_AUTH", "1" if ALLOW_LAN else "0")
+LAN_TOKEN = os.getenv("NEXUS_LAN_TOKEN", "").strip()
 
 ALLOWED_ORIGINS = [
     origin.strip()
     for origin in os.getenv(
-        "ZEUS_ALLOWED_ORIGINS", ",".join(DEFAULT_ALLOWED_ORIGINS)
+        "NEXUS_ALLOWED_ORIGINS", ",".join(DEFAULT_ALLOWED_ORIGINS)
     ).split(",")
     if origin.strip()
 ]
 
-SERVER_HOST = os.getenv("ZEUS_BIND_HOST", "0.0.0.0" if ALLOW_LAN else "127.0.0.1")
-SERVER_PORT = int(os.getenv("ZEUS_PORT", "8080"))
+SERVER_HOST = os.getenv("NEXUS_BIND_HOST", "0.0.0.0" if ALLOW_LAN else "127.0.0.1")
+SERVER_PORT = int(os.getenv("NEXUS_PORT", "8080"))
 PROJECT_COLORS = {
-    "ZEUS_BRAIN": "#00f0ff",
+    "NEXUS_BRAIN": "#00f0ff",
     "GateStack": "#8c3cff",
-    "ZEUS_SYSTEM": "#00ffcc",
-    "zeus-rb": "#00ffcc",
-    "zeus-portfolio": "#ff9628",
+    "NEXUS_SYSTEM": "#00ffcc",
+    "nexus-rb": "#00ffcc",
+    "nexus-portfolio": "#ff9628",
     "bot": "#ff3c50",
     "IA": "#00f0ff",
     "WEB_SENSING": "#ffd166",
@@ -170,18 +170,18 @@ WS_BATCH_SAMPLE_LIMIT = 6
 MEMORY_SAVE_INTERVAL_SECONDS = 12
 MEMORY_SAVE_EVENT_DELTA = 20
 MEMORY_DECAY_FACTOR = 0.98  # Fator de "esquecimento" aplicado em cada ciclo de limpeza
-MAX_SYNAPTIC_PATHS = int(os.getenv("ZEUS_MAX_SYNAPTIC_PATHS", "20000") or "20000")
-MAX_CONNECTIONS_PER_NODE = int(os.getenv("ZEUS_MAX_CONNECTIONS_PER_NODE", "25") or "25")
+MAX_SYNAPTIC_PATHS = int(os.getenv("NEXUS_MAX_SYNAPTIC_PATHS", "20000") or "20000")
+MAX_CONNECTIONS_PER_NODE = int(os.getenv("NEXUS_MAX_CONNECTIONS_PER_NODE", "25") or "25")
 SYNAPTIC_PRUNE_INTERVAL_SECONDS = float(
-    os.getenv("ZEUS_SYNAPTIC_PRUNE_INTERVAL_SECONDS", "60") or "60"
+    os.getenv("NEXUS_SYNAPTIC_PRUNE_INTERVAL_SECONDS", "60") or "60"
 )
-EVENT_QUEUE_MAXSIZE = int(os.getenv("ZEUS_EVENT_QUEUE_MAXSIZE", "2000") or "2000")
+EVENT_QUEUE_MAXSIZE = int(os.getenv("NEXUS_EVENT_QUEUE_MAXSIZE", "2000") or "2000")
 MAX_CHAT_MESSAGE_CHARS = int(
-    os.getenv("ZEUS_MAX_CHAT_MESSAGE_CHARS", "16000") or "16000"
+    os.getenv("NEXUS_MAX_CHAT_MESSAGE_CHARS", "16000") or "16000"
 )
-MAX_WEB_CONTEXT_CHARS = int(os.getenv("ZEUS_MAX_WEB_CONTEXT_CHARS", "50000") or "50000")
+MAX_WEB_CONTEXT_CHARS = int(os.getenv("NEXUS_MAX_WEB_CONTEXT_CHARS", "50000") or "50000")
 MAX_VISION_IMAGE_BYTES = int(
-    os.getenv("ZEUS_MAX_VISION_IMAGE_BYTES", str(6 * 1024 * 1024))
+    os.getenv("NEXUS_MAX_VISION_IMAGE_BYTES", str(6 * 1024 * 1024))
     or str(6 * 1024 * 1024)
 )
 
@@ -232,18 +232,22 @@ current_node = "N/A"
 recent_events = []
 recent_system_alerts: list[dict] = []
 loop = None
+_memory_save_lock = None
 event_pipeline = OverflowEventQueue(EVENT_QUEUE_MAXSIZE)
 watcher_runner = RustWatcherRunner(PROJECT_ROOT)
 _scan_lock = False  # Proteção contra scans simultâneos
+_watcher_task = None
+_sync_worker_task = None
+_sync_engine_tasks = []
 MEMORY_FILE = os.path.join(BASE_DIR, "data", "synaptic_memory.json")
-memory_manager = MemoryManager(db_path=os.path.join(BASE_DIR, "data", "zeus_memory.db"))
+memory_manager = MemoryManager(db_path=os.path.join(BASE_DIR, "data", "nexus_memory.db"))
 pattern_engine = PatternEngine(MEMORY_FILE)
-brain = ZeusBrain()  # The Cognitive Core
+brain = NexusBrain()  # The Cognitive Core
 vector_memory = VectorMemory(
     storage_file=os.path.join(BASE_DIR, "data", "vector_memory.json")
 )
 memory_manager.vector_memory = vector_memory
-voice_module = VoiceSensing(wake_word=os.getenv("ZEUS_WAKE_WORD", "zeus"))
+voice_module = VoiceSensing(wake_word=os.getenv("NEXUS_WAKE_WORD", "nexus"))
 WATCH_ROOTS = [Path(path).resolve() for path in WATCH_DIRS if os.path.exists(path)]
 long_term_memory = load_long_memory()
 resource_control = ResourceControl(
@@ -321,25 +325,25 @@ async def lifespan(app: FastAPI):
     _watcher_task = None
     _sync_worker_task = None
     _sync_engine_tasks = []
-    vault_path = os.getenv("ZEUS_VAULT_PATH", "/home/zeus/Documentos/Brain")
+    vault_path = os.getenv("NEXUS_VAULT_PATH", "/home/zeus/Documentos/Brain")
     if ENABLE_SECOND_BRAIN and os.path.exists(vault_path):
-        print(f"[ZEUS] Iniciando Second Brain integrando {vault_path}")
+        print(f"[NEXUS] Iniciando Second Brain integrando {vault_path}")
         _watcher_task = asyncio.create_task(watch_vault(vault_path))
         _sync_worker_task = asyncio.create_task(sync_worker_loop())
         if ENABLE_SECOND_BRAIN_SYNC_ENGINE or ENABLE_OBSIDIAN_AUTO_SYNC:
-            print("[ZEUS] Iniciando Sync Engine: Sináptico→Obsidian")
+            print("[NEXUS] Iniciando Sync Engine: Sináptico→Obsidian")
             _sync_engine_tasks.append(
                 asyncio.create_task(
                     sync_synaptic_to_obsidian(memory_manager, interval=60.0)
                 )
             )
         if ENABLE_SECOND_BRAIN_SYNC_ENGINE or ENABLE_NOTION_AUTO_SYNC:
-            print("[ZEUS] Iniciando Sync Engine: LongTerm→Notion")
+            print("[NEXUS] Iniciando Sync Engine: LongTerm→Notion")
             _sync_engine_tasks.append(
                 asyncio.create_task(sync_longterm_to_notion(interval=300.0))
             )
         if ENABLE_SECOND_BRAIN_SYNC_ENGINE or ENABLE_LINEAR_AUTO_SYNC:
-            print("[ZEUS] Iniciando Sync Engine: Insights→Linear")
+            print("[NEXUS] Iniciando Sync Engine: Insights→Linear")
             _sync_engine_tasks.append(
                 asyncio.create_task(
                     sync_insights_to_linear(memory_manager, interval=300.0)
@@ -348,7 +352,7 @@ async def lifespan(app: FastAPI):
 
     # Cognitive Loop
     if ENABLE_COGNITIVE_LOOP:
-        print("[ZEUS] Iniciando Cognitive Loop autônomo")
+        print("[NEXUS] Iniciando Cognitive Loop autônomo")
         await cognition_service.start()
 
     yield
@@ -388,9 +392,9 @@ app.middleware("http")(correlation_id_middleware)
 
 
 indexing_semaphore = asyncio.Semaphore(2)  # Limite de indexação simultânea
-LOW_MEM_AUTO = _env_flag("ZEUS_LOW_MEM_AUTO", "1")
-LOW_MEM_ENTER_RAM = float(os.getenv("ZEUS_LOW_MEM_ENTER_RAM", "82") or "82")
-LOW_MEM_EXIT_RAM = float(os.getenv("ZEUS_LOW_MEM_EXIT_RAM", "72") or "72")
+LOW_MEM_AUTO = _env_flag("NEXUS_LOW_MEM_AUTO", "1")
+LOW_MEM_ENTER_RAM = float(os.getenv("NEXUS_LOW_MEM_ENTER_RAM", "82") or "82")
+LOW_MEM_EXIT_RAM = float(os.getenv("NEXUS_LOW_MEM_EXIT_RAM", "72") or "72")
 LOW_MEM_ACTIVE = False
 _voice_task = None
 _web_sensing_task = None
@@ -415,7 +419,7 @@ async def speak(text, target: str = "all"):
     try:
         if not ENABLE_VOICE:
             # Em modo somente texto, apenas loga
-            print(f"[ZEUS VOICE ALERT] {display_reply or text}")
+            print(f"[NEXUS VOICE ALERT] {display_reply or text}")
             return
 
         # Envia o comando de voz para a Bolha/Web via Socket.io
@@ -432,8 +436,8 @@ async def speak(text, target: str = "all"):
         # Mantém a fala no servidor quando habilitado
         await voice_module.speak(spoken_text or text)
     except Exception as e:
-        print(f"[ZEUS] Falha ao falar (fallback para log): {e}")
-        print(f"[ZEUS VOICE ALERT] {display_reply or text}")
+        print(f"[NEXUS] Falha ao falar (fallback para log): {e}")
+        print(f"[NEXUS VOICE ALERT] {display_reply or text}")
 
 
 async def cleanup_voice_temp_files():
@@ -466,7 +470,7 @@ def _extract_bearer_token(value: str | None) -> str | None:
 
 def _require_lan_token_for_request(request: Request) -> None:
     """
-    Quando ZEUS_ALLOW_LAN=1, exige token para chamadas vindas de hosts não-locais.
+    Quando NEXUS_ALLOW_LAN=1, exige token para chamadas vindas de hosts não-locais.
     Objetivo: evitar que qualquer device na LAN tenha acesso ao core.
     """
     require_lan_token_for_request(request, lan=_build_lan_security_config())
@@ -538,7 +542,7 @@ def get_browser_history():
             try:
                 # O SQLite trava o arquivo se o browser estiver aberto. Copiamos para ler.
                 with tempfile.NamedTemporaryFile(
-                    prefix="zeus_web_history_", delete=False
+                    prefix="nexus_web_history_", delete=False
                 ) as temp_file:
                     temp_history = temp_file.name
                 shutil.copy2(path, temp_history)
@@ -730,7 +734,7 @@ async def throttled_index_file(path):
             # Throttle: Se o sistema estiver crítico, aguarda antes de indexar
             while resource_control.is_critical():
                 print(
-                    f"[ZEUS RESOURCE ALERT] High pressure detected. Indexing paused for {path}..."
+                    f"[NEXUS RESOURCE ALERT] High pressure detected. Indexing paused for {path}..."
                 )
                 await asyncio.sleep(5.0)
 
@@ -747,11 +751,11 @@ def get_project(path):
     # Tenta identificar o projeto baseado no caminho absoluto
     for wd in WATCH_DIRS:
         if path.startswith(wd):
-            root_name = os.path.basename(wd.rstrip(os.sep)) or "ZEUS_SYSTEM"
+            root_name = os.path.basename(wd.rstrip(os.sep)) or "NEXUS_SYSTEM"
             rel = os.path.relpath(path, wd)
             parts = rel.split(os.sep)
-            if "ZEUS_BRAIN" in wd:
-                return "ZEUS_BRAIN"
+            if "NEXUS_BRAIN" in wd:
+                return "NEXUS_BRAIN"
             if parts and parts[0] not in {"", "."} and len(parts) > 1:
                 return parts[0]
             return root_name
@@ -991,7 +995,7 @@ async def receive_web_context(data: dict, request: Request):
             "log": {
                 "channel": "web",
                 "title": "Consciência Web Expandida",
-                "detail": f"ZEUS assimilou conteúdo de: {title or url}",
+                "detail": f"NEXUS assimilou conteúdo de: {title or url}",
                 "meta": f"length={len(content)}",
             },
         }
@@ -1003,7 +1007,7 @@ async def receive_web_context(data: dict, request: Request):
 @app.get("/status")
 async def get_status(request: Request):
     _require_lan_token_for_request(request)
-    client_id = request.headers.get("x-zeus-client-id")
+    client_id = request.headers.get("x-nexus-client-id")
 
     cpu_per_core = psutil.cpu_percent(percpu=True)
     ram = psutil.virtual_memory().percent
@@ -1018,7 +1022,7 @@ async def get_status(request: Request):
         "disk": disk,
         "total_events": total_events,
         "mood": system_mood,
-        "active_path": nodes_data[-1]["rel"] if nodes_data else "ZEUS_SYSTEM / IDLE",
+        "active_path": nodes_data[-1]["rel"] if nodes_data else "NEXUS_SYSTEM / IDLE",
         "project_activity": build_project_activity(),
         "messages": pending_msgs,
     }
@@ -1033,7 +1037,7 @@ async def api_events_drain(request: Request, client_id: str | None = None):
     _require_lan_token_for_request(request)
 
     resolved_client_id = (
-        client_id or request.headers.get("x-zeus-client-id") or ""
+        client_id or request.headers.get("x-nexus-client-id") or ""
     ).strip()[:64]
     if not resolved_client_id:
         raise HTTPException(status_code=400, detail="client_id is required.")
@@ -1058,7 +1062,7 @@ async def voice_context_trigger(text: str, channel: str = "system"):
         "cognitive": "Sussurro cerebral: ",
         "signal": "Sinal detectado: ",
         "os": "Alerta de sistema: ",
-        "system": "ZEUS informa: ",
+        "system": "NEXUS informa: ",
     }.get(channel, "")
 
     full_text = f"{prefix}{text}"
@@ -1398,8 +1402,8 @@ class SystemAlertReq(BaseModel):
 
 
 def _build_second_brain_status() -> dict:
-    vault_path = os.getenv("ZEUS_VAULT_PATH", "/home/zeus/Documentos/Brain")
-    db_path = os.getenv("ZEUS_DB_PATH", "./zeus_events.db")
+    vault_path = os.getenv("NEXUS_VAULT_PATH", "/home/zeus/Documentos/Brain")
+    db_path = os.getenv("NEXUS_DB_PATH", "./nexus_events.db")
     status = {
         "enabled": bool(ENABLE_SECOND_BRAIN),
         "sync_engine_enabled": bool(ENABLE_SECOND_BRAIN_SYNC_ENGINE),
@@ -1415,14 +1419,14 @@ def _build_second_brain_status() -> dict:
         "db_path": db_path,
         "db_exists": os.path.exists(db_path),
         "notion": {
-            "enabled": _env_flag("ZEUS_ENABLE_NOTION", "0"),
+            "enabled": _env_flag("NEXUS_ENABLE_NOTION", "0"),
             "configured": bool(
                 os.getenv("NOTION_TOKEN", "").strip()
                 and os.getenv("NOTION_DATABASE_ID", "").strip()
             ),
         },
         "linear": {
-            "enabled": _env_flag("ZEUS_ENABLE_LINEAR", "0"),
+            "enabled": _env_flag("NEXUS_ENABLE_LINEAR", "0"),
             "configured": bool(
                 os.getenv("LINEAR_API_KEY", "").strip()
                 and os.getenv("LINEAR_TEAM_ID", "").strip()
@@ -1446,24 +1450,24 @@ def _build_operational_capabilities() -> dict:
     allowed_edit_paths = [
         item.strip()
         for item in os.getenv(
-            "ZEUS_ALLOWED_EDIT_PATHS",
-            "/home/zeus/Documentos/ZEUS_SYSTEM,/home/zeus/Documentos/Brain,/tmp/zeus_",
+            "NEXUS_ALLOWED_EDIT_PATHS",
+            "/home/zeus/Documentos/ZEUS_SYSTEM,/home/zeus/Documentos/Brain,/tmp/nexus_",
         ).split(",")
         if item.strip()
     ]
     command_allowlist = [
         item.strip()
         for item in os.getenv(
-            "ZEUS_CMD_ALLOWLIST",
+            "NEXUS_CMD_ALLOWLIST",
             "ls,pwd,echo,cat,sed,rg,find,wc,python3,node,npm,cargo,git,systemctl,apt,pip,pip3,df,free,uptime,ip,ss,top,htop",
         ).split(",")
         if item.strip()
     ]
-    root_daemon_socket = os.getenv("ZEUS_DAEMON_SOCKET", "/tmp/zeus/daemon.sock")
-    root_daemon_enabled = _env_flag("ZEUS_ROOT_DAEMON_ENABLED", "0")
+    root_daemon_socket = os.getenv("NEXUS_DAEMON_SOCKET", "/tmp/nexus/daemon.sock")
+    root_daemon_enabled = _env_flag("NEXUS_ROOT_DAEMON_ENABLED", "0")
     return {
         "feedback": {
-            "agent_progress_events": _env_flag("ZEUS_AGENT_PROGRESS_EVENTS", "1"),
+            "agent_progress_events": _env_flag("NEXUS_AGENT_PROGRESS_EVENTS", "1"),
             "tool_logs": True,
             "chat_completion_status": True,
         },
@@ -1478,8 +1482,8 @@ def _build_operational_capabilities() -> dict:
             "internal_watcher_enabled": ENABLE_INTERNAL_WATCHER,
         },
         "execution": {
-            "tool_execution_mode": os.getenv("ZEUS_TOOL_EXECUTION_MODE", "confirm"),
-            "autonomy_level": os.getenv("ZEUS_AUTONOMY_LEVEL", "GUARDED"),
+            "tool_execution_mode": os.getenv("NEXUS_TOOL_EXECUTION_MODE", "confirm"),
+            "autonomy_level": os.getenv("NEXUS_AUTONOMY_LEVEL", "GUARDED"),
             "command_allowlist": command_allowlist,
             "allowed_edit_paths": allowed_edit_paths,
         },
@@ -1807,8 +1811,8 @@ async def api_chat(req: ChatReq, request: Request):
 async def api_applet_chat(req: ChatReq, request: Request):
     req.source = (req.source or "cinnamon_applet").strip() or "cinnamon_applet"
     req.client_id = (
-        req.client_id or "zeus_cinnamon_applet"
-    ).strip() or "zeus_cinnamon_applet"
+        req.client_id or "nexus_cinnamon_applet"
+    ).strip() or "nexus_cinnamon_applet"
     return await api_chat(req, request)
 
 
@@ -1999,7 +2003,7 @@ async def api_system_alert(req: SystemAlertReq, request: Request):
         if ENABLE_VOICE:
             asyncio.create_task(voice_module.speak(spoken_text or message[:500]))
         else:
-            print(f"[ZEUS VOICE ALERT] {display_text(message[:500])}")
+            print(f"[NEXUS VOICE ALERT] {display_text(message[:500])}")
     return {"ok": True}
 
 
@@ -2277,7 +2281,7 @@ def _build_api_health_payload() -> dict:
         watcher_runner.last_event_at,
     )
     if watcher_status["status"] == "offline":
-        watcher_port = int(os.getenv("ZEUS_WATCHER_PORT", "8081"))
+        watcher_port = int(os.getenv("NEXUS_WATCHER_PORT", "8081"))
         watcher_status = build_external_watcher_status(PROJECT_ROOT, port=watcher_port)
 
     health = build_runtime_health(
@@ -2292,8 +2296,8 @@ def _build_api_health_payload() -> dict:
         ocr_available=is_tesseract_available(),
     )
     health["config"] = build_config_diagnostics(lan=_build_lan_security_config())
-    health["config"]["mode"] = os.getenv("ZEUS_MODE", "SAFE")
-    health["config"]["auto_evolve"] = os.getenv("ZEUS_AUTO_EVOLVE", "0") in {
+    health["config"]["mode"] = os.getenv("NEXUS_MODE", "SAFE")
+    health["config"]["auto_evolve"] = os.getenv("NEXUS_AUTO_EVOLVE", "0") in {
         "1",
         "true",
         "yes",
@@ -2488,7 +2492,7 @@ if __name__ == "__main__":
 
     if "--headless" in sys.argv or "--server" in sys.argv:
         # Modo Servidor Puro (Headless)
-        print(f"🌑 ZEUS em modo HEADLESS operacional em {SERVER_HOST}:{SERVER_PORT}")
+        print(f"🌑 NEXUS em modo HEADLESS operacional em {SERVER_HOST}:{SERVER_PORT}")
         ssl_opts = {}
         if not DISABLE_SSL:
             # Bundled test/local keys (fixtures)

@@ -26,7 +26,7 @@ class VectorMemory:
         self.storage_file = storage_file
         self.model = embedding_model
         self.url = "http://127.0.0.1:11434/api/embeddings"
-        self.max_vectors = int(os.getenv("ZEUS_VECTOR_MAX", "5000") or "5000")
+        self.max_vectors = int(os.getenv("NEXUS_VECTOR_MAX", "5000") or "5000")
 
         if RUST_AVAILABLE:
             print("🦀 NEXUS: Usando Backend Rust para Memória Vetorial.")

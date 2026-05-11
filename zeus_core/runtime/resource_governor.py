@@ -9,11 +9,11 @@ class ResourceGovernor:
     """Monitora CPU, RAM, swap e disco, disparando eventos e ajustando o sistema."""
 
     def __init__(self):
-        self.cpu_limit = float(os.getenv("ZEUS_CPU_SOFT_LIMIT", "65"))
-        self.ram_limit = float(os.getenv("ZEUS_RAM_SOFT_LIMIT", "75"))
-        self.swap_limit = float(os.getenv("ZEUS_SWAP_SOFT_LIMIT", "50"))
-        self.disk_min_free = float(os.getenv("ZEUS_DISK_MIN_FREE_PERCENT", "10"))
-        self.zeus_mode = os.getenv("ZEUS_MODE", "BALANCED").upper()
+        self.cpu_limit = float(os.getenv("NEXUS_CPU_SOFT_LIMIT", "65"))
+        self.ram_limit = float(os.getenv("NEXUS_RAM_SOFT_LIMIT", "75"))
+        self.swap_limit = float(os.getenv("NEXUS_SWAP_SOFT_LIMIT", "50"))
+        self.disk_min_free = float(os.getenv("NEXUS_DISK_MIN_FREE_PERCENT", "10"))
+        self.zeus_mode = os.getenv("NEXUS_MODE", "BALANCED").upper()
 
         self.is_low_resource_mode = False
         self.high_cpu_consecutive_checks = 0
@@ -79,7 +79,7 @@ class ResourceGovernor:
     def get_cognitive_interval(self, current_interval: int) -> int:
         """Se estiver em LOW_RESOURCE, o intervalo base é sobrescrito ou aumentado."""
         if self.is_low_resource_mode:
-            return int(os.getenv("ZEUS_COGNITIVE_INTERVAL_LOW_RESOURCE", "90"))
+            return int(os.getenv("NEXUS_COGNITIVE_INTERVAL_LOW_RESOURCE", "90"))
         return current_interval
 
     def start(self):

@@ -1,5 +1,5 @@
 """
-ZEUS RootDaemon — Único processo privilegiado do sistema.
+NEXUS RootDaemon — Único processo privilegiado do sistema.
 
 Roda via systemd. Socket Unix 0660. Sem endpoint HTTP público.
 Aceita comando cru livre com blocklist de segurança.
@@ -136,7 +136,7 @@ READ_ONLY_COMMANDS = {
 
 # Comandos de serviço permitidos explicitamente
 SERVICE_COMMANDS = {"restart", "status", "stop", "start", "reload"}
-ZEUS_SERVICES = {"zeus_core", "zeus-root-daemon", "zeus-gtk-chat", "zeus"}
+NEXUS_SERVICES = {"nexus-core", "nexus-root-daemon", "nexus-gtk-chat", "nexus"}
 
 # Subcomandos que tornam um comando read-only em escrita
 WRITE_SUBCOMMANDS = {
@@ -177,7 +177,7 @@ APT_ALLOWLIST_DEFAULT = (
 
 # Caminhos permitidos para edição
 ALLOWED_EDIT_PATHS_DEFAULT = (
-    "/home/zeus/Documentos/ZEUS_SYSTEM,/home/zeus/Documentos/Brain,/tmp/zeus_"
+    "/home/zeus/Documentos/ZEUS_SYSTEM,/home/zeus/Documentos/Brain,/tmp/nexus_"
 )
 
 
@@ -187,28 +187,28 @@ ALLOWED_EDIT_PATHS_DEFAULT = (
 
 
 def _get_socket_path() -> str:
-    return os.getenv("ZEUS_DAEMON_SOCKET", "/tmp/zeus/daemon.sock")
+    return os.getenv("NEXUS_DAEMON_SOCKET", "/tmp/nexus/daemon.sock")
 
 
 def _get_approval_socket_path() -> str:
-    return os.getenv("ZEUS_DAEMON_APPROVAL_SOCKET", "/tmp/zeus/approval.sock")
+    return os.getenv("NEXUS_DAEMON_APPROVAL_SOCKET", "/tmp/nexus/approval.sock")
 
 
 def _get_vault_path() -> str:
-    return os.getenv("ZEUS_VAULT_PATH", "/home/zeus/Documentos/Brain")
+    return os.getenv("NEXUS_VAULT_PATH", "/home/zeus/Documentos/Brain")
 
 
 def _get_autonomy_level() -> str:
-    return os.getenv("ZEUS_AUTONOMY_LEVEL", "GUARDED").upper()
+    return os.getenv("NEXUS_AUTONOMY_LEVEL", "GUARDED").upper()
 
 
 def _get_apt_allowlist() -> set[str]:
-    raw = os.getenv("ZEUS_APT_ALLOWLIST", APT_ALLOWLIST_DEFAULT)
+    raw = os.getenv("NEXUS_APT_ALLOWLIST", APT_ALLOWLIST_DEFAULT)
     return {p.strip() for p in raw.split(",") if p.strip()}
 
 
 def _get_allowed_edit_paths() -> list[str]:
-    raw = os.getenv("ZEUS_ALLOWED_EDIT_PATHS", ALLOWED_EDIT_PATHS_DEFAULT)
+    raw = os.getenv("NEXUS_ALLOWED_EDIT_PATHS", ALLOWED_EDIT_PATHS_DEFAULT)
     return [p.strip() for p in raw.split(",") if p.strip()]
 
 
@@ -537,7 +537,7 @@ def _run_command(command: str, timeout: int = 60) -> Dict[str, Any]:
 
 
 class RootDaemon:
-    """Daemon principal do ZEUS. Único processo com capacidades elevadas."""
+    """Daemon principal do NEXUS. Único processo com capacidades elevadas."""
 
     def __init__(self):
         self.socket_path = _get_socket_path()
@@ -736,11 +736,11 @@ class RootDaemon:
         return {"status": "success", "results": results}
 
     async def handle_service_control(self, payload: dict) -> dict:
-        """Controla serviços do ZEUS de forma segura."""
+        """Controla serviços do NEXUS de forma segura."""
         service = payload.get("service")
         action = payload.get("service_action")
 
-        if service not in ZEUS_SERVICES or action not in SERVICE_COMMANDS:
+        if service not in NEXUS_SERVICES or action not in SERVICE_COMMANDS:
             return {"status": "blocked", "message": "Serviço ou ação não permitida."}
 
         cmd = f"systemctl --user {action} {service}"

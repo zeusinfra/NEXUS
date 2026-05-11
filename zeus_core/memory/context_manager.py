@@ -10,7 +10,7 @@ class ContextManager:
 
     def __init__(self):
         self.arch_decisions_path = os.path.join(
-            os.getenv("ZEUS_VAULT_PATH", "."), "architecture_decisions.md"
+            os.getenv("NEXUS_VAULT_PATH", "."), "architecture_decisions.md"
         )
 
     def _get_architectural_decisions(self) -> str:

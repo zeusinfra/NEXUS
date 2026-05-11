@@ -13,7 +13,7 @@ CORE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "docs")
 LOG_FILE = os.path.join(CORE_PATH, "06 - Log de Evolução.md")
 
 
-class ZeusBrain:
+class NexusBrain:
     def __init__(self, vector_memory=None):
         self.context = ""
         self.dna = ""
@@ -91,11 +91,11 @@ class ZeusBrain:
 
 
 if __name__ == "__main__":
-    zeus = ZeusBrain()
+    zeus = NexusBrain()
 
     os.system("clear")
     zeus.print_neon("╔════════════════════════════════════════════╗\n", "cyan")
-    zeus.print_neon("║      ZEUS COGNITIVE OPERATING SYSTEM       ║\n", "cyan")
+    zeus.print_neon("║      NEXUS COGNITIVE OPERATING SYSTEM       ║\n", "cyan")
     zeus.print_neon("╚════════════════════════════════════════════╝\n\n", "cyan")
 
     zeus.print_neon("Initializing Neural Context...\n", "bold")

@@ -573,8 +573,8 @@ function createNeuralBridges() {
 createNeuralBridges();
 
 const PROJECT_VISUALS={
-  ZEUS_SYSTEM:{color:[0,1,0.8],tilt:[0.02,0.01],spin:0.00018},
-  ZEUS_BRAIN:{color:[0,0.94,1],tilt:[-0.015,0.024],spin:0.00015},
+  NEXUS_SYSTEM:{color:[0,1,0.8],tilt:[0.02,0.01],spin:0.00018},
+  NEXUS_BRAIN:{color:[0,0.94,1],tilt:[-0.015,0.024],spin:0.00015},
   GateStack:{color:[0.55,0.24,1],tilt:[0.03,-0.02],spin:0.00022},
   bot:{color:[1,0.24,0.35],tilt:[-0.03,0.012],spin:0.0002},
   IA:{color:[0.1,0.9,1],tilt:[0.01,-0.024],spin:0.00016},
@@ -675,7 +675,7 @@ const MOOD_COLORS = {
 };
 let currentMoodColor = MOOD_COLORS.IDLE.clone();
 let targetMoodColor = MOOD_COLORS.IDLE.clone();
-let visualProject='ZEUS_SYSTEM',visualBehavior='IDLE',visualRecall=0,visualDensity=0,visualDominantPath='',signalEntropy=0,systemHeadline='Warm boot neural',visualWebCategory='web',visualOsFamily='system';
+let visualProject='NEXUS_SYSTEM',visualBehavior='IDLE',visualRecall=0,visualDensity=0,visualDominantPath='',signalEntropy=0,systemHeadline='Warm boot neural',visualWebCategory='web',visualOsFamily='system';
 const centerOverlay=document.querySelector('.center-overlay');
 const voiceIo=document.getElementById('voice-io');
 const voiceSub=document.getElementById('voice-sub');
@@ -770,7 +770,7 @@ function toggleSidebars(force, byFocus=false){
   sidebarsHidden=typeof force==='boolean'?force:!sidebarsHidden;
   hiddenByFocus = byFocus && sidebarsHidden;
   appEl.classList.toggle('sidebars-hidden',sidebarsHidden);
-  if(!byFocus) localStorage.setItem('ZEUS_SIDEBARS_HIDDEN',sidebarsHidden?'1':'0');
+  if(!byFocus) localStorage.setItem('NEXUS_SIDEBARS_HIDDEN',sidebarsHidden?'1':'0');
   syncSidebarButton();
   pulseOrb(sidebarsHidden ? .24 : .18,sidebarsHidden ? .05 : -.03,0);
   setCoreStatus(sidebarsHidden?'Focus mode enabled.':'Side panels restored.');
@@ -1090,7 +1090,7 @@ document.addEventListener('keydown',e=>{
 });
 
 syncSidebarButton();
-if(localStorage.getItem('ZEUS_SIDEBARS_HIDDEN')==='1'){
+if(localStorage.getItem('NEXUS_SIDEBARS_HIDDEN')==='1'){
   toggleSidebars(true);
 }
 

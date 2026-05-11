@@ -39,7 +39,7 @@ logger = get_logger("zeus.cognitive.loop")
 # Configuration
 from zeus_core.runtime.resource_governor import resource_governor
 
-DB_PATH = os.getenv("ZEUS_DB_PATH", "./zeus_events.db")
+DB_PATH = os.getenv("NEXUS_DB_PATH", "./zeus_events.db")
 MEMORY_DB_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
     "data",
@@ -105,7 +105,7 @@ class CognitiveLoop:
             logger,
             20,
             "cognitive_loop_started",
-            interval=int(os.getenv("ZEUS_COGNITIVE_INTERVAL_DEFAULT", "20")),
+            interval=int(os.getenv("NEXUS_COGNITIVE_INTERVAL_DEFAULT", "20")),
             mode=cognitive_state_manager.state.mode,
         )
 
@@ -142,13 +142,13 @@ class CognitiveLoop:
             # Wait for next cycle or stop signal
             try:
                 # Dynamic Interval
-                base_interval = int(os.getenv("ZEUS_COGNITIVE_INTERVAL_DEFAULT", "20"))
+                base_interval = int(os.getenv("NEXUS_COGNITIVE_INTERVAL_DEFAULT", "20"))
                 mode = cognitive_state_manager.state.mode
                 if mode == "idle":
-                    base_interval = int(os.getenv("ZEUS_COGNITIVE_INTERVAL_IDLE", "60"))
+                    base_interval = int(os.getenv("NEXUS_COGNITIVE_INTERVAL_IDLE", "60"))
                 elif mode == "active":
                     base_interval = int(
-                        os.getenv("ZEUS_COGNITIVE_INTERVAL_ACTIVE", "10")
+                        os.getenv("NEXUS_COGNITIVE_INTERVAL_ACTIVE", "10")
                     )
 
                 # Governor override

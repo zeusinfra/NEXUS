@@ -15,7 +15,7 @@ class FilesystemMirror:
 
     def __init__(self, memory_manager: Optional[MemoryManager] = None):
         self.memory_manager = memory_manager
-        self.vault_path = os.getenv("ZEUS_VAULT_PATH", "/home/zeus/Documentos/Brain")
+        self.vault_path = os.getenv("NEXUS_VAULT_PATH", "/home/zeus/Documentos/Brain")
         self.mirror_root = os.path.join(self.vault_path, "OS_Mirror")
         os.makedirs(self.mirror_root, exist_ok=True)
 

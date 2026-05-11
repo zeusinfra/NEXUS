@@ -28,27 +28,27 @@ def _load_local_env():
 _load_local_env()
 
 # Configurações de API
-LLM_PROVIDER = os.getenv("ZEUS_LLM_PROVIDER", "").strip().lower()
+LLM_PROVIDER = os.getenv("NEXUS_LLM_PROVIDER", "").strip().lower()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", os.getenv("ZEUS_OPENAI_MODEL", "gpt-4o-mini"))
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", os.getenv("NEXUS_OPENAI_MODEL", "gpt-4o-mini"))
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-OLLAMA_URL = os.getenv("ZEUS_LLM_URL", "http://127.0.0.1:11434/api/chat")
-OLLAMA_API_KEY = os.getenv("ZEUS_LLM_API_KEY", os.getenv("OLLAMA_API_KEY", ""))
-MODEL = os.getenv("ZEUS_LLM_MODEL", "gemma4:31b-cloud")
-DISABLE_OLLAMA = os.getenv("ZEUS_DISABLE_OLLAMA", "0").strip().lower() in {
+OLLAMA_URL = os.getenv("NEXUS_LLM_URL", "http://127.0.0.1:11434/api/chat")
+OLLAMA_API_KEY = os.getenv("NEXUS_LLM_API_KEY", os.getenv("OLLAMA_API_KEY", ""))
+MODEL = os.getenv("NEXUS_LLM_MODEL", "gemma4:31b-cloud")
+DISABLE_OLLAMA = os.getenv("NEXUS_DISABLE_OLLAMA", "0").strip().lower() in {
     "1",
     "true",
     "yes",
     "on",
 }
-PREFER_OLLAMA = os.getenv("ZEUS_PREFER_OLLAMA", "0").strip().lower() in {
+PREFER_OLLAMA = os.getenv("NEXUS_PREFER_OLLAMA", "0").strip().lower() in {
     "1",
     "true",
     "yes",
     "on",
 }
-MAX_PROMPT_CHARS = int(os.getenv("ZEUS_MAX_PROMPT_CHARS", "16000") or "16000")
+MAX_PROMPT_CHARS = int(os.getenv("NEXUS_MAX_PROMPT_CHARS", "16000") or "16000")
 
 GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
 
@@ -58,10 +58,10 @@ if GEMINI_API_KEY and genai:
     try:
         _GEMINI_CLIENT = genai.Client(api_key=GEMINI_API_KEY)
     except Exception as e:
-        print(f" [ZEUS] Erro ao inicializar cliente Gemini: {e}")
+        print(f" [NEXUS] Erro ao inicializar cliente Gemini: {e}")
 elif GEMINI_API_KEY:
     print(
-        " [ZEUS] google-genai não está instalado; Gemini desativado, usando fallback."
+        " [NEXUS] google-genai não está instalado; Gemini desativado, usando fallback."
     )
 
 
@@ -368,19 +368,19 @@ def call_cloud_llm(messages):
         except Exception as e:
             err_msg = str(e)
             if "429" in err_msg or "quota" in err_msg.lower():
-                print(f"\n[ZEUS WARNING] Quota do Gemini excedida (429).")
+                print(f"\n[NEXUS WARNING] Quota do Gemini excedida (429).")
                 print(
-                    f"Considere ativar o Ollama (.env: ZEUS_DISABLE_OLLAMA=0) ou aguardar o reset da quota.\n"
+                    f"Considere ativar o Ollama (.env: NEXUS_DISABLE_OLLAMA=0) ou aguardar o reset da quota.\n"
                 )
                 return f"Error: Gemini Quota Exceeded (429). {err_msg[:100]}"
 
             import traceback
 
             traceback.print_exc()
-            print(f" [ZEUS] Erro no Gemini, fallback para Ollama: {e}")
+            print(f" [NEXUS] Erro no Gemini, fallback para Ollama: {e}")
 
     if DISABLE_OLLAMA:
-        return "Error: Gemini unavailable and ZEUS_DISABLE_OLLAMA=1."
+        return "Error: Gemini unavailable and NEXUS_DISABLE_OLLAMA=1."
 
     return _call_ollama_chat(messages)
 
@@ -437,12 +437,12 @@ def _format_ollama_error(response):
         return (
             "Ollama Cloud nao autenticado. Execute `ollama signin` para usar "
             "modelos cloud via http://127.0.0.1:11434, ou configure "
-            "OLLAMA_API_KEY/ZEUS_LLM_API_KEY para acesso autenticado."
+            "OLLAMA_API_KEY/NEXUS_LLM_API_KEY para acesso autenticado."
         )
     if response.status_code == 404:
         return (
             f"Modelo Ollama nao encontrado: {MODEL}. Confirme o nome em "
-            "`ollama list` ou ajuste ZEUS_LLM_MODEL."
+            "`ollama list` ou ajuste NEXUS_LLM_MODEL."
         )
     return f"API returned {response.status_code} - {body}"
 
@@ -506,10 +506,10 @@ def call_cloud_llm_stream(messages):
             import traceback
 
             traceback.print_exc()
-            print(f" [ZEUS] Erro no Gemini Stream: {e}")
+            print(f" [NEXUS] Erro no Gemini Stream: {e}")
 
     if DISABLE_OLLAMA:
-        yield "Error: Gemini stream unavailable and ZEUS_DISABLE_OLLAMA=1."
+        yield "Error: Gemini stream unavailable and NEXUS_DISABLE_OLLAMA=1."
         return
 
     # Fallback simples (não-streaming ou Ollama stream se implementado futuramente)

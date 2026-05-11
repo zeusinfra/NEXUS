@@ -10,7 +10,7 @@ class ToolError(Exception):
 
 
 def _project_root() -> Path:
-    env_root = os.getenv("ZEUS_PROJECT_ROOT", "").strip()
+    env_root = os.getenv("NEXUS_PROJECT_ROOT", "").strip()
     if env_root:
         return Path(env_root).expanduser().resolve()
     return Path(__file__).resolve().parents[1]

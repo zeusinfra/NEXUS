@@ -12,6 +12,6 @@ else
     exit 1
 fi
 
-echo "⚡ Sincronizando ZEUS Neural Command Center na porta ${ZEUS_PORT:-8080}..."
-export ZEUS_BIND_HOST="0.0.0.0"
+echo "⚡ Sincronizando ZEUS Neural Command Center na porta ${NEXUS_PORT:-8080}..."
+export NEXUS_BIND_HOST="0.0.0.0"
 python -m apps.web_gui "$@"

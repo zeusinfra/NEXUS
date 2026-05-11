@@ -13,7 +13,7 @@ class RecoveryEngine:
     def __init__(self, blackboard, storage_path: str = "recovery_snapshots/"):
         self.blackboard = blackboard
         self.storage_path = storage_path
-        self.logger = logging.getLogger("ZEUS_RECOVERY")
+        self.logger = logging.getLogger("NEXUS_RECOVERY")
         self._setup_snapshot_dir()
 
     def _setup_snapshot_dir(self):

@@ -4,7 +4,7 @@
 echo "🧠 Iniciando instalação vitalícia do ZEUS..."
 
 # 1. Garantir que o diretório de logs existe
-mkdir -p /home/zeus/Documentos/ZEUS_SYSTEM/logs
+mkdir -p /home/zeus/Documentos/NEXUS_SYSTEM/logs
 
 # 2. Criar diretório do systemd de usuário se não existir
 mkdir -p ~/.config/systemd/user/

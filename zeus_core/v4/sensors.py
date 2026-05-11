@@ -62,8 +62,8 @@ class FilePollSensor:
         self.roots = [Path(r).resolve() for r in roots]
         self.max_events = max_events
         self._mtimes: dict[str, float] = {}
-        self.max_checked = int(os.getenv("ZEUS_V4_FS_MAX_CHECKED", "1200"))
-        self.max_seconds = float(os.getenv("ZEUS_V4_FS_MAX_SECONDS", "0.35"))
+        self.max_checked = int(os.getenv("NEXUS_V4_FS_MAX_CHECKED", "1200"))
+        self.max_seconds = float(os.getenv("NEXUS_V4_FS_MAX_SECONDS", "0.35"))
 
         if RUST_SENSORS_AVAILABLE:
             self.rust_engine = SensorEngineRust()
@@ -175,7 +175,7 @@ class UserInboxSensor:
 
 
 def default_roots() -> list[str]:
-    roots_env = os.getenv("ZEUS_V4_WATCH_ROOTS", "").strip()
+    roots_env = os.getenv("NEXUS_V4_WATCH_ROOTS", "").strip()
     if roots_env:
         return [r.strip() for r in roots_env.split(",") if r.strip()]
     return [os.getcwd()]

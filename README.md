@@ -61,7 +61,7 @@ sudo apt install -y \
 ## Quick Start
 
 ```bash
-git clone https://github.com/zeusinfra/NEXUS.git
+git clone https://github.com/nexusinfra/NEXUS.git
 cd NEXUS
 
 ./scripts/bootstrap.sh
@@ -73,16 +73,16 @@ cp .env.example .env
 Run the default terminal operator surface:
 
 ```bash
-./bin/zeus
+./bin/nexus
 ```
 
 Run specific surfaces:
 
 ```bash
-./bin/zeus tui
-./bin/zeus chat
-./bin/zeus server
-./bin/zeus ensure-server
+./bin/nexus tui
+./bin/nexus chat
+./bin/nexus server
+./bin/nexus ensure-server
 ```
 
 Build the Rust workspaces:
@@ -103,7 +103,7 @@ cargo build --manifest-path watcher_rs/Cargo.toml
 | `make test` | Run the Python test suite |
 | `make rust` | Run Rust format, clippy, and tests |
 | `make ci` | Run the main local CI gate |
-| `./bin/zeus help` | Show launcher commands |
+| `./bin/nexus help` | Show launcher commands |
 | `./bin/install-cinnamon-applet.sh` | Install the Cinnamon applet locally |
 
 ## Configuration
@@ -112,14 +112,14 @@ Copy `.env.example` to `.env` and enable only the integrations you need.
 
 Important settings:
 
-- `ZEUS_LLM_PROVIDER`: `ollama`, `openai`, `gemini`, or local defaults
-- `ZEUS_LLM_URL`: hosted or local LLM endpoint
-- `ZEUS_DB_PATH`: SQLite event and cognition database path
-- `ZEUS_VAULT_PATH`: local knowledge vault path
-- `ZEUS_AUTONOMY_LEVEL`: guarded execution mode
-- `ZEUS_ENABLE_SECOND_BRAIN`: enable Second Brain workers
-- `ZEUS_ENABLE_VOICE_SENSING`: enable voice sensing
-- `ZEUS_ENABLE_BROWSER_SENSING`: enable browser sensing
+- `NEXUS_LLM_PROVIDER`: `ollama`, `openai`, `gemini`, or local defaults
+- `NEXUS_LLM_URL`: hosted or local LLM endpoint
+- `NEXUS_DB_PATH`: SQLite event and cognition database path
+- `NEXUS_VAULT_PATH`: local knowledge vault path
+- `NEXUS_AUTONOMY_LEVEL`: guarded execution mode
+- `NEXUS_ENABLE_SECOND_BRAIN`: enable Second Brain workers
+- `NEXUS_ENABLE_VOICE_SENSING`: enable voice sensing
+- `NEXUS_ENABLE_BROWSER_SENSING`: enable browser sensing
 
 Secrets belong in local environment files or secret managers. Do not commit
 real API keys, tokens, private keys, database dumps, or personal vault content.

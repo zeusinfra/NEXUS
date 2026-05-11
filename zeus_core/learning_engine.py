@@ -14,7 +14,7 @@ class LearningEngine:
     def __init__(self, blackboard, storage_file: str = "learning_weights.json"):
         self.blackboard = blackboard
         self.storage_file = storage_file
-        self.logger = logging.getLogger("ZEUS_LEARNING")
+        self.logger = logging.getLogger("NEXUS_LEARNING")
         self.weights = self._load_weights()
 
     def _load_weights(self) -> Dict[str, float]:

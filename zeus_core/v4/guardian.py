@@ -100,7 +100,7 @@ class SemanticGuardian:
         if self.mode == AutonomyMode.SAFE:
             return True
         if self.mode == AutonomyMode.DEV and assessment.level == RiskLevel.MEDIUM:
-            return os.getenv("ZEUS_V4_CONFIRM_MEDIUM", "0").strip().lower() in {
+            return os.getenv("NEXUS_V4_CONFIRM_MEDIUM", "0").strip().lower() in {
                 "1",
                 "true",
                 "yes",

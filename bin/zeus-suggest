@@ -3,7 +3,7 @@ import sys
 import requests
 import os
 
-BACKEND = os.getenv("ZEUS_BACKEND_URL", "http://127.0.0.1:8080").rstrip("/")
+BACKEND = os.getenv("NEXUS_BACKEND_URL", "http://127.0.0.1:8080").rstrip("/")
 
 def get_suggestion(last_cmd):
     payload = {

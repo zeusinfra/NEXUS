@@ -1,5 +1,5 @@
 """
-ZEUS Cognitive Core — FastAPI Routes.
+NEXUS Cognitive Core — FastAPI Routes.
 
 Provides REST endpoints for inspecting and controlling the cognitive system.
 Follows the same dependency-injection pattern as ``status_routes.py``.

@@ -16,7 +16,7 @@ class SelfImprovementPipeline:
 
     def __init__(self):
         self.auto_apply = (
-            os.getenv("ZEUS_SELF_IMPROVEMENT_AUTO_APPLY_LOW_RISK", "true").lower()
+            os.getenv("NEXUS_SELF_IMPROVEMENT_AUTO_APPLY_LOW_RISK", "true").lower()
             == "true"
         )
 
@@ -28,7 +28,7 @@ class SelfImprovementPipeline:
         problems = []
         try:
             # 1. Busca Tracebacks reais (mais preciso que apenas ERROR)
-            log_path = "/home/zeus/Documentos/ZEUS_SYSTEM/zeus_core.log"
+            log_path = "/home/zeus/Documentos/NEXUS_SYSTEM/nexus_core.log"
             if os.path.exists(log_path):
                 result = await daemon_client.execute(
                     f"tail -n 200 {log_path}",

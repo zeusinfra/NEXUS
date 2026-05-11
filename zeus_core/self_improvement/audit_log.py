@@ -10,7 +10,7 @@ logger = get_logger("zeus.self_improvement.audit")
 class AuditLog:
     def __init__(self):
         self.db_path = os.path.join(
-            os.getenv("ZEUS_VAULT_PATH", "/home/zeus/Documentos/Brain"),
+            os.getenv("NEXUS_VAULT_PATH", "/home/zeus/Documentos/Brain"),
             "logs",
             "self_improvement_audit.db",
         )

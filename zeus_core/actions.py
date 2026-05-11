@@ -28,7 +28,7 @@ from zeus_core.diagnostics import get_system_diagnostics
 
 
 def _project_root() -> Path:
-    env_root = os.getenv("ZEUS_PROJECT_ROOT", "").strip()
+    env_root = os.getenv("NEXUS_PROJECT_ROOT", "").strip()
     if env_root:
         return Path(env_root).expanduser().resolve()
     return Path(__file__).resolve().parents[1]
@@ -323,20 +323,20 @@ def system_capabilities(parameters: dict) -> dict:
     allowed_paths = [
         item.strip()
         for item in os.getenv(
-            "ZEUS_ALLOWED_EDIT_PATHS",
-            "/home/zeus/Documentos/ZEUS_SYSTEM,/home/zeus/Documentos/Brain,/tmp/zeus_",
+            "NEXUS_ALLOWED_EDIT_PATHS",
+            "/home/zeus/Documentos/NEXUS_SYSTEM,/home/zeus/Documentos/Brain,/tmp/nexus_",
         ).split(",")
         if item.strip()
     ]
     command_allowlist = [
         item.strip()
         for item in os.getenv(
-            "ZEUS_CMD_ALLOWLIST",
+            "NEXUS_CMD_ALLOWLIST",
             "ls,pwd,echo,cat,sed,rg,find,wc,python3,node,npm,cargo,git,systemctl,apt,pip,pip3,df,free,uptime,ip,ss,top,htop",
         ).split(",")
         if item.strip()
     ]
-    root_daemon_socket = os.getenv("ZEUS_DAEMON_SOCKET", "/tmp/zeus/daemon.sock")
+    root_daemon_socket = os.getenv("NEXUS_DAEMON_SOCKET", "/tmp/nexus/daemon.sock")
     return {
         "telemetry": {
             "system_diagnostics": True,
@@ -350,13 +350,13 @@ def system_capabilities(parameters: dict) -> dict:
             "allowed_edit_paths": allowed_paths,
         },
         "command_execution": {
-            "mode": os.getenv("ZEUS_TOOL_EXECUTION_MODE", "confirm"),
-            "autonomy_level": os.getenv("ZEUS_AUTONOMY_LEVEL", "GUARDED"),
+            "mode": os.getenv("NEXUS_TOOL_EXECUTION_MODE", "confirm"),
+            "autonomy_level": os.getenv("NEXUS_AUTONOMY_LEVEL", "GUARDED"),
             "allowlist": command_allowlist,
-            "progress_events": os.getenv("ZEUS_AGENT_PROGRESS_EVENTS", "1"),
+            "progress_events": os.getenv("NEXUS_AGENT_PROGRESS_EVENTS", "1"),
         },
         "privileged_actions": {
-            "root_daemon_enabled": os.getenv("ZEUS_ROOT_DAEMON_ENABLED", "0")
+            "root_daemon_enabled": os.getenv("NEXUS_ROOT_DAEMON_ENABLED", "0")
             .strip()
             .lower()
             in {"1", "true", "yes", "on"},
@@ -364,13 +364,13 @@ def system_capabilities(parameters: dict) -> dict:
             "socket_exists": Path(root_daemon_socket).exists(),
         },
         "sensors": {
-            "voice": os.getenv("ZEUS_ENABLE_VOICE", "1"),
-            "voice_sensing": os.getenv("ZEUS_ENABLE_VOICE_SENSING", "0"),
-            "browser_sensing": os.getenv("ZEUS_ENABLE_BROWSER_SENSING", "0"),
-            "internal_watcher": os.getenv("ZEUS_ENABLE_INTERNAL_WATCHER", "0"),
-            "resource_monitor": os.getenv("ZEUS_ENABLE_RESOURCE_MONITOR", "0"),
-            "cognitive_loop": os.getenv("ZEUS_COGNITIVE_LOOP_ENABLED", "0"),
-            "second_brain": os.getenv("ZEUS_ENABLE_SECOND_BRAIN", "0"),
+            "voice": os.getenv("NEXUS_ENABLE_VOICE", "1"),
+            "voice_sensing": os.getenv("NEXUS_ENABLE_VOICE_SENSING", "0"),
+            "browser_sensing": os.getenv("NEXUS_ENABLE_BROWSER_SENSING", "0"),
+            "internal_watcher": os.getenv("NEXUS_ENABLE_INTERNAL_WATCHER", "0"),
+            "resource_monitor": os.getenv("NEXUS_ENABLE_RESOURCE_MONITOR", "0"),
+            "cognitive_loop": os.getenv("NEXUS_COGNITIVE_LOOP_ENABLED", "0"),
+            "second_brain": os.getenv("NEXUS_ENABLE_SECOND_BRAIN", "0"),
         },
     }
 

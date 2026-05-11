@@ -53,7 +53,7 @@ class LongTermMemory:
         self.vec = VectorMemory(storage_file=storage_file)
 
     def index_episode(self, key: str, text: str) -> None:
-        if os.getenv("ZEUS_V4_EMBEDDINGS", "1").strip().lower() not in {
+        if os.getenv("NEXUS_V4_EMBEDDINGS", "1").strip().lower() not in {
             "1",
             "true",
             "yes",
@@ -63,7 +63,7 @@ class LongTermMemory:
         # VectorMemory atual indexa arquivo. Para manter compatível, salvamos episódio em arquivo e indexamos.
         if not text.strip():
             return
-        base = Path(os.getenv("ZEUS_V4_EPISODES_DIR", "scratch/v4_episodes")).resolve()
+        base = Path(os.getenv("NEXUS_V4_EPISODES_DIR", "scratch/v4_episodes")).resolve()
         base.mkdir(parents=True, exist_ok=True)
         safe = "".join(ch if ch.isalnum() or ch in {"-", "_"} else "_" for ch in key)[
             :80

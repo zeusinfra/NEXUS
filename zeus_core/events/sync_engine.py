@@ -28,7 +28,7 @@ from zeus_core.long_term_memory import load_memory as load_long_term_memory
 async def sync_synaptic_to_obsidian(memory_manager, interval: float = 60.0):
     """
     Periodically exports synaptic memory snapshot to Obsidian markdown notes.
-    Creates: ZEUS_Sync/Synaptic/neural_map.md, ZEUS_Sync/Patterns/*.md, ZEUS_Sync/Daily/*.md
+    Creates: NEXUS_Sync/Synaptic/neural_map.md, NEXUS_Sync/Patterns/*.md, NEXUS_Sync/Daily/*.md
     """
     print("[SyncEngine] Worker Sináptico→Obsidian iniciado.")
 
@@ -68,7 +68,7 @@ async def sync_synaptic_to_obsidian(memory_manager, interval: float = 60.0):
                 source="synaptic_memory",
                 target="obsidian",
                 source_path="memory_manager.export_sync_snapshot",
-                target_id="ZEUS_Sync/Synaptic/neural_map.md",
+                target_id="NEXUS_Sync/Synaptic/neural_map.md",
                 status="success",
             )
 

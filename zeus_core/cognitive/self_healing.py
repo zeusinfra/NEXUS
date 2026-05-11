@@ -32,7 +32,7 @@ class HealingProposal:
 class SelfHealingEngine:
     def __init__(self, db_path: str | None = None) -> None:
         self.db_path = db_path
-        self.log_path = os.getenv("ZEUS_LOG_PATH", "/var/log/zeus.log")
+        self.log_path = os.getenv("NEXUS_LOG_PATH", "/var/log/zeus.log")
 
     def scan_for_issues(self) -> List[str]:
         """Reads recent logs to find error patterns."""

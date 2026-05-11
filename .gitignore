@@ -17,7 +17,7 @@ __pycache__/
 logs/*.log
 logs/*.jsonl
 *.log
-zeus_core.log
+nexus_core.log
 zeus_server.log
 startup_test*.log
 

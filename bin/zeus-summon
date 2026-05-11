@@ -3,7 +3,7 @@ import sys
 import requests
 import os
 
-OLLAMA_URL = os.getenv("ZEUS_API_URL", "http://localhost:5000/api/message")
+OLLAMA_URL = os.getenv("NEXUS_API_URL", "http://localhost:5000/api/message")
 
 def summon():
     """Manda um sinal para o ZEUS acordar e focar na janela ativa."""

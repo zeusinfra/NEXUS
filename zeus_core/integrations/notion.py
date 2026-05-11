@@ -10,7 +10,7 @@ privacy_guard = PrivacyGuard()
 
 NOTION_TOKEN = os.getenv("NOTION_TOKEN")
 NOTION_DATABASE_ID = os.getenv("NOTION_DATABASE_ID")
-NOTION_ENABLED = os.getenv("ZEUS_ENABLE_NOTION", "false").lower() in {
+NOTION_ENABLED = os.getenv("NEXUS_ENABLE_NOTION", "false").lower() in {
     "1",
     "true",
     "yes",

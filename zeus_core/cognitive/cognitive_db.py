@@ -1,7 +1,7 @@
 """
 ZEUS Cognitive Core — Database Layer.
 
-Manages the cognitive tables inside the shared zeus_events.db:
+Manages the cognitive tables inside the shared nexus_events.db:
   - cognitive_goals
   - cognitive_reflections
   - cognitive_actions
@@ -27,7 +27,7 @@ from zeus_core.env import load_project_env
 
 load_project_env()
 
-DB_PATH = os.getenv("ZEUS_DB_PATH", "./zeus_events.db")
+DB_PATH = os.getenv("NEXUS_DB_PATH", "./nexus_events.db")
 
 
 @contextmanager

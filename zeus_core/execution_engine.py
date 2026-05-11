@@ -19,8 +19,8 @@ class ExecutionEngine:
     def __init__(self, blackboard, bootstrap_config):
         self.blackboard = blackboard
         self.config = bootstrap_config
-        self.logger = logging.getLogger("ZEUS_EXECUTION")
-        self.backup_root = Path("/tmp/zeus_backups")
+        self.logger = logging.getLogger("NEXUS_EXECUTION")
+        self.backup_root = Path("/tmp/nexus_backups")
         self.action_history = []
         self._setup_backup_dir()
 

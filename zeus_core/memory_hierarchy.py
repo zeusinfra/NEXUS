@@ -17,7 +17,7 @@ class MemoryHierarchy:
     def __init__(self, blackboard, storage_path: str = "memory_hierarchy.json"):
         self.blackboard = blackboard
         self.storage_path = storage_path
-        self.logger = logging.getLogger("ZEUS_MEMORY")
+        self.logger = logging.getLogger("NEXUS_MEMORY")
 
         # Layers
         self.short_term: Dict[str, Any] = {}  # Contextual window

@@ -52,7 +52,7 @@ class CognitiveStateManager:
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        mode = os.getenv("ZEUS_COGNITIVE_LOOP_MODE", "safe").strip().lower()
+        mode = os.getenv("NEXUS_COGNITIVE_LOOP_MODE", "safe").strip().lower()
         if mode not in {"safe", "autonomous", "manual"}:
             mode = "safe"
         self._state = CognitiveState(mode=mode)

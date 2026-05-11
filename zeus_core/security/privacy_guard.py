@@ -79,7 +79,7 @@ class PrivacyGuard:
     def __init__(self, db_path: str | None = None) -> None:
         self.db_path = db_path
         # Global privacy mode: 'balanced' | 'strict' | 'local_only'
-        self.mode = os.getenv("ZEUS_PRIVACY_MODE", "balanced").lower()
+        self.mode = os.getenv("NEXUS_PRIVACY_MODE", "balanced").lower()
         self.session_masked_count = 0
 
         if RUST_SECURITY_AVAILABLE:

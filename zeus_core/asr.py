@@ -63,9 +63,9 @@ def transcribe_audio_bytes(
             "ffmpeg não encontrado. Instale ffmpeg para decodificar áudio do navegador."
         )
 
-    model_name = os.getenv("ZEUS_ASR_MODEL", "small").strip()
-    device = os.getenv("ZEUS_ASR_DEVICE", "cpu").strip()
-    compute_type = os.getenv("ZEUS_ASR_COMPUTE_TYPE", "int8").strip()
+    model_name = os.getenv("NEXUS_ASR_MODEL", "small").strip()
+    device = os.getenv("NEXUS_ASR_DEVICE", "cpu").strip()
+    compute_type = os.getenv("NEXUS_ASR_COMPUTE_TYPE", "int8").strip()
 
     with tempfile.TemporaryDirectory() as td:
         td_path = Path(td)

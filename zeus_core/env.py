@@ -8,7 +8,7 @@ from pathlib import Path
 @lru_cache(maxsize=1)
 def load_project_env() -> bool:
     """Load the project .env once, without making imports depend on dotenv."""
-    if os.getenv("ZEUS_SKIP_DOTENV", "").strip().lower() in {"1", "true", "yes", "on"}:
+    if os.getenv("NEXUS_SKIP_DOTENV", "").strip().lower() in {"1", "true", "yes", "on"}:
         return False
     try:
         from dotenv import load_dotenv

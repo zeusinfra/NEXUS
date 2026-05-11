@@ -93,11 +93,11 @@ def _configure_stdout_encoding() -> None:
 
 
 class VoiceSensing:
-    """Módulo de Escuta Ativa 100% Local para o ZEUS.
+    """Módulo de Escuta Ativa 100% Local para o NEXUS.
     Detecta silêncio (VAD), converte áudio localmente via Whisper e toca via Edge-TTS.
     """
 
-    def __init__(self, broadcast_callback=None, wake_word="zeus", llm_callback=None):
+    def __init__(self, broadcast_callback=None, wake_word="nexus", llm_callback=None):
         _configure_stdout_encoding()
         _suppress_alsa_errors()
         self.available = sr is not None and edge_tts is not None
@@ -113,10 +113,10 @@ class VoiceSensing:
         self._whisper_lock = threading.Lock()
         self._ignore_audio_until = 0.0
         self._armed_until = 0.0
-        aliases_env = os.getenv("ZEUS_WAKE_ALIASES", "").strip()
+        aliases_env = os.getenv("NEXUS_WAKE_ALIASES", "").strip()
         aliases = [self.wake_word]
         self.wake_word_required = os.getenv(
-            "ZEUS_WAKE_WORD_REQUIRED", "1"
+            "NEXUS_WAKE_WORD_REQUIRED", "1"
         ).strip().lower() in {"1", "true", "yes", "on"}
         if aliases_env:
             aliases.extend(
@@ -124,8 +124,8 @@ class VoiceSensing:
             )
         else:
             # Default PT-BR: Whisper às vezes entende "Zeus" como "Deus".
-            if self._normalize_text(self.wake_word) == "zeus":
-                aliases.append("deus")
+            if self._normalize_text(self.wake_word) == "nexus":
+                aliases.append("nexus")
         self._wake_aliases = [a for a in aliases if a]
         self._wake_re = self._build_wake_regex(self._wake_aliases)
 
@@ -153,7 +153,7 @@ class VoiceSensing:
             if w:
                 parts.append(re.escape(w))
         if not parts:
-            parts = [re.escape(cls._normalize_text("zeus"))]
+            parts = [re.escape(cls._normalize_text("nexus"))]
         # \b evita disparar no meio de palavras.
         return re.compile(rf"\b(?:{'|'.join(parts)})\b", re.IGNORECASE)
 
@@ -166,7 +166,7 @@ class VoiceSensing:
     def arm(self, seconds=10):
         """Ativa a escuta sem wake word por um período determinado."""
         self._armed_until = time.time() + seconds
-        print(f"[ZEUS LOCAL] Escuta armada por {seconds}s.")
+        print(f"[NEXUS LOCAL] Escuta armada por {seconds}s.")
 
     def _ensure_whisper_loaded(self):
         if self.whisper_model is not None:
@@ -181,12 +181,12 @@ class VoiceSensing:
                     "Voice transcription is unavailable. Install requirements/voice.txt "
                     "to enable faster-whisper."
                 ) from exc
-            print("[ZEUS LOCAL] Carregando modelo Faster-Whisper...")
-            model_name = os.getenv("ZEUS_WHISPER_MODEL", "small").strip() or "small"
+            print("[NEXUS LOCAL] Carregando modelo Faster-Whisper...")
+            model_name = os.getenv("NEXUS_WHISPER_MODEL", "small").strip() or "small"
             self.whisper_model = WhisperModel(
                 model_name, device="cpu", compute_type="int8"
             )
-            print("[ZEUS LOCAL] Whisper pronto.")
+            print("[NEXUS LOCAL] Whisper pronto.")
 
     async def _send_status(self, text):
         if self.broadcast:
@@ -203,11 +203,11 @@ class VoiceSensing:
         """Loop síncrono de captura de áudio (roda em thread separada)."""
         if sr is None or self.recognizer is None:
             print(
-                "[ZEUS LOCAL] Voice sensing unavailable: SpeechRecognition is not installed."
+                "[NEXUS LOCAL] Voice sensing unavailable: SpeechRecognition is not installed."
             )
             self.is_listening = False
             return
-        if os.getenv("ZEUS_MIC_LIST", "0").strip().lower() in {
+        if os.getenv("NEXUS_MIC_LIST", "0").strip().lower() in {
             "1",
             "true",
             "yes",
@@ -215,15 +215,15 @@ class VoiceSensing:
         }:
             try:
                 names = sr.Microphone.list_microphone_names()
-                print("[ZEUS LOCAL] Dispositivos de microfone:")
+                print("[NEXUS LOCAL] Dispositivos de microfone:")
                 for idx, name in enumerate(names):
                     print(f"  [{idx}] {name}")
             except Exception as e:
-                print(f"[ZEUS LOCAL] ⚠️ Falha ao listar microfones: {e}")
+                print(f"[NEXUS LOCAL] ⚠️ Falha ao listar microfones: {e}")
         try:
-            device_index = os.getenv("ZEUS_MIC_DEVICE_INDEX")
+            device_index = os.getenv("NEXUS_MIC_DEVICE_INDEX")
             mic_kwargs = {}
-            mic_name = os.getenv("ZEUS_MIC_NAME", "").strip()
+            mic_name = os.getenv("NEXUS_MIC_NAME", "").strip()
             if mic_name:
                 try:
                     names = sr.Microphone.list_microphone_names()
@@ -235,35 +235,35 @@ class VoiceSensing:
                             break
                     if match is None:
                         print(
-                            f"[ZEUS LOCAL] ⚠️ ZEUS_MIC_NAME não encontrado: '{mic_name}'. Use ZEUS_MIC_LIST=1 para listar."
+                            f"[NEXUS LOCAL] ⚠️ NEXUS_MIC_NAME não encontrado: '{mic_name}'. Use NEXUS_MIC_LIST=1 para listar."
                         )
                     else:
                         mic_kwargs["device_index"] = match
                         print(
-                            f"[ZEUS LOCAL] 🎙️ Microfone selecionado por nome: [{match}] {names[match]}"
+                            f"[NEXUS LOCAL] 🎙️ Microfone selecionado por nome: [{match}] {names[match]}"
                         )
                 except Exception as e:
-                    print(f"[ZEUS LOCAL] ⚠️ Falha ao selecionar microfone por nome: {e}")
+                    print(f"[NEXUS LOCAL] ⚠️ Falha ao selecionar microfone por nome: {e}")
             elif device_index is not None and str(device_index).strip() != "":
                 try:
                     mic_kwargs["device_index"] = int(str(device_index).strip())
                 except Exception:
                     print(
-                        f"[ZEUS LOCAL] ⚠️ ZEUS_MIC_DEVICE_INDEX inválido: {device_index}"
+                        f"[NEXUS LOCAL] ⚠️ NEXUS_MIC_DEVICE_INDEX inválido: {device_index}"
                     )
             mic = sr.Microphone(**mic_kwargs)
         except Exception as e:
-            print(f"[ZEUS LOCAL] ❌ Falha ao abrir microfone: {e}")
+            print(f"[NEXUS LOCAL] ❌ Falha ao abrir microfone: {e}")
             print(
-                "[ZEUS LOCAL] Verifique se há um dispositivo de áudio conectado (ex: DroidCam)."
+                "[NEXUS LOCAL] Verifique se há um dispositivo de áudio conectado (ex: DroidCam)."
             )
             self.is_listening = False
             return
 
         with mic as source:
-            print("[ZEUS LOCAL] Calibrando microfone...")
+            print("[NEXUS LOCAL] Calibrando microfone...")
             self.recognizer.adjust_for_ambient_noise(source, duration=1)
-            print("[ZEUS LOCAL] Ouvindo...")
+            print("[NEXUS LOCAL] Ouvindo...")
             if self._loop:
                 asyncio.run_coroutine_threadsafe(
                     self._send_voice_state("listening"), self._loop
@@ -271,7 +271,7 @@ class VoiceSensing:
 
             while self.is_listening:
                 if self.is_speaking:
-                    # Pausa a escuta enquanto o ZEUS está falando
+                    # Pausa a escuta enquanto o NEXUS está falando
                     time.sleep(0.2)
                     continue
                 if time.time() < self._ignore_audio_until:
@@ -281,7 +281,7 @@ class VoiceSensing:
                 try:
                     # Captura o áudio até detectar silêncio (pause_threshold)
                     try:
-                        phrase_limit = float(os.getenv("ZEUS_PHRASE_TIME_LIMIT", "6"))
+                        phrase_limit = float(os.getenv("NEXUS_PHRASE_TIME_LIMIT", "6"))
                     except Exception:
                         phrase_limit = 6.0
                     audio_data = self.recognizer.listen(
@@ -296,7 +296,7 @@ class VoiceSensing:
                 except sr.WaitTimeoutError:
                     continue
                 except Exception as e:
-                    print(f"[ZEUS LOCAL] Erro de captura: {e}")
+                    print(f"[NEXUS LOCAL] Erro de captura: {e}")
 
     def _process_audio(self, audio_data: sr.AudioData):
         if self._loop and self.broadcast:
@@ -312,12 +312,12 @@ class VoiceSensing:
             self._ensure_whisper_loaded()
             # Salva o áudio em disco para o Whisper ler (prefixo ASCII-safe)
             with tempfile.NamedTemporaryFile(
-                suffix=".wav", delete=False, prefix="zeus_asr_"
+                suffix=".wav", delete=False, prefix="nexus_asr_"
             ) as tmp:
                 tmp.write(audio_data.get_wav_data(convert_rate=16000, convert_width=2))
                 tmp_path = tmp.name
 
-            vad = os.getenv("ZEUS_WHISPER_VAD", "1").strip().lower() in {
+            vad = os.getenv("NEXUS_WHISPER_VAD", "1").strip().lower() in {
                 "1",
                 "true",
                 "yes",
@@ -353,7 +353,7 @@ class VoiceSensing:
                 # - foi "armado" por um wake anterior (dizer só "Zeus" e depois falar o comando).
                 # - OU se o wake word NÃO for obrigatório.
                 if not (woke or armed or not self.wake_word_required):
-                    if os.getenv("ZEUS_VOICE_DEBUG", "0").strip().lower() in {
+                    if os.getenv("NEXUS_VOICE_DEBUG", "0").strip().lower() in {
                         "1",
                         "true",
                         "yes",
@@ -366,7 +366,7 @@ class VoiceSensing:
                     return
 
                 command = self._strip_wake_word(text) if woke else normalized
-                if os.getenv("ZEUS_VOICE_DEBUG", "0").strip().lower() in {
+                if os.getenv("NEXUS_VOICE_DEBUG", "0").strip().lower() in {
                     "1",
                     "true",
                     "yes",
@@ -388,7 +388,7 @@ class VoiceSensing:
                 # Wake word sozinho -> ack local (não gasta LLM)
                 if woke and not command:
                     try:
-                        arm_sec = float(os.getenv("ZEUS_WAKE_ARM_SEC", "8"))
+                        arm_sec = float(os.getenv("NEXUS_WAKE_ARM_SEC", "8"))
                     except Exception:
                         arm_sec = 8.0
                     self._armed_until = time.time() + max(0.0, arm_sec)
@@ -415,9 +415,9 @@ class VoiceSensing:
 
         except Exception as e:
             try:
-                print(f"[ZEUS LOCAL] Erro no Whisper: {e}")
+                print(f"[NEXUS LOCAL] Erro no Whisper: {e}")
             except UnicodeEncodeError:
-                print("[ZEUS LOCAL] Erro no Whisper (encoding issue)")
+                print("[NEXUS LOCAL] Erro no Whisper (encoding issue)")
         finally:
             if tmp_path:
                 try:
@@ -434,9 +434,9 @@ class VoiceSensing:
             return
 
         try:
-            print(f"[ZEUS] {text}")
+            print(f"[NEXUS] {text}")
         except UnicodeEncodeError:
-            print("[ZEUS] (resposta com caracteres especiais)")
+            print("[NEXUS] (resposta com caracteres especiais)")
 
         if self.broadcast:
             await self.broadcast({"type": "CHAT_AI", "message": text})
@@ -455,17 +455,17 @@ class VoiceSensing:
                 )
 
                 with tempfile.NamedTemporaryFile(
-                    suffix=".mp3", delete=False, prefix="zeus_tts_"
+                    suffix=".mp3", delete=False, prefix="nexus_tts_"
                 ) as tmp:
                     tmp_path = tmp.name
 
-                tts_timeout = float(os.getenv("ZEUS_TTS_TIMEOUT_SEC", "12"))
+                tts_timeout = float(os.getenv("NEXUS_TTS_TIMEOUT_SEC", "12"))
                 await asyncio.wait_for(communicate.save(tmp_path), timeout=tts_timeout)
 
                 if self.broadcast:
                     await self._send_status("Falando...")
 
-                play_timeout = float(os.getenv("ZEUS_AUDIO_PLAY_TIMEOUT_SEC", "45"))
+                play_timeout = float(os.getenv("NEXUS_AUDIO_PLAY_TIMEOUT_SEC", "45"))
 
                 # Tocar MP3 diretamente para evitar delay de conversão
                 proc = await asyncio.create_subprocess_exec(
@@ -501,7 +501,7 @@ class VoiceSensing:
                 if self.broadcast:
                     await self._send_status("Falando (fallback local)...")
 
-                speak_timeout = float(os.getenv("ZEUS_SPD_SAY_TIMEOUT_SEC", "20"))
+                speak_timeout = float(os.getenv("NEXUS_SPD_SAY_TIMEOUT_SEC", "20"))
                 proc = await asyncio.create_subprocess_exec(
                     spd,
                     "-w",
@@ -535,12 +535,12 @@ class VoiceSensing:
                     except Exception:
                         pass
         except Exception as e:
-            print(f"[ZEUS LOCAL] Erro de TTS: {e}")
+            print(f"[NEXUS LOCAL] Erro de TTS: {e}")
         finally:
             self.is_speaking = False
             # pequena janela para evitar eco do próprio TTS após o fim do playback
             try:
-                post = float(os.getenv("ZEUS_POST_SPEAK_IGNORE_SEC", "0.9"))
+                post = float(os.getenv("NEXUS_POST_SPEAK_IGNORE_SEC", "0.9"))
             except Exception:
                 post = 0.9
             self._ignore_audio_until = max(

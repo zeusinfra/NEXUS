@@ -26,7 +26,7 @@ _PENDING_CONFIRMATIONS: Dict[str, dict] = {}
 def _tool_mode() -> str:
     # confirm: pede "Sim" antes de executar execute_bash
     # auto: executa sem confirmação
-    mode = os.getenv("ZEUS_TOOL_EXECUTION_MODE", "confirm").strip().lower()
+    mode = os.getenv("NEXUS_TOOL_EXECUTION_MODE", "confirm").strip().lower()
     return mode if mode in {"confirm", "auto"} else "confirm"
 
 
@@ -69,7 +69,7 @@ def _is_confirmation_message(text: str) -> bool:
 
 
 def _progress_enabled() -> bool:
-    value = os.getenv("ZEUS_AGENT_PROGRESS_EVENTS", "1").strip().lower()
+    value = os.getenv("NEXUS_AGENT_PROGRESS_EVENTS", "1").strip().lower()
     return value in {"1", "true", "yes", "on"}
 
 
@@ -109,22 +109,22 @@ class Agent:
             or "refatorar si mesmo" in prompt_lower
             or "patch" in prompt_lower
         ):
-            return int(os.getenv("ZEUS_MAX_STEPS_SELF_IMPROVEMENT", "18"))
+            return int(os.getenv("NEXUS_MAX_STEPS_SELF_IMPROVEMENT", "18"))
         if (
             "sudo" in prompt_lower
             or "root" in prompt_lower
             or "apt install" in prompt_lower
         ):
-            return int(os.getenv("ZEUS_MAX_STEPS_ADMIN", "14"))
+            return int(os.getenv("NEXUS_MAX_STEPS_ADMIN", "14"))
         if (
             "arquitetura" in prompt_lower
             or "design" in prompt_lower
             or "planejar" in prompt_lower
         ):
-            return int(os.getenv("ZEUS_MAX_STEPS_COMPLEX", "12"))
+            return int(os.getenv("NEXUS_MAX_STEPS_COMPLEX", "12"))
         if "erro crítico" in prompt_lower or "falha grave" in prompt_lower:
-            return int(os.getenv("ZEUS_MAX_STEPS_CRITICAL", "16"))
-        return int(os.getenv("ZEUS_MAX_STEPS_DEFAULT", "6"))
+            return int(os.getenv("NEXUS_MAX_STEPS_CRITICAL", "16"))
+        return int(os.getenv("NEXUS_MAX_STEPS_DEFAULT", "6"))
 
     def _system_prompt(self) -> str:
         return """

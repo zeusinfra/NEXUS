@@ -13,7 +13,7 @@ import os
 
 
 def _get_socket_path() -> str:
-    return os.getenv("ZEUS_DAEMON_SOCKET", "/tmp/zeus/daemon.sock")
+    return os.getenv("NEXUS_DAEMON_SOCKET", "/tmp/nexus/daemon.sock")
 
 
 class DaemonClient:

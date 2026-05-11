@@ -185,7 +185,7 @@ def _configured_allowlist() -> set[str]:
     return {
         item.strip()
         for item in os.getenv(
-            "ZEUS_CMD_ALLOWLIST",
+            "NEXUS_CMD_ALLOWLIST",
             "ls,pwd,echo,cat,sed,rg,find,wc,python3,node,npm,cargo,git,systemctl,apt,pip,pip3,df,free,uptime,ip,ss,top,htop",
         ).split(",")
         if item.strip()
@@ -198,7 +198,7 @@ def _contains_shell_control(command: str) -> bool:
 
 def classify_command(tokens: list[str]) -> CommandDecision:
     exe = Path(tokens[0]).name if tokens else ""
-    autonomy = os.getenv("ZEUS_AUTONOMY_LEVEL", "GUARDED").upper()
+    autonomy = os.getenv("NEXUS_AUTONOMY_LEVEL", "GUARDED").upper()
 
     if autonomy == "FULL":
         return CommandDecision(
@@ -239,7 +239,7 @@ def validate_command(
 
     decision = classify_command(tokens)
     allowlist = _configured_allowlist()
-    autonomy = os.getenv("ZEUS_AUTONOMY_LEVEL", "GUARDED").upper()
+    autonomy = os.getenv("NEXUS_AUTONOMY_LEVEL", "GUARDED").upper()
 
     try:
         if autonomy != "FULL" and _contains_shell_control(command):

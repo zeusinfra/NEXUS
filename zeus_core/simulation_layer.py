@@ -17,8 +17,8 @@ class SimulationLayer:
 
     def __init__(self, blackboard):
         self.blackboard = blackboard
-        self.shadow_root = Path("/tmp/zeus_shadow")
-        self.logger = logging.getLogger("ZEUS_SIMULATOR")
+        self.shadow_root = Path("/tmp/nexus_shadow")
+        self.logger = logging.getLogger("NEXUS_SIMULATOR")
         self._setup_shadow_env()
 
     def _setup_shadow_env(self):
@@ -49,7 +49,7 @@ class SimulationLayer:
             self._prepare_shadow_files(files)
 
         # Redirect command to run inside shadow root
-        # This is a simplified simulation: executing in /tmp/zeus_shadow
+        # This is a simplified simulation: executing in /tmp/nexus_shadow
         try:
             tokens = shlex.split(command)
             validate_command(command, tokens, confirmed=False)

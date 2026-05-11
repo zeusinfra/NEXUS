@@ -28,7 +28,7 @@ path = Path(sys.argv[1])
 root = sys.argv[2]
 content = path.read_text(encoding="utf-8")
 content = content.replace("__NEXUS_PROJECT_ROOT__", root)
-content = content.replace("__ZEUS_PROJECT_ROOT__", root)
+content = content.replace("__NEXUS_PROJECT_ROOT__", root)
 path.write_text(content, encoding="utf-8")
 PY
 

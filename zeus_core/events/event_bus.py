@@ -11,7 +11,7 @@ from zeus_core.integrations.obsidian import read_note
 
 # Simple in-memory debounce cache: {file_path: last_trigger_timestamp}
 _debounce_cache = {}
-DEBOUNCE_MS = int(os.getenv("ZEUS_WATCHER_DEBOUNCE_MS", "1200") or "1200")
+DEBOUNCE_MS = int(os.getenv("NEXUS_WATCHER_DEBOUNCE_MS", "1200") or "1200")
 
 
 def publish_file_event(file_path: str, source: str = "obsidian"):

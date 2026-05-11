@@ -47,7 +47,7 @@ IGNORED_RUNTIME_FILES = {
     "zeus_events.db-journal",
     "zeus_events.db-wal",
     "zeus_events.db-shm",
-    "zeus_core.log",
+    "nexus_core.log",
     "zeus_server.log",
 }
 

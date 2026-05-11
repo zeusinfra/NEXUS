@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
+# Legacy wrapper for NEXUS Chat
 set -euo pipefail
-
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-GTK="$ROOT_DIR/bin/zeus-gtk-chat"
-
-exec "$GTK" "$@"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "$DIR/nexus-chat" "$@"

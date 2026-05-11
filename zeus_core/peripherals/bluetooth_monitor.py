@@ -7,7 +7,7 @@ import re
 from zeus_core.observability import get_logger
 
 logger = get_logger("zeus.peripherals.bluetooth_monitor")
-BACKEND = os.getenv("ZEUS_BACKEND_URL", "http://127.0.0.1:8080").rstrip("/")
+BACKEND = os.getenv("NEXUS_BACKEND_URL", "http://127.0.0.1:8080").rstrip("/")
 
 
 class BluetoothMonitor:

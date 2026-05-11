@@ -9,7 +9,7 @@ logger = get_logger("zeus.self_improvement.rollback")
 class RollbackManager:
     def __init__(self):
         self.backup_dir = os.path.join(
-            os.getenv("ZEUS_VAULT_PATH", "/home/zeus/Documentos/Brain"),
+            os.getenv("NEXUS_VAULT_PATH", "/home/zeus/Documentos/Brain"),
             "backups",
             "self_improvement",
         )

@@ -1,0 +1,20 @@
+[Unit]
+Description=ZEUS Cognitive OS Core v3.0
+After=network.target
+
+[Service]
+Type=simple
+User=zeus
+WorkingDirectory=/home/zeus/Documentos/NEXUS_SYSTEM
+ExecStart=/home/zeus/Documentos/NEXUS_SYSTEM/.venv/bin/python3 -m zeus_core.zeus_core_v3
+Restart=always
+RestartSec=5
+StandardOutput=append:/home/zeus/Documentos/NEXUS_SYSTEM/nexus_core.log
+StandardError=append:/home/zeus/Documentos/NEXUS_SYSTEM/nexus_core.log
+
+# Resource Limits (Safety first)
+CPUQuota=30%
+MemoryLimit=1G
+
+[Install]
+WantedBy=multi-user.target

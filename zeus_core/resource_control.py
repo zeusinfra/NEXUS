@@ -14,7 +14,7 @@ class ResourceControl:
     def __init__(self, blackboard, bootstrap_config):
         self.blackboard = blackboard
         self.config = bootstrap_config
-        self.logger = logging.getLogger("ZEUS_RESOURCES")
+        self.logger = logging.getLogger("NEXUS_RESOURCES")
 
         # Thresholds
         self.CPU_CRITICAL = 92.0  # Percent (Aumentado para evitar pausas excessivas)

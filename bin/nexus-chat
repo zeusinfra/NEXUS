@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-exec "$DIR/zeus-chat" "$@"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+GTK="$ROOT_DIR/bin/zeus-gtk-chat"
+
+exec "$GTK" "$@"

@@ -18,10 +18,10 @@ from zeus_core.events.event_bus import EventType, event_bus
 from zeus_core.observability import get_logger
 
 
-BACKEND = os.getenv("ZEUS_BACKEND_URL", "http://127.0.0.1:8080").rstrip("/")
-DEBOUNCE_SEC = float(os.getenv("ZEUS_USB_DEBOUNCE_SEC", "8.0") or "8.0")
+BACKEND = os.getenv("NEXUS_BACKEND_URL", "http://127.0.0.1:8080").rstrip("/")
+DEBOUNCE_SEC = float(os.getenv("NEXUS_USB_DEBOUNCE_SEC", "8.0") or "8.0")
 GLOBAL_ANNOUNCE_COOLDOWN_SEC = float(
-    os.getenv("ZEUS_USB_GLOBAL_COOLDOWN_SEC", "4.0") or "4.0"
+    os.getenv("NEXUS_USB_GLOBAL_COOLDOWN_SEC", "4.0") or "4.0"
 )
 
 logger = get_logger("zeus.peripherals.usb_monitor")

@@ -34,7 +34,7 @@ def is_trusted_host(
         for item in (
             trusted_ips
             if trusted_ips is not None
-            else os.getenv("ZEUS_TRUSTED_IPS", "")
+            else os.getenv("NEXUS_TRUSTED_IPS", "")
         ).split(",")
         if item.strip()
     }
@@ -138,6 +138,6 @@ def require_lan_token_for_socketio(
             provided = None
     if not provided:
         provided = extract_bearer_token(
-            environ.get("HTTP_X_ZEUS_TOKEN")
+            environ.get("HTTP_X_NEXUS_TOKEN")
         ) or extract_bearer_token(environ.get("HTTP_AUTHORIZATION"))
     return provided == lan.lan_token

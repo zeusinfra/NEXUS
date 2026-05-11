@@ -19,7 +19,7 @@ class _BrowserState:
     async def ensure(self, *, headless: Optional[bool] = None) -> None:
         async with self._lock:
             if headless is None:
-                env = os.getenv("ZEUS_BROWSER_HEADLESS", "1").strip().lower()
+                env = os.getenv("NEXUS_BROWSER_HEADLESS", "1").strip().lower()
                 headless = env in {"1", "true", "yes", "on"}
             self._headless = bool(headless)
 

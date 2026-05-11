@@ -7,7 +7,7 @@ class PathFilterTests(unittest.TestCase):
     def test_runtime_noise_paths_are_ignored(self):
         noisy_paths = [
             "/repo/data/zeus_memory.db",
-            "/repo/zeus_events.db-journal",
+            "/repo/nexus_events.db-journal",
             "/repo/zeus_core.log",
             "/repo/logs/watcher.log",
             "/repo/.venv/lib/site.py",

@@ -8,7 +8,7 @@ class ContextBuilder:
     """Constrói o contexto para a LLM baseado em prioridade e orçamentos de tokens."""
 
     def __init__(self):
-        self.max_chars = int(os.getenv("ZEUS_CONTEXT_BUDGET_CHARS", "32000"))
+        self.max_chars = int(os.getenv("NEXUS_CONTEXT_BUDGET_CHARS", "32000"))
 
         # Budgets relativos
         self.budgets = {

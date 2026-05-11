@@ -82,12 +82,12 @@ class CognitionService:
 
     async def run_forever(self) -> None:
         """Run the cognitive loop until interrupted. For standalone daemon use."""
-        setup_logging(os.getenv("ZEUS_LOG_LEVEL", "INFO"))
+        setup_logging(os.getenv("NEXUS_LOG_LEVEL", "INFO"))
         log_event(
             logger,
             20,
             "cognition_daemon_starting",
-            db_path=self.db_path or os.getenv("ZEUS_DB_PATH", "./zeus_events.db"),
+            db_path=self.db_path or os.getenv("NEXUS_DB_PATH", "./zeus_events.db"),
         )
 
         loop = asyncio.get_running_loop()
@@ -108,15 +108,15 @@ class CognitionService:
 
 def main() -> None:
     """CLI entry point for the cognition daemon."""
-    enabled = os.getenv("ZEUS_COGNITIVE_LOOP_ENABLED", "0").strip().lower() in {
+    enabled = os.getenv("NEXUS_COGNITIVE_LOOP_ENABLED", "0").strip().lower() in {
         "1",
         "true",
         "yes",
     }
     if not enabled:
         print(
-            "[ZEUS] Cognitive loop is disabled. "
-            "Set ZEUS_COGNITIVE_LOOP_ENABLED=1 in .env to enable."
+            "[NEXUS] Cognitive loop is disabled. "
+            "Set NEXUS_COGNITIVE_LOOP_ENABLED=1 in .env to enable."
         )
         sys.exit(0)
 
@@ -124,7 +124,7 @@ def main() -> None:
     try:
         asyncio.run(service.run_forever())
     except KeyboardInterrupt:
-        print("\n[ZEUS] Cognitive loop interrupted.")
+        print("\n[NEXUS] Cognitive loop interrupted.")
 
 
 if __name__ == "__main__":

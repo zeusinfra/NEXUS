@@ -1,5 +1,5 @@
 """
-ZEUS Privacy Guard — FastAPI Routes.
+NEXUS Privacy Guard — FastAPI Routes.
 """
 
 from __future__ import annotations

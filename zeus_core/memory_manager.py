@@ -25,7 +25,7 @@ class MemoryManager:
     def __init__(self, db_path="data/zeus_memory.db", vector_memory=None):
         self.db_path = db_path
         self.vector_memory = vector_memory
-        self.logger = logging.getLogger("ZEUS_MEMORY")
+        self.logger = logging.getLogger("NEXUS_MEMORY")
 
         # L1: Sensory Memory (Volatile RAM)
         self.sensory_history = deque(maxlen=200)

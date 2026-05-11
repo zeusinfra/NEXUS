@@ -39,7 +39,7 @@ Examples of unacceptable behavior include:
 
 This Code of Conduct applies in all project spaces, including GitHub issues,
 pull requests, discussions, reviews, community channels, documentation, and
-events where someone represents NEXUS or ZEUS Protocol.
+events where someone represents NEXUS or NEXUS Protocol.
 
 ## Enforcement
 

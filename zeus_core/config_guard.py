@@ -28,7 +28,7 @@ def env_flag(name: str, default: str = "0") -> bool:
 
 def zeus_env() -> str:
     return (
-        os.getenv("ZEUS_ENV", os.getenv("APP_ENV", "local")).strip().lower() or "local"
+        os.getenv("NEXUS_ENV", os.getenv("APP_ENV", "local")).strip().lower() or "local"
     )
 
 
@@ -45,16 +45,16 @@ def validate_jwt_secret(
         if allow_insecure_dev_secret and not production:
             return "dev_only_change_me_zeus_jwt_secret"
         raise RuntimeError(
-            "ZEUS_JWT_SECRET must be set. Use ZEUS_ALLOW_INSECURE_DEV_SECRET=1 only for local development."
+            "NEXUS_JWT_SECRET must be set. Use NEXUS_ALLOW_INSECURE_DEV_SECRET=1 only for local development."
         )
     if secret in INSECURE_JWT_SECRETS:
         if allow_insecure_dev_secret and not production:
             return secret
-        raise RuntimeError("ZEUS_JWT_SECRET is insecure. Set a strong secret.")
+        raise RuntimeError("NEXUS_JWT_SECRET is insecure. Set a strong secret.")
     if len(secret) < 32:
         if allow_insecure_dev_secret and not production:
             return secret
-        raise RuntimeError("ZEUS_JWT_SECRET must be at least 32 characters.")
+        raise RuntimeError("NEXUS_JWT_SECRET must be at least 32 characters.")
     return secret
 
 
@@ -66,35 +66,35 @@ def validate_lan_security(config: LanSecurityConfig) -> None:
     if not remote_auth_required(allow_lan=config.allow_lan, bind_host=config.bind_host):
         return
     if not config.lan_auth_enabled:
-        raise RuntimeError("ZEUS_LAN_AUTH=1 is required when remote access is enabled.")
+        raise RuntimeError("NEXUS_LAN_AUTH=1 is required when remote access is enabled.")
     if not config.lan_token or len(config.lan_token) < 16:
         raise RuntimeError(
-            "ZEUS_LAN_TOKEN must be set (>=16 chars) when remote access is enabled."
+            "NEXUS_LAN_TOKEN must be set (>=16 chars) when remote access is enabled."
         )
 
 
 def validate_llm_config() -> None:
-    provider = os.getenv("ZEUS_LLM_PROVIDER", "").strip().lower()
+    provider = os.getenv("NEXUS_LLM_PROVIDER", "").strip().lower()
     if provider and provider not in {"ollama", "openai", "gemini"}:
-        raise RuntimeError("ZEUS_LLM_PROVIDER must be one of: ollama, openai, gemini.")
+        raise RuntimeError("NEXUS_LLM_PROVIDER must be one of: ollama, openai, gemini.")
 
     if provider == "openai" and not os.getenv("OPENAI_API_KEY", "").strip():
-        raise RuntimeError("OPENAI_API_KEY must be set when ZEUS_LLM_PROVIDER=openai.")
+        raise RuntimeError("OPENAI_API_KEY must be set when NEXUS_LLM_PROVIDER=openai.")
 
     if provider == "gemini" and not os.getenv("GEMINI_API_KEY", "").strip():
-        raise RuntimeError("GEMINI_API_KEY must be set when ZEUS_LLM_PROVIDER=gemini.")
+        raise RuntimeError("GEMINI_API_KEY must be set when NEXUS_LLM_PROVIDER=gemini.")
 
-    llm_url = os.getenv("ZEUS_LLM_URL", "").strip()
+    llm_url = os.getenv("NEXUS_LLM_URL", "").strip()
     parsed = urlparse(llm_url)
     using_ollama_cloud_api = provider == "ollama" and parsed.netloc.endswith(
         "ollama.com"
     )
     if using_ollama_cloud_api and not (
         os.getenv("OLLAMA_API_KEY", "").strip()
-        or os.getenv("ZEUS_LLM_API_KEY", "").strip()
+        or os.getenv("NEXUS_LLM_API_KEY", "").strip()
     ):
         raise RuntimeError(
-            "OLLAMA_API_KEY or ZEUS_LLM_API_KEY must be set when using the hosted Ollama API."
+            "OLLAMA_API_KEY or NEXUS_LLM_API_KEY must be set when using the hosted Ollama API."
         )
 
 
@@ -104,8 +104,8 @@ def validate_startup_config(*, lan: LanSecurityConfig) -> None:
 
 
 def build_config_diagnostics(*, lan: LanSecurityConfig) -> dict:
-    provider = os.getenv("ZEUS_LLM_PROVIDER", "").strip().lower() or "auto"
-    llm_url = os.getenv("ZEUS_LLM_URL", "").strip()
+    provider = os.getenv("NEXUS_LLM_PROVIDER", "").strip().lower() or "auto"
+    llm_url = os.getenv("NEXUS_LLM_URL", "").strip()
     parsed = urlparse(llm_url)
     hosted_ollama_api = provider == "ollama" and parsed.netloc.endswith("ollama.com")
     remote_required = remote_auth_required(
@@ -113,7 +113,7 @@ def build_config_diagnostics(*, lan: LanSecurityConfig) -> dict:
     )
 
     warnings: list[str] = []
-    if is_production() and env_flag("ZEUS_ALLOW_INSECURE_DEV_SECRET", "0"):
+    if is_production() and env_flag("NEXUS_ALLOW_INSECURE_DEV_SECRET", "0"):
         warnings.append("insecure_dev_secret_enabled")
     if remote_required and not lan.lan_auth_enabled:
         warnings.append("remote_auth_disabled")
@@ -121,7 +121,7 @@ def build_config_diagnostics(*, lan: LanSecurityConfig) -> dict:
         warnings.append("lan_token_missing_or_weak")
     if hosted_ollama_api and not (
         os.getenv("OLLAMA_API_KEY", "").strip()
-        or os.getenv("ZEUS_LLM_API_KEY", "").strip()
+        or os.getenv("NEXUS_LLM_API_KEY", "").strip()
     ):
         warnings.append("ollama_hosted_api_missing_key")
 

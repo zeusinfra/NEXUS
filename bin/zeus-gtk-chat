@@ -38,7 +38,7 @@ from zeus_core.security.approval_listener import start_approval_listener_glib
 
 # Se o primeiro argumento não começar com '--', assumimos que é a URL do backend.
 _backend_arg = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("--") else None
-BACKEND = (_backend_arg or os.getenv("ZEUS_BACKEND_URL", "http://127.0.0.1:8080")).rstrip("/")
+BACKEND = (_backend_arg or os.getenv("NEXUS_BACKEND_URL", "http://127.0.0.1:8080")).rstrip("/")
 APP_ID = "local.nexus.CognitiveChat"
 
 
@@ -71,8 +71,8 @@ class NexusGtkChat(Adw.Application):
         self._seen_event_keys: set[str] = set()
         self._events_polling = False
         self.sidebar_scroll: Gtk.ScrolledWindow | None = None
-        self._client_id = os.getenv("ZEUS_GTK_CLIENT_ID", "nexus_gtk_chat").strip() or "nexus_gtk_chat"
-        self._session_id = os.getenv("ZEUS_GTK_SESSION_ID") or datetime.now().strftime("gtk-%Y%m%d-%H%M%S")
+        self._client_id = os.getenv("NEXUS_GTK_CLIENT_ID", "nexus_gtk_chat").strip() or "nexus_gtk_chat"
+        self._session_id = os.getenv("NEXUS_GTK_SESSION_ID") or datetime.now().strftime("gtk-%Y%m%d-%H%M%S")
         self._history_db = os.path.join(
             os.getenv("XDG_DATA_HOME", os.path.expanduser("~/.local/share")),
             "nexus",
@@ -107,7 +107,7 @@ class NexusGtkChat(Adw.Application):
 
     def _apply_theme(self) -> None:
         style_manager = Adw.StyleManager.get_default()
-        theme = os.getenv("ZEUS_GTK_THEME", "dark").lower()
+        theme = os.getenv("NEXUS_GTK_THEME", "dark").lower()
         if theme == "dark":
             style_manager.set_color_scheme(Adw.ColorScheme.PREFER_DARK)
         elif theme == "light":

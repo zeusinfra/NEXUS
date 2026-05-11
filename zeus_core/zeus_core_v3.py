@@ -26,7 +26,7 @@ class BootstrapConfig:
 
     def __init__(self):
         # Load mode from environment, fallback to SAFE
-        env_mode = os.getenv("ZEUS_MODE", "SAFE").upper()
+        env_mode = os.getenv("NEXUS_MODE", "SAFE").upper()
         try:
             self.mode = ExecutionMode[env_mode]
         except KeyError:
@@ -43,7 +43,7 @@ class BootstrapConfig:
             level=logging.INFO,
             format="%(asctime)s - %(levelname)s - %(message)s",
         )
-        self.logger = logging.getLogger("ZEUS_BOOTSTRAP")
+        self.logger = logging.getLogger("NEXUS_BOOTSTRAP")
 
     def set_mode(self, mode_str: str):
         """Safely switch modes."""

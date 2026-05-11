@@ -25,8 +25,8 @@ from zeus_core.observability import get_logger, log_event
 
 logger = get_logger("zeus.cognitive.reflection")
 
-VAULT_PATH = os.getenv("ZEUS_VAULT_PATH", "")
-OBSIDIAN_SYNC = os.getenv("ZEUS_ENABLE_OBSIDIAN_AUTO_SYNC", "0").strip().lower() in {
+VAULT_PATH = os.getenv("NEXUS_VAULT_PATH", "")
+OBSIDIAN_SYNC = os.getenv("NEXUS_ENABLE_OBSIDIAN_AUTO_SYNC", "0").strip().lower() in {
     "1",
     "true",
     "yes",

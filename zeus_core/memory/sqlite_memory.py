@@ -6,11 +6,11 @@ from zeus_core.env import load_project_env
 
 load_project_env()
 
-DB_PATH = os.getenv("ZEUS_DB_PATH", "./zeus_events.db")
+DB_PATH = os.getenv("NEXUS_DB_PATH", "./zeus_events.db")
 
 
 def get_connection(db_path: str | None = None):
-    return sqlite3.connect(db_path or os.getenv("ZEUS_DB_PATH", DB_PATH))
+    return sqlite3.connect(db_path or os.getenv("NEXUS_DB_PATH", DB_PATH))
 
 
 def init_db(db_path: str | None = None):

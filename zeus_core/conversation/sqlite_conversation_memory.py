@@ -57,7 +57,7 @@ class SQLiteConversationMemory:
     def __init__(self, db_path: str | None = None) -> None:
         root = Path(__file__).resolve().parents[2]
         self.db_path = db_path or os.getenv(
-            "ZEUS_CONVERSATION_DB_PATH",
+            "NEXUS_CONVERSATION_DB_PATH",
             str(root / "data" / "conversation_memory.db"),
         )
         Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)

@@ -3,7 +3,7 @@ import asyncio
 
 class LifecycleManager:
     """
-    Gerenciador de tarefas de background do ZEUS.
+    Gerenciador de tarefas de background do NEXUS.
     Recebe o dicionário de globais do web_gui para manipular o estado da aplicação sem causar importações circulares.
     """
 
@@ -14,15 +14,15 @@ class LifecycleManager:
     async def boot_greeting(self):
         try:
             await asyncio.sleep(3)
-            prompt = "O sistema ZEUS acaba de ser iniciado. Crie uma mensagem falada muito curta de boas-vindas (máximo 1 frase). Seja técnico, direto e natural."
+            prompt = "O sistema NEXUS acaba de ser iniciado. Crie uma mensagem falada muito curta de boas-vindas (máximo 1 frase). Seja técnico, direto e natural."
             reply = await self.g["call_ollama"](prompt)
             if reply and reply.strip():
                 await self.g["speak"](reply)
             else:
-                await self.g["speak"]("ZEUS online. Pronto para operar.")
+                await self.g["speak"]("NEXUS online. Pronto para operar.")
         except Exception as e:
             print(f"Erro na saudação inicial: {e}")
-            await self.g["speak"]("ZEUS online. Pronto para operar.")
+            await self.g["speak"]("NEXUS online. Pronto para operar.")
 
     async def web_sensing_loop(self):
         while True:
@@ -70,7 +70,7 @@ class LifecycleManager:
                 if self.g["resource_control"].is_critical():
                     if voice_module.is_listening:
                         print(
-                            "[ZEUS RESOURCE ALERT] Critical Load. Pausing Voice Sensing..."
+                            "[NEXUS RESOURCE ALERT] Critical Load. Pausing Voice Sensing..."
                         )
                         voice_module.stop()
                         self._voice_task_running = False
@@ -79,7 +79,7 @@ class LifecycleManager:
 
                 if not voice_module.is_listening and not self._voice_task_running:
                     self._voice_task_running = True
-                    print("[ZEUS] Iniciando módulo de voz local...")
+                    print("[NEXUS] Iniciando módulo de voz local...")
                     asyncio.create_task(voice_module.run())
 
                 await asyncio.sleep(5.0)
@@ -97,7 +97,7 @@ class LifecycleManager:
 
             if not self.g["LOW_MEM_ACTIVE"] and ram >= self.g["LOW_MEM_ENTER_RAM"]:
                 self.g["LOW_MEM_ACTIVE"] = True
-                print(f"[ZEUS LOW-MEM] Entering low-mem mode (RAM={ram}%).")
+                print(f"[NEXUS LOW-MEM] Entering low-mem mode (RAM={ram}%).")
 
                 self.g["ENABLE_VOICE"] = False
                 voice_module = self.g["voice_module"]
@@ -127,11 +127,11 @@ class LifecycleManager:
 
             elif self.g["LOW_MEM_ACTIVE"] and ram <= self.g["LOW_MEM_EXIT_RAM"]:
                 self.g["LOW_MEM_ACTIVE"] = False
-                print(f"[ZEUS LOW-MEM] Exiting low-mem mode (RAM={ram}%).")
+                print(f"[NEXUS LOW-MEM] Exiting low-mem mode (RAM={ram}%).")
 
-                if self.g["_env_flag"]("ZEUS_ENABLE_VOICE", "1"):
+                if self.g["_env_flag"]("NEXUS_ENABLE_VOICE", "1"):
                     self.g["ENABLE_VOICE"] = True
-                if self.g["_env_flag"]("ZEUS_ENABLE_BROWSER_SENSING", "0"):
+                if self.g["_env_flag"]("NEXUS_ENABLE_BROWSER_SENSING", "0"):
                     self.g["ENABLE_BROWSER_SENSING"] = True
                     if self.g.get("_web_sensing_task") is None:
                         try:
