@@ -23,11 +23,14 @@ def isolated_runtime(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     """Keep tests away from developer runtime state by default."""
     db_path = tmp_path / "zeus_test.db"
     data_dir = tmp_path / "data"
+    vault_dir = tmp_path / "vault"
     data_dir.mkdir()
+    vault_dir.mkdir()
 
     monkeypatch.setenv("ZEUS_TESTING", "1")
     monkeypatch.setenv("ZEUS_DB_PATH", str(db_path))
     monkeypatch.setenv("ZEUS_DATA_DIR", str(data_dir))
+    monkeypatch.setenv("ZEUS_VAULT_PATH", str(vault_dir))
     monkeypatch.setenv("ZEUS_AUTONOMY_LEVEL", "GUARDED")
     monkeypatch.setenv("ZEUS_ENABLE_VOICE", "0")
     monkeypatch.setenv("ZEUS_ENABLE_VOICE_SENSING", "0")

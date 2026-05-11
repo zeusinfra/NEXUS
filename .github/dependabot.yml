@@ -9,6 +9,9 @@ updates:
       python-runtime:
         patterns:
           - "*"
+    ignore:
+      - dependency-name: "numpy"
+        versions: [">=2.3.0"]
 
   - package-ecosystem: "cargo"
     directory: "/core-rust"
