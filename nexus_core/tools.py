@@ -122,6 +122,28 @@ def cmd_control(
 
     if not approval_id:
         proposal = create_command_proposal(command, cwd=str(_project_root()))
+        if proposal["status"] == "APPROVED" and proposal.get("approval_id"):
+            execution = asyncio.run(
+                execute_approved_command(
+                    proposal["proposal_id"],
+                    proposal["approval_id"],
+                    timeout_s=timeout_s,
+                )
+            )
+            result = read_execution_result(proposal["proposal_id"])
+            return {
+                "command": command,
+                "proposal_id": proposal["proposal_id"],
+                "approval_id": proposal["approval_id"],
+                "status": execution.get("status"),
+                "pid": execution.get("pid"),
+                "exit_code": execution.get("exit_code"),
+                "stdout": result.get("stdout", ""),
+                "stderr": result.get("stderr", ""),
+                "stdout_path": execution.get("stdout_path"),
+                "stderr_path": execution.get("stderr_path"),
+                "verified_by_executor": execution.get("verified_by_executor"),
+            }
         return {
             "command": command,
             "requires_approval": proposal["status"] == "PROPOSED",

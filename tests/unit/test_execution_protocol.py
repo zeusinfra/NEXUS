@@ -4,6 +4,7 @@ import pytest
 
 from nexus_core.execution_protocol import (
     ActionState,
+    ApprovalScope,
     ExecutionLedger,
     assert_verified_completion,
     cancel_execution,
@@ -199,3 +200,26 @@ async def test_disabled_mode_blocks_real_execution(execution_env, monkeypatch):
     assert execution["status"] == ActionState.BLOCKED.value
     assert "disabled" in execution["summary"]
     assert not marker.exists()
+
+
+@pytest.mark.asyncio
+async def test_session_low_risk_grant_auto_approves_low_risk_commands(
+    execution_env, monkeypatch
+):
+    monkeypatch.setenv("NEXUS_EXECUTION_MODE", "session_low_risk")
+    first = create_command_proposal("python3 --version", cwd=str(execution_env))
+    request_user_approval(
+        first["proposal_id"],
+        approved_by="tester",
+        approval_scope=ApprovalScope.SESSION_LOW_RISK,
+    )
+
+    second = create_command_proposal("python3 -V", cwd=str(execution_env))
+
+    assert second["status"] == ActionState.APPROVED.value
+    assert second["approval_id"]
+    assert second["approval_scope"] == ApprovalScope.SESSION_LOW_RISK.value
+    execution = await execute_approved_command(
+        second["proposal_id"], second["approval_id"], timeout_s=5
+    )
+    assert execution["status"] == ActionState.SUCCEEDED.value

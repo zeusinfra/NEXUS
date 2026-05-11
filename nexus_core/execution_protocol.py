@@ -215,6 +215,22 @@ def read_execution_result(proposal_id: str) -> dict:
     return result
 
 
+def _active_session_low_risk_grant(ledger: ExecutionLedger) -> dict | None:
+    now = datetime.now(timezone.utc)
+    for row in reversed(ledger.records()):
+        if row.get("status") != ActionState.APPROVED.value:
+            continue
+        if row.get("approval_scope") != ApprovalScope.SESSION_LOW_RISK.value:
+            continue
+        if row.get("risk_level") != "LOW":
+            continue
+        expires_at = row.get("expires_at")
+        if expires_at and parse_utc(expires_at) <= now:
+            continue
+        return row
+    return None
+
+
 def create_command_proposal(
     command: str,
     *,
@@ -272,7 +288,26 @@ def create_command_proposal(
         summary=reason or "Command proposal created.",
         verified_by_executor=False,
     )
-    return ledger.append_transition(ActionState.DRAFT.value, record)
+    proposal = ledger.append_transition(ActionState.DRAFT.value, record)
+    if execution_mode() == ExecutionMode.SESSION_LOW_RISK and risk_level == "LOW":
+        grant = _active_session_low_risk_grant(ledger)
+        if grant:
+            approval = ExecutionRecord(
+                proposal_id=proposal_id,
+                approval_id=f"appr_{uuid.uuid4().hex[:16]}",
+                command=command,
+                cwd=cwd,
+                status=ActionState.APPROVED.value,
+                command_hash=base["command_hash"],
+                risk_level=risk_level,
+                approved_by=grant.get("approved_by") or "session_low_risk",
+                approval_scope=ApprovalScope.SESSION_LOW_RISK.value,
+                expires_at=grant.get("expires_at"),
+                summary="Approved by active session low-risk grant.",
+                verified_by_executor=False,
+            )
+            return ledger.append_transition(ActionState.PROPOSED.value, approval)
+    return proposal
 
 
 def request_user_approval(

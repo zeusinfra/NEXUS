@@ -959,6 +959,47 @@ Se não precisar agir, responda normalmente em PT-BR.
                         }
                     )
                     continue
+                if proposal.get(
+                    "status"
+                ) == ActionState.APPROVED.value and proposal.get("approval_id"):
+
+                    async def on_execution_event(payload: dict) -> None:
+                        await self._broadcast(
+                            broadcast,
+                            {
+                                "type": "EXECUTION_UPDATE",
+                                "proposal_id": proposal["proposal_id"],
+                                "approval_id": proposal["approval_id"],
+                                "payload": payload,
+                            },
+                        )
+
+                    tool_out = await execute_approved_command(
+                        proposal["proposal_id"],
+                        proposal["approval_id"],
+                        timeout_s=int(args.get("timeout_s") or 30),
+                        on_event=on_execution_event,
+                    )
+                    result = read_execution_result(proposal["proposal_id"])
+                    result["approval_id"] = proposal["approval_id"]
+                    result["execution"] = tool_out
+                    await self._progress(
+                        broadcast,
+                        "tool_done",
+                        text=f"Ferramenta {name}: resultado recebido.",
+                        step=step_no,
+                        total_steps=dynamic_steps,
+                        tool=name,
+                        details=_summarize_tool_result(result),
+                    )
+                    messages.append({"role": "assistant", "content": full_assistant})
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": f"Tool output ({name}): {json.dumps(result, ensure_ascii=False)}",
+                        }
+                    )
+                    continue
                 _PENDING_CONFIRMATIONS[client_key] = {
                     "name": name,
                     "args": args,
