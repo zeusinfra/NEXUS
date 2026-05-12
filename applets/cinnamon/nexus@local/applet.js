@@ -63,6 +63,7 @@ class NexusApplet extends Applet.TextIconApplet {
             this._openChat();
         } else {
             this._startBackend();
+            this._openChat();
         }
         this._refreshStatus();
     }

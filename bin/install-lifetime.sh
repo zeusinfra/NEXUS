@@ -8,6 +8,7 @@ mkdir -p /home/zeus/Documentos/ZEUS_SYSTEM/logs
 
 # 2. Criar diretório do systemd de usuário se não existir
 mkdir -p ~/.config/systemd/user/
+mkdir -p ~/.config/autostart/
 
 # 3. Copiar os arquivos de serviço
 cp deploy/systemd/nexus.service ~/.config/systemd/user/nexus.service
@@ -28,7 +29,18 @@ echo "✅ Backend NEXUS configurado como serviço de usuário."
 echo "🔄 O sistema irá reiniciar automaticamente em caso de falha."
 echo "📡 Use 'systemctl --user status nexus.service' para monitorar."
 
-# 6. Adicionar ao Autostart do Cinnamon (Opcional, pois o Applet já faz isso)
-# O Applet do Cinnamon já inicia automaticamente com o painel.
+# 7. Restaurar abertura automática do chat no login
+rm -f ~/.config/autostart/zeus-chat-autostart.desktop
+cat > ~/.config/autostart/nexus-chat-autostart.desktop <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=NEXUS Chat
+Comment=Abre o chat desktop do NEXUS ao iniciar a sessao
+Exec=/home/zeus/Documentos/ZEUS_SYSTEM/bin/nexus-gtk-chat --autostart
+Terminal=false
+X-GNOME-Autostart-enabled=true
+EOF
+
+echo "🪟 Chat NEXUS configurado para abrir no login."
 
 echo "🚀 NEXUS está agora em estado VITALÍCIO."

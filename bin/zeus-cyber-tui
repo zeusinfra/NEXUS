@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-# Legacy wrapper for NEXUS Cyber TUI
-set -euo pipefail
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-exec "$DIR/nexus-cyber-tui" "$@"
