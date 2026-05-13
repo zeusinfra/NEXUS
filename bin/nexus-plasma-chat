@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+VENV_PY="$ROOT_DIR/.venv/bin/python"
+SYS_PY="${PYTHON:-python3}"
+
+has_qt() {
+    "$1" - <<'PY' >/dev/null 2>&1
+try:
+    import PySide6  # noqa: F401
+except Exception:
+    import PyQt6  # noqa: F401
+PY
+}
+
+PY="$SYS_PY"
+if [[ -x "$VENV_PY" ]] && has_qt "$VENV_PY"; then
+    PY="$VENV_PY"
+elif ! has_qt "$PY"; then
+    echo "Erro: PySide6/PyQt6 nao encontrado." >&2
+    echo "Instale no Plasma com: sudo apt install python3-pyqt6" >&2
+    echo "Ou na venv com: $VENV_PY -m pip install PySide6" >&2
+    exit 1
+fi
+
+exec "$PY" "$ROOT_DIR/apps/plasma_chat.py" "$@"

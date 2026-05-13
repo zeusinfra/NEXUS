@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=NEXUS Tray
+Comment=Applet de controle do NEXUS para o Painel
+Exec=/home/nexus/Documentos/NEXUS/NEXUS/applets/xfce/tray_nexus.sh
+Icon=/usr/share/icons/Papirus/32x32/apps/brain.svg
+Terminal=false
+Type=Application
+Categories=System;Utility;
+StartupNotify=false

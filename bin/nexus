@@ -146,6 +146,7 @@ if [[ "$1" == "help" || "$1" == "-h" || "$1" == "--help" ]]; then
     echo "  ./bin/nexus               → Cyber TUI (padrão)"
     echo "  ./bin/nexus tui            → Cyber TUI (explícito)"
     echo "  ./bin/nexus chat           → Abrir chat GTK (desktop)"
+    echo "  ./bin/nexus plasma         → Abrir chat Qt para KDE Plasma"
     echo "  ./bin/nexus web            → Iniciar Servidor (Browser)"
     echo "  ./bin/nexus server         → Backend headless"
     echo "  ./bin/nexus ensure-server  → Garantir backend online"
@@ -204,6 +205,11 @@ case "$1" in
     chat)
         echo "💬  Abrindo chat NEXUS GTK..."
         "$ROOT_DIR/bin/nexus-chat"
+        ;;
+    plasma|kde|qt|plasma-chat)
+        echo "💬  Abrindo NEXUS Plasma (Qt)..."
+        ensure_server_background
+        "$ROOT_DIR/bin/nexus-plasma-chat"
         ;;
     setup-aliases)
         echo "🔧  Configurando aliases globais em ~/.bashrc..."

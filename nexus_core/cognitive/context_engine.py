@@ -1,5 +1,6 @@
 from nexus_core.integrations.linear import get_active_issues
-from nexus_core.memory.sqlite_memory import get_connection, get_sync_status
+from nexus_core.memory.sqlite_memory import get_connection, get_sync_status, init_db
+import sqlite3
 import time
 
 _ISSUES_CACHE = {"ts": 0.0, "items": []}
@@ -9,17 +10,21 @@ _ISSUES_CACHE_TTL_SECONDS = 90.0
 def _get_recent_notes(limit: int = 3) -> list:
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute(
-        """
-        SELECT file_path, detected_tags 
-        FROM processed_files 
-        ORDER BY last_processed_at DESC 
-        LIMIT ?
-    """,
-        (limit,),
-    )
-    rows = cursor.fetchall()
-    conn.close()
+    try:
+        cursor.execute(
+            """
+            SELECT file_path, detected_tags
+            FROM processed_files
+            ORDER BY last_processed_at DESC
+            LIMIT ?
+        """,
+            (limit,),
+        )
+        rows = cursor.fetchall()
+    except sqlite3.OperationalError:
+        rows = []
+    finally:
+        conn.close()
 
     notes = []
     for row in rows:
@@ -54,6 +59,7 @@ def build_current_context() -> str:
     """
     context_lines = ["Contexto operacional atual:"]
 
+    init_db()
     sync_status = get_sync_status()
     context_lines.append(
         f"- Sincronização: pendentes={sync_status.get('pending', 0)}, processados={sync_status.get('processed', 0)}, erros={sync_status.get('error', 0)}."
