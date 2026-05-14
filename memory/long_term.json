@@ -17,6 +17,10 @@
     "proactivity_level": {
       "value": "Alta - sugerir melhorias e conexões",
       "updated": "2026-05-05"
+    },
+    "operating_system": {
+      "value": "MX Linux",
+      "updated": "2026-05-13"
     }
   },
   "projects": {
@@ -74,6 +78,10 @@
     "contact_email": {
       "value": "noxiousvoid@proton.me",
       "updated": "2026-05-10"
+    },
+    "system_environment": {
+      "value": "The user switched to MX Linux (based on Debian Stable).",
+      "updated": "2026-05-13"
     }
   }
 }

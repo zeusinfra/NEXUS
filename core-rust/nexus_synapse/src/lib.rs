@@ -106,6 +106,25 @@ impl SynapseManagerRust {
 
         Ok(results)
     }
+
+    /// [PONTE DE COMANDO] Executa uma operação de alto desempenho diretamente em Rust.
+    pub fn call_native_bridge(&self, action: String, payload: String) -> PyResult<String> {
+        match action.as_str() {
+            "sys_info" => {
+                // Simulação de telemetria ultra-rápida em Rust
+                Ok(format!("{{ \"status\": \"stable\", \"core_ver\": \"1.5.0-rust\", \"payload\": \"{}\" }}", payload))
+            },
+            "prune_noise" => {
+                // Poda de ruído em massa diretamente no DB
+                let conn = Connection::open(&self.db_path)
+                    .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+                let deleted = conn.execute("DELETE FROM synapses WHERE weight < 2 AND last_interaction < date('now', '-7 days')", [])
+                    .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+                Ok(format!("{{ \"deleted\": {} }}", deleted))
+            },
+            _ => Ok(format!("{{ \"error\": \"Action '{}' not implemented in Rust bridge\" }}", action))
+        }
+    }
 }
 
 #[pymodule]

@@ -38,11 +38,18 @@ async fn main() {
         .route("/save", post(save_memory))
         .with_state(state);
 
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:8082")
-        .await
-        .unwrap();
-    println!("🧠 NEXUS Memory Service (Rust Microservice) rodando em http://127.0.0.1:8082");
-    axum::serve(listener, app).await.unwrap();
+    let addr = "127.0.0.1:8085";
+    let listener = match tokio::net::TcpListener::bind(addr).await {
+        Ok(l) => l,
+        Err(e) => {
+            eprintln!("❌ FAILED to bind to {}: {}. Check permissions or if the port is in use.", addr, e);
+            std::process::exit(1);
+        }
+    };
+    println!("🧠 NEXUS Memory Service (Rust Microservice) rodando em http://{}", addr);
+    if let Err(e) = axum::serve(listener, app).await {
+        eprintln!("❌ Server error: {}", e);
+    }
 }
 
 async fn health_check() -> &'static str {

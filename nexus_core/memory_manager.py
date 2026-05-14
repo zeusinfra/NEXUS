@@ -1,6 +1,7 @@
 import os
 import sqlite3
 import time
+import json
 from collections import deque
 from datetime import datetime
 from typing import List
@@ -136,6 +137,33 @@ class MemoryManager:
         conn.commit()
         conn.close()
 
+    def record_pattern(
+        self, pattern_type: str, context: dict | str, importance: float = 1.0
+    ) -> None:
+        """Persist a behavioral pattern observed by sensors or interaction loops."""
+        if not pattern_type:
+            return
+        if isinstance(context, str):
+            context_text = context
+        else:
+            context_text = json.dumps(context or {}, ensure_ascii=False)
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO patterns (type, context, timestamp, importance)
+            VALUES (?, ?, ?, ?)
+            """,
+            (
+                pattern_type[:80],
+                context_text[:4000],
+                datetime.now().isoformat(),
+                float(importance),
+            ),
+        )
+        conn.commit()
+        conn.close()
+
     def get_working_context(self, path: str, limit=5) -> List[str]:
         """Retrieves related paths (synapses) from L2."""
         if self.rust_synapse:
@@ -197,6 +225,34 @@ class MemoryManager:
         conn.commit()
         conn.close()
         self.logger.info("Memory decay applied to L2.")
+
+    def dream_cycle(self):
+        """
+        [MODO SONHO] Realiza a manutenção profunda da memória orgânica.
+        1. Poda (Pruning): Remove sinapses com peso 1 que não são acessadas há muito tempo.
+        2. Consolidação: Fortalece sinapses que sobrevivem ao decay.
+        """
+        self.logger.info("🌙 [NEXUS DREAMING] Iniciando ciclo de poda sináptica...")
+        
+        # Primeiro aplica um decay agressivo
+        self.decay_memory(factor=0.85)
+        
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # Remove conexões 'esquecidas' (peso 1)
+        cursor.execute("DELETE FROM synapses WHERE weight <= 1")
+        pruned_synapses = cursor.rowcount
+        
+        # Remove nós isolados
+        cursor.execute("DELETE FROM nodes WHERE weight <= 1 AND path NOT IN (SELECT source FROM synapses UNION SELECT target FROM synapses)")
+        pruned_nodes = cursor.rowcount
+        
+        conn.commit()
+        conn.close()
+        
+        self.logger.info(f"✨ [NEXUS DREAMING] Poda concluída: {pruned_nodes} nós e {pruned_synapses} sinapses removidos.")
+        return {"pruned_nodes": pruned_nodes, "pruned_synapses": pruned_synapses}
 
     def export_legacy_json(self) -> dict:
         """Converts SQLite state back to the legacy JSON format for backward compatibility."""

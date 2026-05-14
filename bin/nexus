@@ -102,8 +102,8 @@ start_rust_services() {
         WATCHER_PID=$!
     fi
 
-    if service_responds "http://127.0.0.1:8082/health"; then
-        echo "✅ Memory Service já está respondendo na porta 8082."
+    if service_responds "http://127.0.0.1:8085/health"; then
+        echo "✅ Memory Service já está respondendo na porta 8085."
     else
         (cd "$ROOT_DIR/core-rust/nexus_memory" && cargo run --release --bin memory_service > "$ROOT_DIR/logs/memory.log" 2>&1) &
         MEMORY_PID=$!
@@ -208,6 +208,12 @@ case "$1" in
         ;;
     plasma|kde|qt|plasma-chat)
         echo "💬  Abrindo NEXUS Plasma (Qt)..."
+        export NEXUS_ORGANIC_MODE="${NEXUS_ORGANIC_MODE:-1}"
+        export NEXUS_ENABLE_BROWSER_SENSING="${NEXUS_ENABLE_BROWSER_SENSING:-1}"
+        export NEXUS_ENABLE_AUTONOMOUS_TASKS="${NEXUS_ENABLE_AUTONOMOUS_TASKS:-1}"
+        export NEXUS_COGNITIVE_LOOP_ENABLED="${NEXUS_COGNITIVE_LOOP_ENABLED:-1}"
+        export NEXUS_ENABLE_RESOURCE_MONITOR="${NEXUS_ENABLE_RESOURCE_MONITOR:-1}"
+        export NEXUS_WATCH_DIRS="${NEXUS_WATCH_DIRS:-$ROOT_DIR,$HOME/Documentos/Brain}"
         ensure_server_background
         "$ROOT_DIR/bin/nexus-plasma-chat"
         ;;

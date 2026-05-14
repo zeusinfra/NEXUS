@@ -60,6 +60,18 @@ def create_status_router(deps: StatusRouteDeps) -> APIRouter:
         metrics = health.get("metrics", {})
         config = health.get("config", {})
 
+        # Sincronização e Sinapses (Nível 5)
+        synapse_count = 0
+        try:
+            from nexus_core.memory_manager import memory_manager
+            import sqlite3
+            conn = sqlite3.connect(memory_manager.db_path)
+            synapse_count = conn.execute("SELECT COUNT(*) FROM synapses").fetchone()[0]
+            conn.close()
+        except: pass
+
+        from apps.web_gui import sync_engine
+
         return {
             "ok": True,
             "online": True,
@@ -75,6 +87,12 @@ def create_status_router(deps: StatusRouteDeps) -> APIRouter:
                 "focus_score": state.attention.get("focus_score", 0.0),
                 "active_goals": state.active_goals_list,
                 "privacy_shield": state.privacy_status.get("shield"),
+                "synapse_count": synapse_count,
+            },
+            "sync": {
+                "is_running": sync_engine.is_running,
+                "last_sync": sync_engine.last_sync,
+                "relay": sync_engine.relay_url
             },
             "voice": health.get("voice", {}),
             "vision": health.get("vision", {}),

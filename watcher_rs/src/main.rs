@@ -6,7 +6,7 @@ use axum::{
 };
 use notify::{Config, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
-use std::{path::Path, sync::Arc, time::Duration};
+use std::{env, path::Path, sync::Arc, time::Duration};
 use sysinfo::System;
 use tokio::sync::broadcast;
 use tower_http::cors::CorsLayer;
@@ -73,12 +73,22 @@ async fn main() {
         )
         .expect("Error creating watcher");
 
-        let watch_dirs = vec![
-            std::env::var("HOME").unwrap_or_else(|_| "/home/zeus".to_string())
-                + "/Documentos/NEXUS_BRAIN",
-            std::env::var("HOME").unwrap_or_else(|_| "/home/zeus".to_string())
-                + "/Documentos/ZEUS_SYSTEM",
-        ];
+        let home = env::var("HOME").unwrap_or_else(|_| "/home/nexus".to_string());
+        let watch_dirs: Vec<String> = env::var("NEXUS_WATCH_DIRS")
+            .ok()
+            .map(|raw| {
+                raw.split(',')
+                    .map(str::trim)
+                    .filter(|item| !item.is_empty())
+                    .map(|item| item.replace("$HOME", &home))
+                    .collect()
+            })
+            .unwrap_or_else(|| {
+                vec![
+                    format!("{}/Documentos/NEXUS/NEXUS", home),
+                    format!("{}/Documentos/Brain", home),
+                ]
+            });
 
         for dir in watch_dirs {
             if Path::new(&dir).exists() {

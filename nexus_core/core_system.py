@@ -537,11 +537,18 @@ class LibrarianAgent:
             except Exception as e:
                 print(f"RAG Error: {e}")
 
-        # 2. DNA (Sempre incluir as instruções centrais)
+        # 3. DNA (Sempre incluir as instruções centrais)
         dna_path = os.path.join(self.core_path, "07 - DNA.md")
         if os.path.exists(dna_path):
             with open(dna_path, "r", encoding="utf-8") as f:
                 relevant_data.append(f"--- DNA CORE ---\n{f.read()}\n----------------")
+
+        # 4. SKILLS (O que eu já aprendi a fazer?)
+        skills_path = os.path.join(os.path.dirname(self.core_path), "skills")
+        if os.path.exists(skills_path):
+            skills = [f.stem for f in Path(skills_path).glob("*.py") if f.name != "__init__.py"]
+            if skills:
+                relevant_data.append(f"--- SKILLS ASSIMILADAS ---\n{', '.join(skills)}\n--------------------------")
 
         return "\n\n".join(relevant_data)
 
@@ -551,15 +558,15 @@ class StrategistAgent(CloudAgent):
 
     def plan(self, blackboard, user_input):
         system_prompt = (
-            "Você é o STRATEGIST do NEXUS. Analise o contexto e crie um plano técnico MULTI-ETAPAS detalhado.\n"
-            "Seu plano DEVE conter as seguintes seções:\n"
-            "1. Objetivo e Diagnóstico\n"
-            "2. Arquivos Envolvidos\n"
-            "3. Riscos e Impacto (CPU/RAM/Disco)\n"
-            "4. Passo a Passo Técnico\n"
-            "5. Fallbacks e Plano de Rollback\n"
-            "6. Nível de Autonomia Necessário (Requer SudoBroker?)\n"
-            "7. Critérios de Sucesso"
+            "Você é o CÉREBRO ORGÂNICO do NEXUS (Strategist). Sua missão é evoluir de forma exponencial e autônoma.\n"
+            "Pense como um sistema biológico: busque padrões ocultos em tudo o que o usuário acessa e crie sinapses entre conceitos aparentemente distintos.\n"
+            "Seu plano DEVE focar em:\n"
+            "1. Diagnóstico de Padrões e Conexões Sinápticas (O que isso me lembra? Com o que isso se conecta no histórico?)\n"
+            "2. Estratégia de Aprendizado Exponencial (Como posso aprender mais sobre isso sozinho?)\n"
+            "3. Autonomia e Auto-Melhoria (Quais módulos core do NEXUS podem ser otimizados agora?)\n"
+            "4. Passo a Passo Técnico detalhado\n"
+            "5. Riscos e Impacto no Ecossistema Local\n"
+            "6. Nível de Autonomia (Requer SudoBroker ou decisão autônoma?)"
         )
         user_prompt = (
             f"Contexto: {blackboard.get('context_fragment')}\nObjetivo: {user_input}"
@@ -592,14 +599,14 @@ class OperatorAgent(CloudAgent):
 
     def execute(self, blackboard):
         system_prompt = (
-            "Você é o OPERATOR do NEXUS. Transforme o plano estratégico em ações ou comandos seguros.\n"
-            "REGRAS OBRIGATÓRIAS:\n"
-            "1. Prefira comandos idempotentes.\n"
-            "2. Exija backup antes de alterações.\n"
-            "3. Proponha dry-run quando possível.\n"
-            "4. NUNCA use sudo diretamente (ex: sudo apt update). Se precisar de admin, delegue para o SudoBroker.\n"
-            "5. NUNCA execute comandos destrutivos (rm -rf /, dd, mkfs, chmod -R 777).\n"
-            "6. Se for um patch em código, proponha patches pequenos."
+            "Você é o OPERATOR do NEXUS. Sua missão é traduzir a vontade do cérebro em ações concretas de evolução.\n"
+            "REGRAS DE OURO:\n"
+            "1. Autonomia Responsável: Proponha ações que melhorem o sistema sem comprometer a estabilidade.\n"
+            "2. Conectividade: Sempre que criar ou modificar algo, registre a 'sinapse' (o porquê desta ação em relação ao histórico).\n"
+            "3. Auto-Otimização: Se identificar redundâncias no código ou processos, proponha o refactoring imediato.\n"
+            "4. Self-Coding: Você pode criar novas habilidades permanentes usando o 'skill_engine'. Se o usuário pedir algo recorrente, escreva uma skill em Python com uma função 'run()' e sugira sua integração ao DNA.\n"
+            "5. Segurança: Use o SudoBroker para ações privilegiadas e nunca execute comandos destrutivos.\n"
+            "6. Aprendizado Contínuo: Gere sugestões de novos 'conhecimentos' que o Librarian deve buscar."
         )
         user_prompt = f"Plano: {blackboard.get('plan')}"
 

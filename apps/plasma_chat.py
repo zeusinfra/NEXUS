@@ -3,11 +3,14 @@ from __future__ import annotations
 
 import json
 import base64
+import atexit
+import faulthandler
 import os
 import subprocess
 import sys
 import tempfile
 import time
+import traceback
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -33,6 +36,7 @@ try:
         QMenu,
         QMessageBox,
         QPushButton,
+        QProgressBar,
         QScrollArea,
         QSizePolicy,
         QSystemTrayIcon,
@@ -58,6 +62,7 @@ except ImportError:
             QMenu,
             QMessageBox,
             QPushButton,
+            QProgressBar,
             QScrollArea,
             QSizePolicy,
             QSystemTrayIcon,
@@ -83,6 +88,13 @@ CLIENT_ID = os.getenv("NEXUS_PLASMA_CLIENT_ID", "nexus_plasma_gui").strip()
 SESSION_ID = os.getenv("NEXUS_PLASMA_SESSION_ID") or datetime.now().strftime(
     "plasma-%Y%m%d-%H%M%S"
 )
+ICON_PATH = ROOT_DIR / "assets" / "icons" / "nexus-plasma-chat.svg"
+VISIBLE_WORKERS = {
+    "chat": "Processando pedido...",
+    "tts": "Gerando voz...",
+    "voice_start": "Armando escuta local...",
+}
+NON_OVERLAPPING_WORKERS = {"health", "status", "events"}
 
 
 def _request_json(
@@ -153,12 +165,17 @@ class PlasmaChatWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("NEXUS Plasma")
+        self.setWindowIcon(_app_icon())
         self.setMinimumSize(980, 680)
         self.resize(1180, 760)
 
         self._workers: list[ApiWorker] = []
+        self._active_worker_names: set[str] = set()
+        self._visible_workers: dict[ApiWorker, str] = {}
+        self._activity_items: list[str] = []
         self._seen_event_keys: set[str] = set()
         self._sending = False
+        self._allow_exit = False
         self._last_health: dict = {}
         self._voice_enabled = True
         self._last_speech_text = ""
@@ -191,12 +208,25 @@ class PlasmaChatWindow(QMainWindow):
         side_layout.setContentsMargins(20, 18, 20, 18)
         side_layout.setSpacing(14)
 
+        brand_row = QHBoxLayout()
+        brand_icon = QLabel()
+        brand_icon.setObjectName("brandIcon")
+        pixmap = _app_icon().pixmap(52, 52)
+        if not pixmap.isNull():
+            brand_icon.setPixmap(pixmap)
+        brand_icon.setFixedSize(56, 56)
+        brand_icon.setScaledContents(False)
+
+        brand_text = QVBoxLayout()
         title = QLabel("NEXUS")
         title.setObjectName("brand")
         subtitle = QLabel("Plasma Command Surface")
         subtitle.setObjectName("subtitle")
-        side_layout.addWidget(title)
-        side_layout.addWidget(subtitle)
+        brand_text.addWidget(title)
+        brand_text.addWidget(subtitle)
+        brand_row.addWidget(brand_icon)
+        brand_row.addLayout(brand_text, 1)
+        side_layout.addLayout(brand_row)
 
         self.backend_label = QLabel("Backend: verificando")
         self.mode_label = QLabel("Modo: --")
@@ -272,9 +302,23 @@ class PlasmaChatWindow(QMainWindow):
         self.chat.setOpenExternalLinks(True)
         content_layout.addWidget(self.chat, 1)
 
+        self.activity_bar = QProgressBar()
+        self.activity_bar.setObjectName("activityBar")
+        self.activity_bar.setRange(0, 1)
+        self.activity_bar.setValue(0)
+        self.activity_bar.setTextVisible(False)
+        self.activity_bar.setFixedHeight(7)
+        content_layout.addWidget(self.activity_bar)
+
         self.progress_label = QLabel("Pronto.")
         self.progress_label.setObjectName("progress")
         content_layout.addWidget(self.progress_label)
+
+        self.activity_log = QTextBrowser()
+        self.activity_log.setObjectName("activityLog")
+        self.activity_log.setFixedHeight(118)
+        self.activity_log.setOpenExternalLinks(False)
+        content_layout.addWidget(self.activity_log)
 
         composer = QFrame()
         composer.setObjectName("composer")
@@ -318,17 +362,15 @@ class PlasmaChatWindow(QMainWindow):
 
         self.add_message(
             "system",
-            "NEXUS Plasma pronto. Use Ctrl+Enter para enviar. Voz ligada.",
+            "NEXUS Plasma pronto. Envie uma tarefa; cada etapa aparece em Atividade.",
         )
+        self._add_activity("Interface iniciada. Aguardando pedido.")
 
     def _build_tray(self) -> None:
         self.tray: QSystemTrayIcon | None = None
         if not QSystemTrayIcon.isSystemTrayAvailable():
             return
-        icon = QIcon.fromTheme("plasma")
-        if icon.isNull():
-            icon = QIcon.fromTheme("applications-system")
-        self.tray = QSystemTrayIcon(icon, self)
+        self.tray = QSystemTrayIcon(_app_icon(), self)
         self.tray.setToolTip("NEXUS Plasma")
         menu = QMenu()
         show_action = QAction("Mostrar", self)
@@ -338,7 +380,7 @@ class PlasmaChatWindow(QMainWindow):
         status_action.triggered.connect(self.refresh_status)
         menu.addAction(status_action)
         quit_action = QAction("Sair", self)
-        quit_action.triggered.connect(QApplication.instance().quit)
+        quit_action.triggered.connect(self.quit_app)
         menu.addAction(quit_action)
         self.tray.setContextMenu(menu)
         self.tray.activated.connect(self._tray_activated)
@@ -367,6 +409,12 @@ class PlasmaChatWindow(QMainWindow):
                 font-size: 28px;
                 font-weight: 800;
                 letter-spacing: 0;
+            }
+            #brandIcon {
+                background: #151b1f;
+                border: 1px solid #2d3c42;
+                border-radius: 8px;
+                padding: 2px;
             }
             #subtitle, #progress {
                 color: #9aa5ad;
@@ -404,6 +452,23 @@ class PlasmaChatWindow(QMainWindow):
                 border: 1px solid #2a3035;
                 border-radius: 6px;
                 padding: 12px;
+            }
+            #activityLog {
+                background: #111417;
+                color: #d8dee4;
+                border: 1px solid #283139;
+                border-radius: 6px;
+                padding: 8px;
+                font-size: 12px;
+            }
+            #activityBar {
+                border: 0;
+                border-radius: 3px;
+                background: #20262b;
+            }
+            #activityBar::chunk {
+                border-radius: 3px;
+                background: #77e0d4;
             }
             #composer {
                 background: #101214;
@@ -469,7 +534,16 @@ class PlasmaChatWindow(QMainWindow):
         if reason == QSystemTrayIcon.ActivationReason.Trigger:
             self.show_normal()
 
+    def quit_app(self) -> None:
+        self._allow_exit = True
+        app = QApplication.instance()
+        if app:
+            app.quit()
+
     def closeEvent(self, event) -> None:  # noqa: N802 - Qt API
+        if self._allow_exit:
+            super().closeEvent(event)
+            return
         if self.tray and self.tray.isVisible():
             event.ignore()
             self.hide()
@@ -480,7 +554,9 @@ class PlasmaChatWindow(QMainWindow):
                 2200,
             )
             return
-        super().closeEvent(event)
+        event.ignore()
+        self.showMinimized()
+        self._add_activity("Janela minimizada. Use Sair no menu da bandeja para encerrar.")
 
     def add_message(self, role: str, text: str) -> None:
         safe = (
@@ -502,6 +578,38 @@ class PlasmaChatWindow(QMainWindow):
         )
         self.chat.verticalScrollBar().setValue(self.chat.verticalScrollBar().maximum())
 
+    def _add_activity(self, text: str, *, kind: str = "info") -> None:
+        safe = (
+            str(text)
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+        )
+        color = {
+            "ok": "#84f0cf",
+            "warn": "#f0d98a",
+            "error": "#ff9aa2",
+            "work": "#77e0d4",
+        }.get(kind, "#c6d1d8")
+        stamp = datetime.now().strftime("%H:%M:%S")
+        self._activity_items.insert(
+            0,
+            f'<p style="margin:3px 0;"><span style="color:#79848c;">{stamp}</span> '
+            f'<span style="color:{color};">{safe}</span></p>',
+        )
+        self._activity_items = self._activity_items[:40]
+        self.activity_log.setHtml("".join(self._activity_items))
+
+    def _set_busy(self, busy: bool, text: str | None = None) -> None:
+        if busy:
+            self.activity_bar.setRange(0, 0)
+            self.progress_label.setText(text or "Trabalhando...")
+            return
+        self.activity_bar.setRange(0, 1)
+        self.activity_bar.setValue(0)
+        if text:
+            self.progress_label.setText(text)
+
     def _start_worker(
         self,
         name: str,
@@ -510,17 +618,28 @@ class PlasmaChatWindow(QMainWindow):
         payload: dict | None = None,
         timeout: float = 30.0,
     ) -> None:
+        if name in NON_OVERLAPPING_WORKERS and name in self._active_worker_names:
+            return
         worker = ApiWorker(name, method, path, payload, timeout)
         worker.finished.connect(self._worker_finished)
         worker.failed.connect(self._worker_failed)
         worker.finished.connect(lambda *_: self._cleanup_worker(worker))
         worker.failed.connect(lambda *_: self._cleanup_worker(worker))
         self._workers.append(worker)
+        self._active_worker_names.add(name)
+        if name in VISIBLE_WORKERS:
+            self._visible_workers[worker] = name
+            self._set_busy(True, VISIBLE_WORKERS[name])
+            self._add_activity(VISIBLE_WORKERS[name], kind="work")
         worker.start()
 
     def _cleanup_worker(self, worker: ApiWorker) -> None:
         if worker in self._workers:
             self._workers.remove(worker)
+        self._active_worker_names.discard(worker.name)
+        self._visible_workers.pop(worker, None)
+        if not self._visible_workers and not self._sending:
+            self._set_busy(False)
         worker.deleteLater()
 
     def refresh_status(self) -> None:
@@ -539,12 +658,15 @@ class PlasmaChatWindow(QMainWindow):
             return
         self.input.clear()
         self.add_message("user", message)
+        client_msg_id = str(uuid.uuid4())
+        self._seen_event_keys.add(f"CHAT_USER:{client_msg_id}")
         self._sending = True
         self.send_button.setEnabled(False)
-        self.progress_label.setText("Processando pedido...")
+        self._set_busy(True, "Processando pedido...")
+        self._add_activity("Pedido enviado ao agente.", kind="work")
         payload = {
             "message": message,
-            "client_msg_id": str(uuid.uuid4()),
+            "client_msg_id": client_msg_id,
             "source": "plasma_gui",
             "client_id": CLIENT_ID,
             "session_id": SESSION_ID,
@@ -577,6 +699,7 @@ class PlasmaChatWindow(QMainWindow):
 
     def start_voice_listening(self) -> None:
         self.progress_label.setText("Armando escuta local por 10 segundos...")
+        self._add_activity("Escuta local solicitada por 10 segundos.", kind="work")
         self._start_worker(
             "voice_start",
             "POST",
@@ -586,7 +709,8 @@ class PlasmaChatWindow(QMainWindow):
         )
 
     def ensure_backend(self) -> None:
-        self.progress_label.setText("Garantindo backend...")
+        self._set_busy(True, "Garantindo backend...")
+        self._add_activity("Solicitando inicialização do backend.", kind="work")
         try:
             subprocess.Popen(
                 [str(ROOT_DIR / "bin" / "nexus"), "ensure-server"],
@@ -596,8 +720,15 @@ class PlasmaChatWindow(QMainWindow):
             )
         except Exception as exc:
             self.add_message("error", f"Falha ao iniciar backend: {exc}")
+            self._add_activity(f"Falha ao iniciar backend: {exc}", kind="error")
+            self._set_busy(False, "Falha ao iniciar backend.")
             return
-        QTimer.singleShot(1800, self.refresh_status)
+        QTimer.singleShot(1800, self._finish_backend_ensure)
+
+    def _finish_backend_ensure(self) -> None:
+        self._set_busy(False, "Backend solicitado. Recarregando status.")
+        self._add_activity("Backend solicitado; verificando saude.", kind="ok")
+        self.refresh_status()
 
     def open_web_console(self) -> None:
         try:
@@ -616,9 +747,12 @@ class PlasmaChatWindow(QMainWindow):
         elif name == "chat":
             self._sending = False
             self.send_button.setEnabled(True)
-            self.progress_label.setText("Resposta recebida.")
+            self._set_busy(False, "Resposta recebida.")
+            self._add_activity("Resposta recebida.", kind="ok")
             reply = data.get("reply") or data.get("raw_reply") or "(sem resposta)"
             self._last_speech_text = str(data.get("speech_reply") or reply)
+            if data.get("id"):
+                self._seen_event_keys.add(f"CHAT_AI:{data.get('id')}")
             self.add_message("assistant", str(reply))
             audio = data.get("audio") or ""
             if self._voice_enabled and audio:
@@ -635,6 +769,7 @@ class PlasmaChatWindow(QMainWindow):
             audio = data.get("audio") or ""
             if audio:
                 self._play_audio_b64(str(audio))
+                self._add_activity("Audio de resposta reproduzido.", kind="ok")
             else:
                 self.add_message(
                     "system",
@@ -643,6 +778,7 @@ class PlasmaChatWindow(QMainWindow):
         elif name == "voice_start":
             duration = data.get("duration", 10)
             self.progress_label.setText(f"Escuta armada por {duration}s.")
+            self._add_activity(f"Escuta armada por {duration}s.", kind="ok")
 
     def _worker_failed(self, name: str, error: str) -> None:
         if name == "health":
@@ -651,19 +787,23 @@ class PlasmaChatWindow(QMainWindow):
             self.connection_badge.style().unpolish(self.connection_badge)
             self.connection_badge.style().polish(self.connection_badge)
             self.backend_label.setText(f"Backend: offline ({error})")
+            self._add_activity(f"Backend offline: {error}", kind="error")
             return
         if name == "events":
             return
         if name == "chat":
             self._sending = False
             self.send_button.setEnabled(True)
-            self.progress_label.setText("Falha no pedido.")
+            self._set_busy(False, "Falha no pedido.")
             self.add_message("error", error)
+            self._add_activity(f"Falha no pedido: {error}", kind="error")
             return
         if name in {"tts", "voice_start"}:
             self.add_message("error", error)
+            self._add_activity(error, kind="error")
             return
         self.progress_label.setText(error)
+        self._add_activity(error, kind="error")
 
     def _play_audio_b64(self, audio_b64: str) -> None:
         try:
@@ -735,7 +875,8 @@ class PlasmaChatWindow(QMainWindow):
         if isinstance(cpu, list) and cpu:
             cpu_avg = round(sum(float(v) for v in cpu) / len(cpu), 1)
             self.mode_label.setText(f"CPU: {cpu_avg}% | RAM: {ram}%")
-        self.progress_label.setText(f"Foco: {active}")
+        if not self._sending and not self._visible_workers:
+            self.progress_label.setText(f"Foco: {active}")
 
     def _render_events(self, events: list) -> None:
         for event in events:
@@ -743,22 +884,62 @@ class PlasmaChatWindow(QMainWindow):
             text = (
                 event.get("text")
                 or event.get("message")
+                or event.get("command")
                 or event.get("path")
                 or event.get("stage")
                 or event.get("status")
                 or ""
             )
-            key = str(event.get("id") or f"{event_type}:{text}:{time.time()}")
+            key = (
+                f"{event_type}:{event.get('id')}"
+                if event.get("id")
+                else f"{event_type}:{text}:{time.time()}"
+            )
             if key in self._seen_event_keys:
                 continue
             self._seen_event_keys.add(key)
 
             if event_type == "AGENT_PROGRESS" and text:
                 self.progress_label.setText(str(text))
+                kind = (
+                    "ok"
+                    if event.get("stage") in {"completed", "chat_completed"}
+                    else "work"
+                )
+                self._add_activity(str(text), kind=kind)
             elif event_type == "CHAT_AI" and text:
                 self.add_message("assistant", str(text))
+                self._add_activity("Resposta publicada no chat.", kind="ok")
             elif event_type in {"SYSTEM_ALERT", "ADMIN_ACTION"} and text:
                 self.add_message("system", str(text))
+                self._add_activity(str(text), kind="warn")
+            elif event_type == "TOOL_LOG":
+                tool = event.get("tool", "ferramenta")
+                stage = event.get("stage", "evento")
+                self._add_activity(f"{tool}: {stage}", kind="work")
+            elif event_type == "HUD_STATUS" and text:
+                self.progress_label.setText(str(text))
+                self._add_activity(str(text), kind="work")
+            elif event_type == "EXECUTION_PENDING_APPROVAL":
+                command = event.get("command", "")
+                proposal_id = event.get("proposal_id", "")
+                self.add_message(
+                    "system",
+                    "Execucao aguardando aprovacao.\n"
+                    f"proposal_id: {proposal_id}\n"
+                    f"comando: {command}\n"
+                    "Responda Sim para aprovar.",
+                )
+                self._add_activity(f"Execucao pendente: {command}", kind="warn")
+            elif event_type == "EXECUTION_UPDATE":
+                stage = event.get("stage") or (event.get("payload") or {}).get(
+                    "status"
+                )
+                proposal_id = event.get("proposal_id", "")
+                self._add_activity(
+                    f"Execucao {proposal_id}: {stage or 'atualizada'}",
+                    kind="work",
+                )
 
             self._prepend_event(event_type, str(text)[:180])
 
@@ -775,6 +956,29 @@ def main() -> int:
         print("NEXUS Plasma GUI: Qt import ok")
         return 0
 
+    def handle_exception(exc_type, exc, tb) -> None:
+        log_path = ROOT_DIR / "logs" / "plasma_chat_crash.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        with log_path.open("a", encoding="utf-8") as fp:
+            fp.write(f"\n[{datetime.now().isoformat(timespec='seconds')}]\n")
+            traceback.print_exception(exc_type, exc, tb, file=fp)
+        sys.__excepthook__(exc_type, exc, tb)
+
+    sys.excepthook = handle_exception
+    native_log = ROOT_DIR / "logs" / "plasma_chat_native.log"
+    native_log.parent.mkdir(parents=True, exist_ok=True)
+    native_fp = native_log.open("a", encoding="utf-8")
+    native_fp.write(f"\n[{datetime.now().isoformat(timespec='seconds')}] Plasma start\n")
+    native_fp.flush()
+    faulthandler.enable(file=native_fp, all_threads=True)
+    atexit.register(
+        lambda: (
+            native_fp.write(
+                f"[{datetime.now().isoformat(timespec='seconds')}] Plasma exit\n"
+            ),
+            native_fp.flush(),
+        )
+    )
     app = QApplication(sys.argv)
     app.setApplicationName("NEXUS Plasma")
     app.setDesktopFileName("nexus-plasma-chat")
@@ -782,8 +986,21 @@ def main() -> int:
     window = PlasmaChatWindow()
     window.show()
     if "--smoke" in sys.argv:
-        QTimer.singleShot(600, app.quit)
+        QTimer.singleShot(600, window.quit_app)
     return app.exec()
+
+
+def _app_icon() -> QIcon:
+    if ICON_PATH.exists():
+        icon = QIcon(str(ICON_PATH))
+        if not icon.isNull():
+            return icon
+    icon = QIcon.fromTheme("nexus-plasma-chat")
+    if icon.isNull():
+        icon = QIcon.fromTheme("plasma")
+    if icon.isNull():
+        icon = QIcon.fromTheme("applications-system")
+    return icon
 
 
 def _find_audio_player() -> str | None:

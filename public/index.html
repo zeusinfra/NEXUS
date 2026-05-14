@@ -366,72 +366,120 @@ function initNeuralLabels() {
     });
 }
 
-function initKnowledgeGraph() {
+async function initKnowledgeGraph() {
   plexusGroup.clear();
   clusterInfo.length = 0;
-  const nodes = [];
-  const clusterCenters = [];
-
-  for(let i=0; i<CLUSTER_COUNT; i++) {
-    const center = new THREE.Vector3((Math.random()-0.5)*6, (Math.random()-0.5)*6, (Math.random()-0.5)*6);
-    clusterCenters.push(center);
-    clusterInfo.push({ center, color: new THREE.Color(CLUSTER_COLORS[i]), hover: 0, freq: 0.5 + Math.random() });
-  }
-
-  const vertices = [];
-  const colors = [];
-  const edgeVertices = [];
-  const edgeColors = [];
-
-  for(let i=0; i<NODE_COUNT; i++) {
-    const cid = i % CLUSTER_COUNT;
-    const center = clusterCenters[cid];
-    const color = new THREE.Color(CLUSTER_COLORS[cid]);
-    const offset = new THREE.Vector3((Math.random()-0.5)*1.8, (Math.random()-0.5)*1.8, (Math.random()-0.5)*1.8);
-    const p = center.clone().add(offset);
+  
+  try {
+    const response = await fetch('/api/synapse_graph');
+    const data = await response.json();
     
-    vertices.push(p.x, p.y, p.z);
-    colors.push(color.r, color.g, color.b);
-    nodes.push({ pos: p, cid, color });
+    const nodes = data.nodes;
+    const links = data.links;
 
-    for(let j=0; j<nodes.length-1; j++) {
-      if(nodes[j].cid === cid && p.distanceTo(nodes[j].pos) < 0.9) {
-        if(Math.random() > 0.65) {
-          edgeVertices.push(p.x, p.y, p.z, nodes[j].pos.x, nodes[j].pos.y, nodes[j].pos.z);
-          edgeColors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+    const vertices = [];
+    const colors = [];
+    const edgeVertices = [];
+    const edgeColors = [];
+
+    // Mapeamento de IDs para posições para criar as arestas
+    const nodePositions = {};
+
+    nodes.forEach((node, i) => {
+        const cid = i % CLUSTER_COUNT;
+        const color = new THREE.Color(CLUSTER_COLORS[cid]);
+        
+        // Posicionamento esférico/orgânico baseado no peso
+        const radius = 3 + Math.random() * 2;
+        const phi = Math.acos(-1 + (2 * i) / nodes.length);
+        const theta = Math.sqrt(nodes.length * Math.PI) * phi;
+        
+        const p = new THREE.Vector3(
+            radius * Math.cos(theta) * Math.sin(phi),
+            radius * Math.sin(theta) * Math.sin(phi),
+            radius * Math.cos(phi)
+        );
+        
+        vertices.push(p.x, p.y, p.z);
+        colors.push(color.r, color.g, color.b);
+        nodePositions[node.id] = p;
+        
+        // Adiciona label neural se for um nó importante
+        if (i < 10) {
+            addNeuralLabel(p, node.name, color);
         }
-      }
-    }
+    });
+
+    links.forEach(link => {
+        const sourcePos = nodePositions[link.source];
+        const targetPos = nodePositions[link.target];
+        
+        if (sourcePos && targetPos) {
+            edgeVertices.push(sourcePos.x, sourcePos.y, sourcePos.z, targetPos.x, targetPos.y, targetPos.z);
+            const color = new THREE.Color(0x00ff88);
+            edgeColors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+        }
+    });
+
+    const nodeGeo = new THREE.BufferGeometry();
+    nodeGeo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    nodeGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    const nodeMat = new THREE.PointsMaterial({
+        size: 0.08,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.9,
+        blending: THREE.AdditiveBlending
+    });
+    plexusGroup.add(new THREE.Points(nodeGeo, nodeMat));
+
+    const edgeGeo = new THREE.BufferGeometry();
+    edgeGeo.setAttribute('position', new THREE.Float32BufferAttribute(edgeVertices, 3));
+    edgeGeo.setAttribute('color', new THREE.Float32BufferAttribute(edgeColors, 3));
+    const edgeMat = new THREE.LineBasicMaterial({
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.15,
+        blending: THREE.AdditiveBlending
+    });
+    const edgeMesh = new THREE.LineSegments(edgeGeo, edgeMat);
+    plexusGroup.add(edgeMesh);
+    
+  } catch (err) {
+    console.error("Erro ao carregar grafo sináptico:", err);
   }
-
-  const nodeGeo = new THREE.BufferGeometry();
-  nodeGeo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-  nodeGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  const nodeMat = new THREE.PointsMaterial({
-    size: 0.05,
-    vertexColors: true,
-    transparent: true,
-    opacity: 0.8,
-    blending: THREE.AdditiveBlending
-  });
-  plexusGroup.add(new THREE.Points(nodeGeo, nodeMat));
-
-  const edgeGeo = new THREE.BufferGeometry();
-  edgeGeo.setAttribute('position', new THREE.Float32BufferAttribute(edgeVertices, 3));
-  edgeGeo.setAttribute('color', new THREE.Float32BufferAttribute(edgeColors, 3));
-  const edgeMat = new THREE.LineBasicMaterial({
-    vertexColors: true,
-    transparent: true,
-    opacity: 0.25,
-    blending: THREE.AdditiveBlending
-  });
-  const edgeMesh = new THREE.LineSegments(edgeGeo, edgeMat);
-  plexusGroup.add(edgeMesh);
-  window.graphEdges = edgeMesh;
-
-  initNeuralLabels();
 }
+
+function addNeuralLabel(pos, text, color) {
+    const container = document.getElementById('neural-labels-container');
+    const el = document.createElement('div');
+    el.className = 'neural-label';
+    el.style.borderColor = '#' + color.getHexString();
+    el.innerHTML = `<div class="line" style="background:#${color.getHexString()}"></div>${text}`;
+    container.appendChild(el);
+    // Armazena posição 3D para o loop de animação
+    if (!window.activeLabels) window.activeLabels = [];
+    window.activeLabels.push({ el, pos: pos.clone(), color: color });
+}
+
+// Botão de Modo Sonho
+const dreamBtn = document.createElement('button');
+dreamBtn.innerHTML = '🌙 MODO SONHO';
+dreamBtn.style = 'position:fixed; bottom:20px; right:20px; background:var(--panel-bg); color:var(--accent); border:1px solid var(--accent); padding:10px 20px; border-radius:20px; font-family:var(--font-mono); font-size:0.7rem; cursor:pointer; z-index:1000;';
+dreamBtn.onclick = async () => {
+    dreamBtn.innerHTML = '✨ SONHANDO...';
+    try {
+        const res = await fetch('/api/dream', { method: 'POST' });
+        const data = await res.json();
+        alert(`Ciclo de sono concluído! ${data.pruned_synapses} sinapses podadas.`);
+        initKnowledgeGraph();
+    } catch(e) { alert('Erro ao iniciar ciclo de sono.'); }
+    dreamBtn.innerHTML = '🌙 MODO SONHO';
+};
+document.body.appendChild(dreamBtn);
+
 initKnowledgeGraph();
+setInterval(initKnowledgeGraph, 30000); // Atualiza a cada 30s
 
 // --- ADVANCED NEURAL SINGULARITY ---
 const singularityGroup = new THREE.Group();

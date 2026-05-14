@@ -36,6 +36,10 @@ class LifecycleManager:
                     "path": url,
                     "project": "WEB_SENSING",
                 }
+                try:
+                    self.g["assimilate_access_event"](url, event)
+                except Exception:
+                    pass
                 await self.g["enqueue_event"](event)
                 await self.g["broadcast_message"](
                     {

@@ -14,7 +14,7 @@ import base64
 import importlib.util
 import uuid
 from pathlib import Path
-from collections import Counter
+from collections import Counter, deque
 from communication.voice_service import voice_service
 from urllib.parse import urlparse
 
@@ -31,7 +31,7 @@ from nexus_core.security.privacy_guard import PrivacyGuard
 from apps.lifecycle_manager import LifecycleManager
 from pattern_engine import PatternEngine
 from apps.nexus_evolution import NexusBrain
-from nexus_core.core_system import call_cloud_llm, get_llm_status
+from nexus_core.core_system import call_cloud_llm, get_llm_status, ObserverAgent
 from nexus_core.agent import Agent
 from nexus_core.vector_memory import VectorMemory
 from nexus_core.voice_sensing import VoiceSensing
@@ -123,7 +123,19 @@ setup_logging(os.getenv("NEXUS_LOG_LEVEL", "INFO"))
 logger = get_logger("nexus.web")
 
 # --- CONFIGURAÇÕES ---
-WATCH_DIRS = [str(PROJECT_ROOT)]
+def _default_watch_dirs() -> list[str]:
+    candidates = [
+        PROJECT_ROOT,
+        Path.home() / "Documentos" / "Brain",
+    ]
+    return [str(path.resolve()) for path in candidates if path.exists()]
+
+
+WATCH_DIRS = [
+    str(Path(path).expanduser().resolve())
+    for path in os.getenv("NEXUS_WATCH_DIRS", ",".join(_default_watch_dirs())).split(",")
+    if path.strip() and Path(path).expanduser().exists()
+]
 BASE_DIR = str(PROJECT_ROOT)
 DEFAULT_ALLOWED_ORIGINS = [
     "http://127.0.0.1:8080",
@@ -249,6 +261,7 @@ system_mood = "CALM"
 current_node = "N/A"
 recent_events = []
 recent_system_alerts: list[dict] = []
+recent_access_paths = deque(maxlen=32)
 loop = None
 _memory_save_lock = None
 event_pipeline = OverflowEventQueue(EVENT_QUEUE_MAXSIZE)
@@ -274,10 +287,47 @@ resource_control = ResourceControl(
     brain.blackboard, {}
 )  # Integrando controle de recursos
 
+async def proactive_observation_loop():
+    """Loop que observa a tela periodicamente para manter consciência situacional."""
+    logger.info("👀 [NEXUS VISION] Iniciando Observador Proativo de Tela.")
+    while True:
+        try:
+            # Lógica Adaptativa: Se o sistema estiver sob pressão ou ativo, observa mais frequentemente
+            snapshot = get_os_snapshot()
+            pressure = snapshot.get("pressure", "calm")
+            
+            base_interval = int(os.getenv("NEXUS_VISION_INTERVAL", "300"))
+            
+            if pressure == "critical":
+                current_interval = base_interval // 4  # Observa 4x mais rápido em crise
+            elif pressure == "active":
+                current_interval = base_interval // 2  # Observa 2x mais rápido em uso intenso
+            else:
+                current_interval = base_interval
+
+            logger.info(f"👀 [NEXUS VISION] Próxima observação em {current_interval}s (Modo: {pressure})")
+            await asyncio.sleep(current_interval)
+
+            if not resource_control.is_critical():
+                observation = await asyncio.to_thread(
+                    observer_agent.observe_screen,
+                    brain.blackboard,
+                    "Resuma o que o usuário está fazendo agora e identifique o foco principal da atenção dele."
+                )
+                logger.info(f"🧠 [NEXUS VISION] Nova percepção situacional: {observation[:100]}...")
+        except Exception as e:
+            logger.error(f"❌ [NEXUS VISION] Erro no loop de observação: {e}")
+            await asyncio.sleep(60)
+
 lifecycle_manager = LifecycleManager(globals())
 cognition_service = CognitionService()
 privacy_guard = PrivacyGuard()
 goal_engine = GoalEngine()
+observer_agent = ObserverAgent(PROJECT_ROOT)
+
+from nexus_core.synaptic_sync import SyncEngine
+from nexus_core.architect_agent import architect_agent
+sync_engine = SyncEngine(memory_manager)
 
 
 @asynccontextmanager
@@ -375,6 +425,16 @@ async def lifespan(app: FastAPI):
         print("[NEXUS] Iniciando Cognitive Loop autônomo")
         await cognition_service.start()
 
+    # Iniciar Observação Proativa de Tela (Nível 3)
+    if os.getenv("NEXUS_ENABLE_PROACTIVE_VISION", "0") == "1":
+        asyncio.create_task(proactive_observation_loop())
+
+    # Iniciar Ciclo de Sono / Modo Sonho (Poda Sináptica)
+    asyncio.create_task(dreaming_loop())
+
+    # Sequência de Boot: Saudação e Diagnóstico (Nível 4)
+    asyncio.create_task(boot_sequence())
+
     yield
     # Salvar Memória ao fechar
     save_memory()
@@ -407,8 +467,135 @@ async def lifespan(app: FastAPI):
         pass
 
 
+
+
+async def dreaming_loop():
+    """
+    Loop de Manutenção: O NEXUS entra em 'Modo Sonho' quando o sistema está calmo.
+    Isso realiza a poda sináptica e consolidação de memória.
+    """
+    logger.info("🌙 [NEXUS DREAMING] Motor de Ciclo de Sono iniciado.")
+    while True:
+        try:
+            # Verifica o estado a cada hora
+            await asyncio.sleep(3600)
+            
+            snapshot = get_os_snapshot()
+            pressure = snapshot.get("pressure", "calm")
+            
+            # Só 'sonha' se o sistema estiver calmo (madrugada ou inativo)
+            if pressure == "calm":
+                logger.info("🌙 [NEXUS DREAMING] Sistema calmo. Iniciando Consolidação...")
+                results = await asyncio.to_thread(memory_manager.dream_cycle)
+                await broadcast_message({
+                    "type": "system_alert",
+                    "message": f"Modo Sonho concluído: {results['pruned_synapses']} sinapses podadas.",
+                    "level": "info"
+                })
+        except Exception as e:
+            logger.error(f"❌ [NEXUS DREAMING] Erro no ciclo de sono: {e}")
+
+
 app = FastAPI(lifespan=lifespan)
 app.middleware("http")(correlation_id_middleware)
+
+# --- NEXUS BRAIN ENDPOINTS ---
+@app.get("/api/synapse_graph")
+async def get_synapse_graph():
+    """Retorna o grafo de sinapses para visualização 3D."""
+    conn = sqlite3.connect(memory_manager.db_path)
+    cursor = conn.cursor()
+    
+    # Busca nós
+    cursor.execute("SELECT path, weight FROM nodes WHERE weight > 1 ORDER BY weight DESC LIMIT 100")
+    nodes = [{"id": r[0], "name": os.path.basename(r[0]), "val": r[1]} for r in cursor.fetchall()]
+    
+    # Busca arestas (sinapses)
+    cursor.execute("SELECT source, target, weight FROM synapses WHERE weight > 1 LIMIT 200")
+    links = [{"source": r[0], "target": r[1], "value": r[2]} for r in cursor.fetchall()]
+    
+    conn.close()
+    return {"nodes": nodes, "links": links}
+
+@app.post("/api/dream")
+async def trigger_dream():
+    """Gatilho manual para o Ciclo de Sono."""
+    results = await asyncio.to_thread(memory_manager.dream_cycle)
+    return results
+
+# --- SYNC ENDPOINTS ---
+@app.get("/api/sync/status")
+async def get_sync_status():
+    return {
+        "is_running": sync_engine.is_running,
+        "last_sync": sync_engine.last_sync,
+        "relay": sync_engine.relay_url
+    }
+
+@app.post("/api/sync/push")
+async def push_sync():
+    snapshot = await sync_engine.export_neural_snapshot()
+    return {"status": "success", "nodes_exported": len(snapshot["top_nodes"])}
+
+# --- ARCHITECT ENDPOINTS ---
+@app.post("/api/architect/plan")
+async def architect_plan(request: Request):
+    data = await request.json()
+    goal = data.get("goal")
+    if not goal:
+        return {"error": "Goal is required"}
+    blueprint = await asyncio.to_thread(architect_agent.plan_project, goal)
+    return blueprint
+
+@app.post("/api/architect/build")
+async def architect_build(request: Request):
+    data = await request.json()
+    blueprint = data.get("blueprint")
+    if not blueprint:
+        return {"error": "Blueprint is required"}
+    
+    results = []
+    for file_info in blueprint.get("files", []):
+        code = await asyncio.to_thread(architect_agent.generate_code, file_info, str(blueprint))
+        full_path = os.path.join(PROJECT_ROOT, "generated", file_info["path"])
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        with open(full_path, "w", encoding="utf-8") as f:
+            f.write(code)
+        results.append({"path": file_info["path"], "status": "written"})
+    return {"status": "project_build_complete", "files": results}
+
+from nexus_core.boot_diagnostics import perform_boot_diagnostic
+
+async def boot_sequence():
+    """Sequência de inicialização: Diagnóstico e Saudação por Voz."""
+    logger.info("⚡ [NEXUS BOOT] Iniciando sequência de diagnóstico...")
+    await asyncio.sleep(5) 
+    
+    # Cooldown para evitar saudações repetidas em restarts rápidos
+    last_boot = brain.blackboard.get("last_voice_boot", 0)
+    now_ts = time.time()
+    
+    report, tech_report = perform_boot_diagnostic()
+    memory_manager.record_pattern("system_boot", tech_report, importance=1.0)
+
+    # Só fala se tiver passado mais de 10 minutos desde o último boot falado
+    if now_ts - last_boot > 600:
+        brain.blackboard.update("last_voice_boot", now_ts)
+        try:
+            audio_path = os.path.join(PROJECT_ROOT, "data/voice_temp", "boot_greeting.mp3")
+            import edge_tts
+            communicate = edge_tts.Communicate(report, "pt-BR-AntonioNeural")
+            await communicate.save(audio_path)
+            players = ["ffplay", "mpv", "play"]
+            for player in players:
+                if shutil.which(player):
+                    subprocess.Popen([player, "-nodisp", "-autoexit", audio_path] if player == "ffplay" else [player, audio_path])
+                    break
+            await broadcast_message({"type": "voice_response", "text": report, "boot": True})
+        except Exception as e:
+            logger.error(f"❌ [NEXUS BOOT] Erro na saudação de voz: {e}")
+    else:
+        logger.info("⚡ [NEXUS BOOT] Saudação silenciada (Cooldown ativo).")
 
 
 indexing_semaphore = asyncio.Semaphore(2)  # Limite de indexação simultânea
@@ -719,6 +906,7 @@ async def update_nodes_on_event(event):
 
     # Update synapse/node in L2
     memory_manager.update_synapse(path, path)  # Self-update weight
+    assimilate_access_event(path, event)
 
     if event["event"] == "SCAN" or event["event"] == "Create":
         # Get weight from L2
@@ -745,6 +933,46 @@ async def update_nodes_on_event(event):
 
     if len(nodes_data) > 1000:
         nodes_data = nodes_data[-1000:]
+
+
+def assimilate_access_event(path: str, event: dict) -> None:
+    """Create short-range synapses between recently accessed contexts."""
+    if not path or is_runtime_noise_path(path):
+        return
+    project = event.get("project") or get_project(path)
+    kind = event.get("event") or event.get("type") or "ACCESS"
+    cluster = get_node_cluster(path)
+
+    # Sinapses por Proximidade Temporal (Memória de Curto Prazo)
+    for previous in list(recent_access_paths)[-8:]:
+        if previous and previous != path and not is_runtime_noise_path(previous):
+            memory_manager.update_synapse(previous, path, weight_inc=1)
+            memory_manager.update_synapse(path, previous, weight_inc=1)
+
+    # Sinapses por Similaridade Semântica (Memória de Longo Prazo / Orgânica)
+    if os.path.exists(path) and os.path.isfile(path):
+        try:
+            # Busca contextos semanticamente similares para criar sinapses "inteligentes"
+            similar_contexts = vector_memory.find_similar(path, top_k=3)
+            for sim_path, score in similar_contexts:
+                if sim_path != path and score > 0.7:
+                    memory_manager.update_synapse(path, sim_path, weight_inc=int(score * 2))
+                    print(f"🧠 [NEXUS SINAPSE] Conexão orgânica detectada: {os.path.basename(path)} <-> {os.path.basename(sim_path)} ({score:.2f})")
+        except Exception:
+            pass
+
+    recent_access_paths.append(path)
+    memory_manager.record_pattern(
+        "access",
+        {
+            "path": path,
+            "project": project,
+            "kind": kind,
+            "cluster": cluster,
+            "recent_context": list(recent_access_paths)[-6:],
+        },
+        importance=1.0 if cluster in {"files", "web"} else 0.6,
+    )
 
 
 async def throttled_index_file(path):
@@ -1508,6 +1736,14 @@ def _build_operational_capabilities() -> dict:
             "tool_logs": True,
             "chat_completion_status": True,
         },
+        "organic_memory": {
+            "enabled": _env_flag("NEXUS_ORGANIC_MODE", "0"),
+            "watch_dirs": WATCH_DIRS,
+            "browser_sensing_enabled": ENABLE_BROWSER_SENSING,
+            "autonomous_tasks_enabled": ENABLE_AUTONOMOUS_TASKS,
+            "cognitive_loop_enabled": ENABLE_COGNITIVE_LOOP,
+            "synaptic_learning": True,
+        },
         "inspection": {
             "system_diagnostics": True,
             "os_snapshot": True,
@@ -1739,6 +1975,14 @@ async def api_chat(req: ChatReq, request: Request):
     )
     client_key = request.client.host if request.client else "unknown"
 
+    async def emit_to_request_client(payload: dict) -> None:
+        event = dict(payload or {})
+        if client_id and not event.get("client_id"):
+            event["client_id"] = client_id
+        if source and not event.get("source"):
+            event["source"] = source
+        await broadcast_message(event)
+
     # Status sintético para a Thought Bar. O progresso real vem de AGENT_PROGRESS/TOOL_LOG.
     thought_stream = [
         "Acessando córtex de memória...",
@@ -1753,7 +1997,7 @@ async def api_chat(req: ChatReq, request: Request):
             for t in thought_stream:
                 if thought_stop.is_set():
                     return
-                await broadcast_message({"type": "HUD_STATUS", "text": t})
+                await emit_to_request_client({"type": "HUD_STATUS", "text": t})
                 try:
                     await asyncio.wait_for(thought_stop.wait(), timeout=0.8)
                     return
@@ -1765,7 +2009,7 @@ async def api_chat(req: ChatReq, request: Request):
     started_at = time.perf_counter()
     try:
         reply = await react_agent.run(
-            context_prompt, client_key=client_key, broadcast=broadcast_message
+            context_prompt, client_key=client_key, broadcast=emit_to_request_client
         )
         thought_stop.set()
         await thought_task
@@ -1783,7 +2027,7 @@ async def api_chat(req: ChatReq, request: Request):
             )
         )
         asyncio.create_task(update_memory_after_chat(user_message, reply))
-        await broadcast_message(
+        await emit_to_request_client(
             {
                 "type": "CHAT_AI",
                 "id": msg_id,
@@ -1794,10 +2038,10 @@ async def api_chat(req: ChatReq, request: Request):
                 "speech_message": voice_reply,
             }
         )
-        await broadcast_message(
+        await emit_to_request_client(
             {"type": "HUD_STATUS", "text": "Aguardando atividade neural..."}
         )
-        await broadcast_message(
+        await emit_to_request_client(
             {
                 "type": "AGENT_PROGRESS",
                 "stage": "chat_completed",
@@ -1832,7 +2076,7 @@ async def api_chat(req: ChatReq, request: Request):
     except Exception as e:
         thought_stop.set()
         await thought_task
-        await broadcast_message(
+        await emit_to_request_client(
             {
                 "type": "AGENT_PROGRESS",
                 "stage": "chat_failed",

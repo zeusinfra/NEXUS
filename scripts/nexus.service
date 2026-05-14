@@ -1,0 +1,16 @@
+[Unit]
+Description=NEXUS Cognitive Operating System
+After=network.target
+
+[Service]
+Type=simple
+User=nexus
+WorkingDirectory=/home/nexus/Documentos/NEXUS/NEXUS
+ExecStart=/home/nexus/Documentos/NEXUS/NEXUS/.venv/bin/python apps/web_gui.py
+Restart=always
+RestartSec=10
+Environment=PYTHONPATH=/home/nexus/Documentos/NEXUS/NEXUS
+Environment=NEXUS_PROJECT_ROOT=/home/nexus/Documentos/NEXUS/NEXUS
+
+[Install]
+WantedBy=multi-user.target

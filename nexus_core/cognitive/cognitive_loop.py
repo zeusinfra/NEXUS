@@ -71,6 +71,7 @@ class CognitiveLoop:
         self.memory_compression = MemoryCompression(db_path=db_path)
         self.orchestrator = PriorityOrchestrator(db_path=db_path)
         self.predictive = PredictiveEngine(db_path=db_path)
+        self.blackboard: dict[str, Any] = {}
         from nexus_core.security.privacy_guard import PrivacyGuard
 
         self.privacy = PrivacyGuard(db_path=db_path)
@@ -384,7 +385,7 @@ class CognitiveLoop:
             try:
                 # Fazemos a observação em uma thread separada para não travar o loop
                 visual_desc = self.observer.observe_screen(
-                    self.goal_engine.blackboard,
+                    self.blackboard,
                     question="Descreva brevemente as janelas ativas e o que o usuário parece estar fazendo.",
                 )
                 perception["visual_context"] = visual_desc
