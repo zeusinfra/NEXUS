@@ -32,24 +32,25 @@ The design principles are:
 flowchart LR
     FS[Filesystem] --> Watcher[Rust Watcher]
     USB[USB/Bluetooth] --> Sentinel[Peripheral Sentinels]
-    Obsidian[Obsidian Vault] --> Watcher
-
+    Vision[Screen Capture] --> Observer[ObserverAgent]
+    
     Watcher --> EventBus[Event Bus]
     Sentinel --> EventBus
-    API[FastAPI Backend] --> EventBus
-
+    Observer --> EventBus
+    
+    EventBus --> Synapse[Rust Synapse Core L2]
+    Synapse --> Sync[Sync Engine / Relay]
+    Sync --> Ubiquity[Other NEXUS Nodes]
+    
     EventBus --> SQLite[(nexus_events.db)]
     EventBus --> Cognition[Cognitive Loop]
-    EventBus --> Sync[Sync Engine]
-
-    Sync --> Notion[Notion Knowledge Base]
-    Sync --> Linear[Linear Engineering Queue]
-    Sync --> Obsidian
-
+    
+    Cognition --> Architect[ArchitectAgent]
+    Architect --> SelfEvolve[Code/System Evolution]
+    
     GTK[GTK4 Ops Chat] --> API
-    TUI[Cyber TUI] --> API
-    Applet[Cinnamon Applet] --> API
-    HUD[Web HUD] --> API
+    TUI[Bio-TUI] --> API
+    HUD[Web HUD / 3D Graph] --> API
 ```
 
 ## Operating Flow

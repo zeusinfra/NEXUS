@@ -1,28 +1,20 @@
 # NEXUS by NEXUS Protocol
 
-> Local-first cognitive operations for Linux desktops.
+> Local-first cognitive operations for Linux desktops. Phase 4: Organic Brain.
 
 NEXUS is an autonomous cognitive operating layer that helps a Linux operator
-observe, reason about, and act on a local workstation. It combines a FastAPI
-backend, GTK and terminal interfaces, SQLite memory, Rust system components,
-voice/vision hooks, peripheral monitoring, and a guarded privileged-action
-path through RootDaemon.
+observe, reason about, and act on a local workstation. It features a tiered 
+memory system with high-performance Rust synapses, an autonomous architect for 
+self-evolution, and a ubiquitous brain engine for cross-device state sync.
 
-The project is designed around a simple principle: local context and system
-control should stay local by default, and risky actions should be explicit,
-auditable, and reversible.
+## Key Evolutions (Phase 4/5)
 
-## What NEXUS Does
-
-- Provides a desktop operator console through GTK4 and a Cyber TUI fallback.
-- Runs a local backend for chat, telemetry, cognition, events, and health.
-- Routes LLM work through configurable local or hosted providers.
-- Persists conversation, cognitive, and operational state in SQLite-backed
-  stores.
-- Watches USB, Bluetooth, filesystem, and runtime signals for useful context.
-- Integrates with Second Brain workflows across Obsidian, Notion, and Linear.
-- Gates privileged commands through policy checks, approval records, audit
-  logs, and RootDaemon isolation.
+- **Organic Memory**: Tiered architecture (L1/L2/L3) with a native Rust Synapse core for high-performance associative memory.
+- **Ubiquitous Brain**: `SyncEngine` for neural snapshot synchronization across multiple devices via global relay.
+- **Architect Agent**: Autonomous software engineering agent capable of project blueprinting, code generation, and self-auditing.
+- **Bio-Organic TUI**: Real-time terminal monitor with neural pulse (sparkline) and biological event terminology.
+- **Synaptic 3D**: Real-time visualization of the neural network using Three.js.
+- **Proactive Observation**: Situational awareness via adaptative screen capture and multi-modal analysis.
 
 ## Repository Layout
 
