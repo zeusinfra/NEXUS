@@ -50,7 +50,7 @@ _ensure_tui_deps()
 from textual.app import App, ComposeResult
 from textual.containers import Container, Center, Middle, Horizontal
 from textual.screen import Screen
-from textual.widgets import Input, Static, RichLog
+from textual.widgets import Input, Static, RichLog, Sparkline
 from textual.binding import Binding
 from textual import work
 from textual.worker import get_current_worker
@@ -209,6 +209,19 @@ Input:focus {
     height: 1;
     color: #00aaff;
     content-align: left middle;
+}
+
+#chat-synapses {
+    width: auto;
+    color: #00ffcc;
+    margin-right: 2;
+}
+
+#chat-pulse {
+    width: 12;
+    height: 1;
+    color: #ff00ff;
+    margin-right: 2;
 }
 
 #chat-telemetry {
@@ -582,6 +595,8 @@ class ChatScreen(Screen):
         with Container(id="chat-input-bar"):
             with Horizontal(id="chat-meta"):
                 yield Static("[dim]ready[/dim]", id="chat-status", markup=True)
+                yield Static("[dim]syn[/dim] 0", id="chat-synapses", markup=True, classes="meta-item")
+                yield Sparkline([], id="chat-pulse", summary="Neural Pulse")
                 yield Static("[dim]cpu[/dim] --%  [dim]ram[/dim] --%", id="chat-telemetry", markup=True)
             yield Static("[dim]  !cmd  shell  │  /help  comandos  │  Enter  envia para IA[/dim]", id="input-hint", markup=True)
             yield Input(placeholder="Message NEXUS...", id="chat-input")
@@ -646,25 +661,38 @@ class ChatScreen(Screen):
     def poll_telemetry(self) -> None:
         """Atualiza CPU/RAM no footer a cada 3 segundos."""
         worker = get_current_worker()
+        pulse_data = []
         while self.running and not worker.is_cancelled:
-            status = _fetch_status()
+            # Pegar telemetria completa (incluindo sinapses do applet status)
+            data = _get_json("/api/applet/status", timeout=2.5)
+            status = _fetch_status() # Reusa a lógica de normalização
+            
+            synapses = data.get("synaptic_count", 0)
+            pulse_data.append(float(synapses % 100)) # Simula variação para o pulso
+            if len(pulse_data) > 20: pulse_data.pop(0)
+
             if status["online"]:
                 footer_text = f"[dim]cpu[/dim] {escape(str(status['cpu']))}%  [dim]ram[/dim] {escape(str(status['ram']))}% "
                 header_text = f"[bold #00ffcc]NEXUS[/] Ops · {escape(str(status['model']))} · [dim]{escape(str(status['provider']))}[/dim]"
+                syn_text = f"[dim]syn[/dim] [bold]{synapses}[/]"
             else:
                 footer_text = f"[dim]cpu[/dim] {escape(str(status['cpu']))}%  [dim]ram[/dim] {escape(str(status['ram']))}% "
                 header_text = "[bold #00ffcc]NEXUS[/] Ops · [red]Offline[/red]"
-            if not self._call_from_thread(self._update_bars, header_text, footer_text):
+                syn_text = "[dim]syn[/dim] 0"
+                
+            if not self._call_from_thread(self._update_bars, header_text, footer_text, syn_text, pulse_data):
                 return
             for _ in range(30):
                 if not self.running or worker.is_cancelled:
                     return
                 time.sleep(0.1)
 
-    def _update_bars(self, header: str, footer: str) -> None:
+    def _update_bars(self, header: str, footer: str, syn: str, pulse: list[float]) -> None:
         try:
             self.query_one("#chat-header", Static).update(header)
             self.query_one("#chat-telemetry", Static).update(footer)
+            self.query_one("#chat-synapses", Static).update(syn)
+            self.query_one("#chat-pulse", Sparkline).data = pulse
         except Exception:
             pass
 

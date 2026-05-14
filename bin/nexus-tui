@@ -4,6 +4,25 @@ import requests
 import os
 import sys
 from datetime import datetime
+from pathlib import Path
+
+# Garantir que usa o venv se as libs não estiverem no sistema
+def _ensure_deps():
+    try:
+        import rich
+        import requests
+        return
+    except ImportError:
+        pass
+    root = Path(__file__).resolve().parents[1]
+    venv_py = root / ".venv" / "bin" / "python"
+    if venv_py.exists() and str(venv_py) != sys.executable:
+        os.execv(str(venv_py), [str(venv_py), __file__, *sys.argv[1:]])
+    print("Erro: Bibliotecas 'rich' ou 'requests' não encontradas. Rode './scripts/bootstrap.sh'.")
+    sys.exit(1)
+
+_ensure_deps()
+
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel

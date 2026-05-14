@@ -143,9 +143,11 @@ if [[ "$1" == "help" || "$1" == "-h" || "$1" == "--help" ]]; then
     echo "║     NEXUS — Command Launcher       ║"
     echo "╚════════════════════════════════════╝"
     echo ""
-    echo "  ./bin/nexus               → Cyber TUI (padrão)"
-    echo "  ./bin/nexus tui            → Cyber TUI (explícito)"
-    echo "  ./bin/nexus chat           → Abrir chat GTK (desktop)"
+    echo "  ./bin/nexus               → Bio-Organic TUI (padrão)
+  ./bin/nexus tui            → Bio-Organic TUI (explícito)
+  ./bin/nexus cyber          → Abrir Cyber TUI (Textual)
+  ./bin/nexus chat           → Abrir chat GTK (desktop)
+"
     echo "  ./bin/nexus plasma         → Abrir chat Qt para KDE Plasma"
     echo "  ./bin/nexus web            → Iniciar Servidor (Browser)"
     echo "  ./bin/nexus server         → Backend headless"
@@ -198,7 +200,12 @@ case "$1" in
         tail -f "$SERVER_LOG"
         ;;
     tui|console|ops)
-        echo "📟  Iniciando NEXUS Cyber TUI..."
+        echo "📟  Iniciando NEXUS Bio-Organic TUI..."
+        ensure_server_background
+        "$PY" "$ROOT_DIR/bin/nexus-tui"
+        ;;
+    cyber)
+        echo "📟  Iniciando NEXUS Cyber TUI (Interface completa)..."
         ensure_server_background
         "$PY" "$ROOT_DIR/bin/nexus-cyber-tui"
         ;;
@@ -218,16 +225,16 @@ case "$1" in
         "$ROOT_DIR/bin/nexus-plasma-chat"
         ;;
     setup-aliases)
-        echo "🔧  Configurando aliases globais em ~/.bashrc..."
+        grep -q "alias nexus=" ~/.bashrc || echo "alias nexus='cd $ROOT_DIR && ./bin/nexus'" >> ~/.bashrc
         grep -q "alias nexus-server" ~/.bashrc || echo "alias nexus-server='cd $ROOT_DIR && ./bin/nexus web > nexus_server.log 2>&1 & sleep 1 && tail -f nexus_server.log'" >> ~/.bashrc
         grep -q "alias nexus-chat" ~/.bashrc || echo "alias nexus-chat='cd $ROOT_DIR && ./bin/nexus-chat'" >> ~/.bashrc
-        echo "✅  Aliases criados: 'nexus-server' e 'nexus-chat'."
+        echo "✅  Aliases criados: 'nexus', 'nexus-server' e 'nexus-chat'."
         echo "🔄  Execute 'source ~/.bashrc' para ativar."
         ;;
     *)
         # Padrão: inicia o Cyber TUI com backend
         echo "🧠 NEXUS — Iniciando..."
         ensure_server_background
-        "$PY" "$ROOT_DIR/bin/nexus-cyber-tui"
+        "$PY" "$ROOT_DIR/bin/nexus-tui"
         ;;
 esac
