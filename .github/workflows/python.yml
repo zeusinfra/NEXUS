@@ -57,7 +57,7 @@ jobs:
       - name: Build Rust Bridge (nexus_synapse)
         run: |
           cd core-rust/nexus_synapse
-          maturin build --release --out ../../target/wheels
+          maturin build --release --interpreter python3 --out ../../target/wheels
           pip install ../../target/wheels/*.whl
 
       - name: Lint
