@@ -113,16 +113,20 @@ impl SynapseManagerRust {
             "sys_info" => {
                 // Simulação de telemetria ultra-rápida em Rust
                 Ok(format!("{{ \"status\": \"stable\", \"core_ver\": \"1.5.0-rust\", \"payload\": \"{}\" }}", payload))
-            },
+            }
             "prune_noise" => {
                 // Poda de ruído em massa diretamente no DB
-                let conn = Connection::open(&self.db_path)
-                    .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+                let conn = Connection::open(&self.db_path).map_err(|e| {
+                    PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string())
+                })?;
                 let deleted = conn.execute("DELETE FROM synapses WHERE weight < 2 AND last_interaction < date('now', '-7 days')", [])
                     .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
                 Ok(format!("{{ \"deleted\": {} }}", deleted))
-            },
-            _ => Ok(format!("{{ \"error\": \"Action '{}' not implemented in Rust bridge\" }}", action))
+            }
+            _ => Ok(format!(
+                "{{ \"error\": \"Action '{}' not implemented in Rust bridge\" }}",
+                action
+            )),
         }
     }
 }

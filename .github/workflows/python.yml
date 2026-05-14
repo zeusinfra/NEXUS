@@ -38,6 +38,11 @@ jobs:
             requirements/dev.txt
             pyproject.toml
 
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
       - name: Install system dependencies
         run: |
           sudo apt-get update

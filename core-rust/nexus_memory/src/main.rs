@@ -42,11 +42,17 @@ async fn main() {
     let listener = match tokio::net::TcpListener::bind(addr).await {
         Ok(l) => l,
         Err(e) => {
-            eprintln!("❌ FAILED to bind to {}: {}. Check permissions or if the port is in use.", addr, e);
+            eprintln!(
+                "❌ FAILED to bind to {}: {}. Check permissions or if the port is in use.",
+                addr, e
+            );
             std::process::exit(1);
         }
     };
-    println!("🧠 NEXUS Memory Service (Rust Microservice) rodando em http://{}", addr);
+    println!(
+        "🧠 NEXUS Memory Service (Rust Microservice) rodando em http://{}",
+        addr
+    );
     if let Err(e) = axum::serve(listener, app).await {
         eprintln!("❌ Server error: {}", e);
     }
