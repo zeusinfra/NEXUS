@@ -68,7 +68,8 @@ def create_status_router(deps: StatusRouteDeps) -> APIRouter:
             conn = sqlite3.connect(memory_manager.db_path)
             synapse_count = conn.execute("SELECT COUNT(*) FROM synapses").fetchone()[0]
             conn.close()
-        except: pass
+        except Exception:
+            pass
 
         from apps.web_gui import sync_engine
 

@@ -10,4 +10,3 @@ numpy>=1.26,<2.3
 pyudev>=0.24,<1.0
 python-dotenv>=1.0,<2.0
 python-socketio>=5.11,<6.0
-textual>=0.55,<9.0

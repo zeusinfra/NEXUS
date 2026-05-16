@@ -1,0 +1,16 @@
+[execution]
+default_mode = "manual"
+prefer_dry_run = true
+sandbox_preferred = "podman"
+
+[approval]
+ttl_seconds = 600
+require_explicit_user = true
+allow_session_low_risk = false
+
+[blocked]
+commands = ["rm", "dd", "mkfs", "shutdown", "reboot", "poweroff", "halt"]
+
+[requires_approval]
+commands = ["sudo", "chmod", "chown", "systemctl", "apt", "pip", "pip3", "npm", "cargo"]
+sensitive_paths = ["/etc", "/boot", "/usr", "/var/lib", "/home/*/.ssh"]

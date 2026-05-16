@@ -140,7 +140,6 @@ NEXUS_SERVICES = {
     "nexus_core",
     "nexus-core",
     "nexus-root-daemon",
-    "nexus-gtk-chat",
     "nexus",
 }
 
@@ -177,7 +176,6 @@ WRITE_SUBCOMMANDS = {
 APT_ALLOWLIST_DEFAULT = (
     "build-essential,python3-dev,python3-pip,python3-venv,git,curl,wget,"
     "htop,neofetch,ffmpeg,jq,tree,ripgrep,fd-find,bat,tmux,vim,nano,"
-    "libgtk-4-dev,libadwaita-1-dev,gir1.2-adw-1,gir1.2-gtk-4.0,"
     "tesseract-ocr,tesseract-ocr-por,fonts-inter,fonts-jetbrains-mono"
 )
 

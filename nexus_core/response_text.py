@@ -80,24 +80,4 @@ def display_text(value: str) -> str:
     return "\n".join(lines).strip()
 
 
-def pango_markup(value: str) -> str:
-    """Small safe Markdown subset rendered as Pango markup for GTK labels."""
-    text = str(value or "")
-    if not text.strip():
-        return ""
 
-    text = _FENCE_RE.sub(lambda m: "\n" + m.group(1).strip() + "\n", text)
-    text = _LINK_RE.sub(r"\1", text)
-    text = html.escape(text)
-    text = re.sub(r"`([^`]+)`", r"<tt>\1</tt>", text)
-    text = re.sub(r"\*\*([^*]+)\*\*", r"<b>\1</b>", text)
-    text = re.sub(r"__([^_]+)__", r"<b>\1</b>", text)
-
-    lines = []
-    for raw_line in text.splitlines():
-        line = raw_line.rstrip()
-        line = re.sub(r"^#{1,6}\s*", "", line)
-        line = re.sub(r"^&gt;\s*", "", line)
-        line = re.sub(r"^[-*+]\s+", "• ", line)
-        lines.append(line)
-    return "\n".join(lines).strip()

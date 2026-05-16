@@ -32,6 +32,10 @@ Examples of unacceptable behavior include:
 - Publishing private information without explicit permission.
 - Encouraging unsafe system actions, credential exposure, or privacy
   violations.
+- Pressuring maintainers or operators to bypass NEXUS approval, audit, or
+  rollback safeguards for privileged or destructive commands.
+- Misrepresenting execution evidence, test results, security posture, or
+  operational state.
 - Any conduct that would reasonably be considered inappropriate in a
   professional open-source setting.
 

@@ -86,7 +86,7 @@ class LearningEngine:
 
     def get_best_strategy(self) -> str:
         """Returns the strategy with the highest weight."""
-        return max(self.weights, key=self.weights.get)
+        return max(self.weights.keys(), key=lambda k: self.weights[k])
 
     def record_experience(
         self,

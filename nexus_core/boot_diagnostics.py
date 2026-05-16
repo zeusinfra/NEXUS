@@ -1,6 +1,5 @@
 import psutil
 import platform
-import os
 import socket
 from datetime import datetime
 from nexus_core.rust_sensors import get_os_snapshot as get_rust_snapshot

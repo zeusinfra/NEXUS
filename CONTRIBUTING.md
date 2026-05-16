@@ -16,7 +16,7 @@ credentials, and privileged actions.
 ## Development Setup
 
 ```bash
-git clone https://github.com/nexusinfra/NEXUS.git
+git clone https://github.com/zeusinfra/NEXUS.git
 cd NEXUS
 
 ./scripts/bootstrap.sh
@@ -36,6 +36,7 @@ Build Rust workspaces:
 ```bash
 cargo build --manifest-path core-rust/Cargo.toml
 cargo build --manifest-path watcher_rs/Cargo.toml
+cargo check --manifest-path nexus-iced/Cargo.toml
 ```
 
 ## Workflow
@@ -57,6 +58,7 @@ Python:
 python -m ruff check .
 python -m ruff format --check .
 python -m pytest
+python -m pytest -q tests/unit/test_organization_daemon.py tests/unit/test_organization_security.py tests/unit/test_organization_memory.py tests/unit/test_organization_runtime.py tests/unit/test_organization_observer.py tests/unit/test_organization_health.py
 ```
 
 Rust:
@@ -115,6 +117,24 @@ This includes changes to:
 
 Security-sensitive changes should include tests for both allowed and rejected
 paths where practical.
+
+## Organizational Runtime Changes
+
+Changes under `nexus_core/organization/`, `configs/nexus.toml`,
+`configs/permissions.toml`, `interfaces/`, or `nexus-iced/` can affect the
+operator-facing autonomy model.
+
+Preserve these invariants:
+
+- Do not claim execution without evidence.
+- Keep proposal, approval, execution, verification, and memory as separate
+  auditable steps.
+- Store runtime state under configured runtime/log/memory paths, not arbitrary
+  user locations.
+- Default systemd and service-management helpers to dry-run or reporting modes.
+- Keep GUI/TUI controls explicit about risk, impact, rollback, and failure.
+- Add tests when policy, approval, runtime, observer, health, or memory
+  behavior changes.
 
 ## Coding Guidelines
 

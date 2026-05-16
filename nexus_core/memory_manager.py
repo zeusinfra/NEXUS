@@ -4,7 +4,7 @@ import time
 import json
 from collections import deque
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 import logging
 
 from nexus_core.path_filters import is_runtime_noise_path
@@ -188,7 +188,7 @@ class MemoryManager:
         return results
 
     # --- L3: Long-Term Memory (Vector Integration) ---
-    def promote_to_long_term(self, path: str, content: str = None):
+    def promote_to_long_term(self, path: str, content: Optional[str] = None):
         """Indexes a node semantically in L3."""
         if self.vector_memory:
             if content:

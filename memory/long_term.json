@@ -7,6 +7,10 @@
     "traits": {
       "value": "Analítico, detalhista, proativo e comunicativo",
       "updated": "2026-05-05"
+    },
+    "name": {
+      "value": "NEXUS",
+      "updated": "2026-05-15"
     }
   },
   "preferences": {
@@ -21,6 +25,10 @@
     "operating_system": {
       "value": "MX Linux",
       "updated": "2026-05-13"
+    },
+    "technical_philosophy": {
+      "value": "sistema cognitivo leve, estabilidade e eficiência de recursos",
+      "updated": "2026-05-15"
     }
   },
   "projects": {
@@ -56,6 +64,16 @@
       "delivery_method": {
         "value": "email",
         "updated": "2026-05-10"
+      }
+    },
+    "gui_migration": {
+      "language": {
+        "value": "Rust",
+        "updated": "2026-05-15"
+      },
+      "goals": {
+        "value": "['melhoria de desempenho', 'estabilidade', 'eficiência de recursos', 'segurança de memória']",
+        "updated": "2026-05-15"
       }
     }
   },

@@ -23,7 +23,7 @@ Do not report vulnerabilities through public GitHub issues.
 
 Preferred reporting path:
 
-1. Open a private GitHub security advisory for `nexusinfra/NEXUS`.
+1. Open a private GitHub security advisory for `zeusinfra/NEXUS`.
 2. Include enough detail for maintainers to reproduce and assess the issue.
 3. Wait for maintainer acknowledgement before public disclosure.
 
@@ -48,6 +48,9 @@ tokens, or sensitive user data in a report.
 
 High-priority areas include:
 
+- Organizational runtime proposal, approval, execution, verification, and
+  memory records.
+- Iced GUI or TUI controls that approve or execute commands.
 - RootDaemon and privileged command execution.
 - Command policy classification, allowlists, blocklists, and approval gates.
 - Authentication, LAN access, CORS, trusted host checks, and token handling.
@@ -86,6 +89,14 @@ Contributors should preserve these defaults:
 - Explicit review for privileged execution changes.
 - Auditability for high-risk actions.
 - Conservative defaults for network exposure and integration sync.
+- No command may be reported as successful without concrete evidence such as an
+  exit code, runtime event, verification record, service status, or file check.
+- Approval must not imply execution. Interfaces should keep these actions
+  separate and visible.
+- Destructive commands must require explicit operator approval and should prefer
+  dry-run, backup, or rollback guidance where possible.
+- Daemon and systemd helpers should default to planning/reporting unless a
+  write or execute flag is explicitly supplied.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for pull request expectations around
 security-sensitive changes.

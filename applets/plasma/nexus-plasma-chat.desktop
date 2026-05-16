@@ -1,9 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=NEXUS Plasma
-Comment=Chat e telemetria NEXUS para KDE Plasma
-Exec=/home/nexus/Documentos/NEXUS/NEXUS/bin/nexus plasma
-Icon=nexus-plasma-chat
-Terminal=false
-Categories=Utility;System;
-StartupNotify=true

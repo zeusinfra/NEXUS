@@ -1,4 +1,5 @@
 import os
+from typing import Any
 from nexus_core.env import load_project_env
 
 load_project_env()
@@ -110,11 +111,8 @@ from nexus_core.security_guard import (
 )
 from nexus_core.security.daemon_client import daemon_client
 from fastapi import FastAPI, WebSocket, HTTPException, Request
-from fastapi.responses import RedirectResponse
 import socketio
 
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from pydantic import BaseModel
@@ -147,7 +145,7 @@ _env_flag = env_flag
 
 ALLOW_LAN = _env_flag("NEXUS_ALLOW_LAN", "0")
 DISABLE_SSL = _env_flag("NEXUS_DISABLE_SSL", "0")
-print(f"DEBUG: ALLOW_LAN={ALLOW_LAN}, DISABLE_SSL={DISABLE_SSL}")
+logger.debug("ALLOW_LAN=%s, DISABLE_SSL=%s", ALLOW_LAN, DISABLE_SSL)
 
 ENABLE_VOICE = _env_flag("NEXUS_ENABLE_VOICE", "1")
 ENABLE_VOICE_SENSING = _env_flag("NEXUS_ENABLE_VOICE_SENSING", "0")
@@ -243,9 +241,7 @@ IGNORED_DIRS = {
 }
 
 
-def persist_memory_if_needed():
-    # Deprecated: memory_manager handles persistence automatically via SQLite.
-    pass
+
 
 
 # --- STATE ---
@@ -397,11 +393,11 @@ async def lifespan(app: FastAPI):
     _sync_engine_tasks = []
     vault_path = os.getenv("NEXUS_VAULT_PATH", "/home/zeus/Documentos/Brain")
     if ENABLE_SECOND_BRAIN and os.path.exists(vault_path):
-        print(f"[NEXUS] Iniciando Second Brain integrando {vault_path}")
+        logger.info(f"[NEXUS] Iniciando Second Brain integrando {vault_path}")
         _watcher_task = asyncio.create_task(watch_vault(vault_path))
         _sync_worker_task = asyncio.create_task(sync_worker_loop())
         if ENABLE_SECOND_BRAIN_SYNC_ENGINE or ENABLE_OBSIDIAN_AUTO_SYNC:
-            print("[NEXUS] Iniciando Sync Engine: Sináptico→Obsidian")
+            logger.info("[NEXUS] Iniciando Sync Engine: Sináptico→Obsidian")
             _sync_engine_tasks.append(
                 asyncio.create_task(
                     sync_synaptic_to_obsidian(memory_manager, interval=60.0)
@@ -431,6 +427,11 @@ async def lifespan(app: FastAPI):
 
     # Iniciar Ciclo de Sono / Modo Sonho (Poda Sináptica)
     asyncio.create_task(dreaming_loop())
+
+    # Pre-carregar modelo de voz Kokoro (evita lag na primeira resposta)
+    if ENABLE_VOICE:
+        logger.info("🎙️ [NEXUS VOICE] Pre-carregando motor Kokoro...")
+        asyncio.create_task(voice_service.generate_speech_wav("OK"))
 
     # Sequência de Boot: Saudação e Diagnóstico (Nível 4)
     asyncio.create_task(boot_sequence())
@@ -582,15 +583,17 @@ async def boot_sequence():
     if now_ts - last_boot > 600:
         brain.blackboard.update("last_voice_boot", now_ts)
         try:
-            audio_path = os.path.join(PROJECT_ROOT, "data/voice_temp", "boot_greeting.mp3")
-            import edge_tts
-            communicate = edge_tts.Communicate(report, "pt-BR-AntonioNeural")
-            await communicate.save(audio_path)
-            players = ["ffplay", "mpv", "play"]
-            for player in players:
-                if shutil.which(player):
-                    subprocess.Popen([player, "-nodisp", "-autoexit", audio_path] if player == "ffplay" else [player, audio_path])
-                    break
+            audio_wav = await voice_service.generate_speech_wav(report)
+            if audio_wav:
+                boot_audio_path = os.path.join(PROJECT_ROOT, "data", "voice_temp", "boot_greeting.wav")
+                os.makedirs(os.path.dirname(boot_audio_path), exist_ok=True)
+                with open(boot_audio_path, "wb") as f:
+                    f.write(audio_wav)
+                players = ["ffplay", "mpv", "play"]
+                for player in players:
+                    if shutil.which(player):
+                        subprocess.Popen([player, "-nodisp", "-autoexit", boot_audio_path] if player == "ffplay" else [player, boot_audio_path])
+                        break
             await broadcast_message({"type": "voice_response", "text": report, "boot": True})
         except Exception as e:
             logger.error(f"❌ [NEXUS BOOT] Erro na saudação de voz: {e}")
@@ -618,24 +621,22 @@ async def enqueue_event(event: dict) -> None:
 
 
 async def speak(text, target: str = "all"):
-    """Toca TTS local (Edge-TTS + ffplay) via VoiceSensing quando habilitado."""
+    """Envia texto para TTS (Kokoro local) e broadcast via Socket.io."""
     if not text or not text.strip():
         return
     spoken_text = speech_text(text)
     display_reply = display_text(text)
     try:
         if not ENABLE_VOICE:
-            # Em modo somente texto, apenas loga
-            print(f"[NEXUS VOICE ALERT] {display_reply or text}")
+            logger.info("[NEXUS VOICE] %s", display_reply or text)
             return
 
-        # Envia o comando de voz para a Bolha/Web via Socket.io
+        # Envia o comando de voz para clientes conectados via Socket.io
         await broadcast_message(
             {
                 "type": "voice_play",
                 "text": spoken_text or text,
                 "raw_text": text,
-                "voice": "pt-BR-AntonioNeural",
                 "target": target,
             }
         )
@@ -643,8 +644,8 @@ async def speak(text, target: str = "all"):
         # Mantém a fala no servidor quando habilitado
         await voice_module.speak(spoken_text or text)
     except Exception as e:
-        print(f"[NEXUS] Falha ao falar (fallback para log): {e}")
-        print(f"[NEXUS VOICE ALERT] {display_reply or text}")
+        logger.warning("Falha ao falar (fallback para log): %s", e)
+        logger.info("[NEXUS VOICE] %s", display_reply or text)
 
 
 async def cleanup_voice_temp_files():
@@ -798,54 +799,9 @@ def classify_web_context(url: str):
 
 
 def get_os_snapshot():
-    rust_snapshot = get_rust_os_snapshot()
-    if rust_snapshot:
-        return rust_snapshot
+    """Retorna um snapshot do sistema (CPU, RAM, Processos) via Rust core ou psutil."""
+    return get_rust_os_snapshot()
 
-    cpu_per_core = psutil.cpu_percent(percpu=True)
-    cpu_avg = sum(cpu_per_core) / len(cpu_per_core) if cpu_per_core else 0
-    ram = psutil.virtual_memory().percent
-    disk = psutil.disk_usage("/").percent
-    process_rows = []
-    try:
-        # Pega todos os processos de uma vez para ser mais eficiente
-        for proc in psutil.process_iter(["name", "cpu_percent", "memory_percent"]):
-            try:
-                info = proc.info
-                cpu = info.get("cpu_percent") or 0.0
-                mem = info.get("memory_percent") or 0.0
-                if cpu < 1.0 and mem < 1.0:  # Ignora processos irrelevantes
-                    continue
-                process_rows.append(
-                    {
-                        "name": info.get("name") or "unknown",
-                        "cpu": round(cpu, 1),
-                        "memory": round(mem, 1),
-                        "family": classify_process_family(
-                            info.get("name") or "unknown"
-                        ),
-                    }
-                )
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                continue
-    except Exception:
-        pass
-    process_rows.sort(key=lambda item: item["cpu"], reverse=True)
-    pressure = "calm"
-    if cpu_avg > 80 or ram > 85 or disk > 92:
-        pressure = "critical"
-    elif cpu_avg > 55 or ram > 70:
-        pressure = "active"
-    elif cpu_avg > 25 or ram > 55:
-        pressure = "stable"
-    return {
-        "cpu_per_core": cpu_per_core,
-        "cpu_avg": round(cpu_avg, 1),
-        "ram": ram,
-        "disk": disk,
-        "top_processes": process_rows[:3],
-        "pressure": pressure,
-    }
 
 
 def classify_process_family(name: str):
@@ -1133,16 +1089,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static files
-public_dir = os.path.join(BASE_DIR, "public")
-if not os.path.exists(public_dir):
-    os.makedirs(public_dir)
-app.mount("/static", StaticFiles(directory=public_dir), name="static")
-
-
 @app.get("/")
 async def root():
-    return RedirectResponse(url="/static/index.html")
+    return {"status": "NEXUS Core is running headless"}
 
 
 @app.post("/open-file")
@@ -2070,8 +2019,9 @@ async def api_chat(req: ChatReq, request: Request):
         }
         if req.voice_response and ENABLE_VOICE:
             audio_b64 = await voice_service.generate_speech_base64(voice_reply or reply)
-            response["audio"] = audio_b64
-            response["audio_mime"] = "audio/mpeg" if audio_b64 else None
+            if audio_b64:
+                response["audio"] = audio_b64
+                response["audio_mime"] = "audio/wav"
         return response
     except Exception as e:
         thought_stop.set()
@@ -2493,7 +2443,7 @@ async def api_vision_analyze(req: VisionAnalyzeReq, request: Request):
         }
     )
 
-    analysis = {}
+    analysis: dict[str, Any] = {}
     if mode in {"auto", "llm"}:
         try:
             analysis["llm"] = await asyncio.to_thread(
@@ -2891,54 +2841,27 @@ if __name__ == "__main__":
     import uvicorn
     import sys
 
-    if "--headless" in sys.argv or "--server" in sys.argv:
-        # Modo Servidor Puro (Headless)
-        print(f"🌑 NEXUS em modo HEADLESS operacional em {SERVER_HOST}:{SERVER_PORT}")
-        ssl_opts = {}
-        if not DISABLE_SSL:
-            # Bundled test/local keys (fixtures)
-            if os.path.exists("configs/test-key.pem") and os.path.exists(
-                "configs/test-cert.pem"
-            ):
-                ssl_opts = {
-                    "ssl_keyfile": "configs/test-key.pem",
-                    "ssl_certfile": "configs/test-cert.pem",
-                }
-            # Fallback for user-provided real local keys
-            elif os.path.exists("configs/key.pem") and os.path.exists(
-                "configs/cert.pem"
-            ):
-                ssl_opts = {
-                    "ssl_keyfile": "configs/key.pem",
-                    "ssl_certfile": "configs/cert.pem",
-                }
-            elif os.path.exists("key.pem") and os.path.exists("cert.pem"):
-                ssl_opts = {"ssl_keyfile": "key.pem", "ssl_certfile": "cert.pem"}
+    def _resolve_ssl_opts() -> dict:
+        """Resolve SSL key/cert paths from well-known locations."""
+        if DISABLE_SSL:
+            return {}
+        candidates = [
+            ("configs/test-key.pem", "configs/test-cert.pem"),
+            ("configs/key.pem", "configs/cert.pem"),
+            ("key.pem", "cert.pem"),
+        ]
+        for key, cert in candidates:
+            if os.path.exists(key) and os.path.exists(cert):
+                return {"ssl_keyfile": key, "ssl_certfile": cert}
+        return {}
 
-        # Log level reduzido para não poluir o terminal headless
+    ssl_opts = _resolve_ssl_opts()
+
+    if "--headless" in sys.argv or "--server" in sys.argv:
+        logger.info("🌑 NEXUS em modo HEADLESS operacional em %s:%s", SERVER_HOST, SERVER_PORT)
         uvicorn.run(
             app, host=SERVER_HOST, port=SERVER_PORT, log_level="warning", **ssl_opts
         )
     else:
-        # Modo Web padrão
-        ssl_opts = {}
-        if not DISABLE_SSL:
-            # Bundled test/local keys (fixtures)
-            if os.path.exists("configs/test-key.pem") and os.path.exists(
-                "configs/test-cert.pem"
-            ):
-                ssl_opts = {
-                    "ssl_keyfile": "configs/test-key.pem",
-                    "ssl_certfile": "configs/test-cert.pem",
-                }
-            # Fallback for user-provided real local keys
-            elif os.path.exists("configs/key.pem") and os.path.exists(
-                "configs/cert.pem"
-            ):
-                ssl_opts = {
-                    "ssl_keyfile": "configs/key.pem",
-                    "ssl_certfile": "configs/cert.pem",
-                }
-            elif os.path.exists("key.pem") and os.path.exists("cert.pem"):
-                ssl_opts = {"ssl_keyfile": "key.pem", "ssl_certfile": "cert.pem"}
         uvicorn.run(app, host=SERVER_HOST, port=SERVER_PORT, **ssl_opts)
+

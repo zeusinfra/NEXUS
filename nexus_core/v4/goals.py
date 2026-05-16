@@ -5,7 +5,7 @@ import os
 import time
 from dataclasses import asdict
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, List
 
 from nexus_core.v4.types import Goal
 
@@ -49,7 +49,7 @@ class GoalsEngine:
                 prioridade=float(item.get("prioridade") or 0.5),
                 estado=(item.get("estado") or "ativo"),
                 progresso=_clamp01(item.get("progresso") or 0.0),
-                meta=item.get("meta") if isinstance(item.get("meta"), dict) else {},
+                meta=dict(item.get("meta") or {}) if isinstance(item.get("meta"), dict) else {},
             )
         self.goals = loaded
 
@@ -62,7 +62,7 @@ class GoalsEngine:
         )
         os.replace(tmp, self.path)
 
-    def list(self) -> list[Goal]:
+    def list(self) -> List[Goal]:
         return sorted(
             self.goals.values(), key=lambda g: (g.estado != "ativo", -g.prioridade)
         )
@@ -70,7 +70,7 @@ class GoalsEngine:
     def upsert(self, goal: Goal) -> None:
         self.goals[goal.id] = goal
 
-    def get_active(self) -> list[Goal]:
+    def get_active(self) -> List[Goal]:
         return [g for g in self.list() if g.estado == "ativo"]
 
     def ensure_default_goals(self) -> None:
@@ -98,8 +98,8 @@ class GoalsEngine:
 
     def auto_create_from_patterns(
         self, suggestions: Iterable[tuple[str, float]]
-    ) -> list[Goal]:
-        created: list[Goal] = []
+    ) -> List[Goal]:
+        created: List[Goal] = []
         for desc, prio in suggestions:
             desc = str(desc or "").strip()
             if not desc:

@@ -143,29 +143,30 @@ if [[ "$1" == "help" || "$1" == "-h" || "$1" == "--help" ]]; then
     echo "║     NEXUS — Command Launcher       ║"
     echo "╚════════════════════════════════════╝"
     echo ""
-    echo "  ./bin/nexus               → Bio-Organic TUI (padrão)
-  ./bin/nexus tui            → Bio-Organic TUI (explícito)
-  ./bin/nexus cyber          → Abrir Cyber TUI (Textual)
-  ./bin/nexus chat           → Abrir chat GTK (desktop)
-"
-    echo "  ./bin/nexus plasma         → Abrir chat Qt para KDE Plasma"
-    echo "  ./bin/nexus web            → Iniciar Servidor (Browser)"
+    echo "  ./bin/nexus               → Rust Iced GUI (padrão)"
+    echo "  ./bin/nexus iced           → Abrir GUI Rust Iced (explícito)"
     echo "  ./bin/nexus server         → Backend headless"
     echo "  ./bin/nexus ensure-server  → Garantir backend online"
+    echo "  ./bin/nexus org status     → Estado da empresa cognitiva"
+    echo "  ./bin/nexus org health     → Health do daemon organizacional"
+    echo "  ./bin/nexus org run        → Daemon organizacional"
+    echo "  ./bin/nexus org systemd-plan → Plano de instalação systemd"
+    echo "  ./bin/nexus org memory-status → Memória organizacional"
+    echo "  ./bin/nexus tui            → TUI operacional Bubble Tea"
     echo "  ./bin/nexus logs           → Ver logs em tempo real"
     echo "  ./bin/nexus v4             → Core v4 (loop contínuo)"
     echo "  ./bin/nexus evolve         → Motor de Evolução"
+    echo "  ./bin/nexus restart        → Reiniciar Sistema (Backend + Rust)"
     echo "  ./bin/nexus setup-aliases  → Instalar aliases"
     echo ""
     exit 0
 fi
 
 case "$1" in
-    sphere|gui|3d|web)
-        echo "🧠 Iniciando NEXUS Command Center (Browser)..."
-        echo "🌐 Acesse: http://127.0.0.1:8080"
-        start_rust_services
-        "$PY" -m apps.web_gui
+    gui|iced|"")
+        echo "🧠 NEXUS — Iniciando GUI Iced..."
+        ensure_server_background
+        (cd "$ROOT_DIR/nexus-iced" && cargo run --release)
         ;;
     v4|core4|daemon)
         echo "🧠 Iniciando NEXUS Cognitive Core v4 (Loop contínuo)..."
@@ -191,6 +192,17 @@ case "$1" in
     ensure-server)
         ensure_server_background
         ;;
+    org|organization)
+        shift
+        "$PY" -m nexus_core.organization "${@:-status}"
+        ;;
+    tui)
+        if ! command -v go >/dev/null 2>&1; then
+            echo "❌ Go não está instalado. A TUI Bubble Tea precisa do toolchain Go." >&2
+            exit 1
+        fi
+        (cd "$ROOT_DIR/interfaces/tui-bubbletea" && go run .)
+        ;;
     evolve|think|ev)
         echo "🌀 Iniciando Motor de Evolução..."
         "$PY" -m apps.nexus_evolution
@@ -199,42 +211,28 @@ case "$1" in
         echo "📜  Monitorando logs do NEXUS..."
         tail -f "$SERVER_LOG"
         ;;
-    tui|console|ops)
-        echo "📟  Iniciando NEXUS Bio-Organic TUI..."
+    restart)
+        echo "🔄 Reiniciando NEXUS (Ciclo Neural Completo)..."
+        pids="$(backend_pids)"
+        if [[ -n "$pids" ]]; then
+            echo "🛑 Parando backend ($pids)..."
+            kill $pids >/dev/null 2>&1 || true
+            sleep 2
+        fi
+        pkill -f "nexus_memory" || true
+        pkill -f "watcher_rs" || true
         ensure_server_background
-        "$PY" "$ROOT_DIR/bin/nexus-tui"
-        ;;
-    cyber)
-        echo "📟  Iniciando NEXUS Cyber TUI (Interface completa)..."
-        ensure_server_background
-        "$PY" "$ROOT_DIR/bin/nexus-cyber-tui"
-        ;;
-    chat)
-        echo "💬  Abrindo chat NEXUS GTK..."
-        "$ROOT_DIR/bin/nexus-chat"
-        ;;
-    plasma|kde|qt|plasma-chat)
-        echo "💬  Abrindo NEXUS Plasma (Qt)..."
-        export NEXUS_ORGANIC_MODE="${NEXUS_ORGANIC_MODE:-1}"
-        export NEXUS_ENABLE_BROWSER_SENSING="${NEXUS_ENABLE_BROWSER_SENSING:-1}"
-        export NEXUS_ENABLE_AUTONOMOUS_TASKS="${NEXUS_ENABLE_AUTONOMOUS_TASKS:-1}"
-        export NEXUS_COGNITIVE_LOOP_ENABLED="${NEXUS_COGNITIVE_LOOP_ENABLED:-1}"
-        export NEXUS_ENABLE_RESOURCE_MONITOR="${NEXUS_ENABLE_RESOURCE_MONITOR:-1}"
-        export NEXUS_WATCH_DIRS="${NEXUS_WATCH_DIRS:-$ROOT_DIR,$HOME/Documentos/Brain}"
-        ensure_server_background
-        "$ROOT_DIR/bin/nexus-plasma-chat"
+        echo "✅ Reinicialização concluída."
         ;;
     setup-aliases)
         grep -q "alias nexus=" ~/.bashrc || echo "alias nexus='cd $ROOT_DIR && ./bin/nexus'" >> ~/.bashrc
-        grep -q "alias nexus-server" ~/.bashrc || echo "alias nexus-server='cd $ROOT_DIR && ./bin/nexus web > nexus_server.log 2>&1 & sleep 1 && tail -f nexus_server.log'" >> ~/.bashrc
-        grep -q "alias nexus-chat" ~/.bashrc || echo "alias nexus-chat='cd $ROOT_DIR && ./bin/nexus-chat'" >> ~/.bashrc
-        echo "✅  Aliases criados: 'nexus', 'nexus-server' e 'nexus-chat'."
+        grep -q "alias nexus-server" ~/.bashrc || echo "alias nexus-server='cd $ROOT_DIR && ./bin/nexus server'" >> ~/.bashrc
+        echo "✅  Aliases criados: 'nexus' e 'nexus-server'."
         echo "🔄  Execute 'source ~/.bashrc' para ativar."
         ;;
     *)
-        # Padrão: inicia o Cyber TUI com backend
-        echo "🧠 NEXUS — Iniciando..."
-        ensure_server_background
-        "$PY" "$ROOT_DIR/bin/nexus-tui"
+        echo "❌ Comando desconhecido: ${1:-<vazio>}" >&2
+        echo "Use './bin/nexus help' para listar comandos." >&2
+        exit 2
         ;;
 esac

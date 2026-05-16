@@ -1,5 +1,4 @@
 import psutil
-import os
 from datetime import datetime
 
 def run():

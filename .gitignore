@@ -16,6 +16,7 @@ __pycache__/
 # Logs / runtime artifacts
 logs/*.log
 logs/*.jsonl
+runtime/
 *.log
 nexus_core.log
 nexus_server.log
@@ -38,6 +39,10 @@ configs/serviceAccountKey.json
 data/
 *.db
 *.sqlite
+*.sqlite3
+models/tts/*.onnx
+models/tts/*.bin
+test_audio.wav
 scratch/
 test_mirror_temp/
 

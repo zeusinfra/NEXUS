@@ -3,17 +3,17 @@ from nexus_core.conversation.sqlite_conversation_memory import SQLiteConversatio
 
 def test_conversation_memory_recalls_recent_and_similar(tmp_path):
     memory = SQLiteConversationMemory(str(tmp_path / "conversation.db"))
-    memory.add_turn("s1", "gtk", "user", "Vamos melhorar os baloes de conversa GTK")
-    memory.add_turn("s1", "gtk", "assistant", "Plano para melhorar bubbles e markdown")
+    memory.add_turn("s1", "iced", "user", "Vamos melhorar os baloes de conversa Iced")
+    memory.add_turn("s1", "iced", "assistant", "Plano para melhorar bubbles e markdown")
     memory.add_turn(
         "s2",
-        "gtk",
+        "iced",
         "user",
         "A memoria das conversas precisa lembrar assuntos parecidos",
     )
 
     block = memory.build_context_block(
-        "melhorar memoria conversa parecida", session_id="s1", client_id="gtk"
+        "melhorar memoria conversa parecida", session_id="s1", client_id="iced"
     )
 
     assert "HISTORICO RECENTE" in block

@@ -41,22 +41,9 @@ if sr is None:
 
     sr = _Mock()
 
-try:
-    import edge_tts
-except Exception:
-    edge_tts = None
+from communication.voice_service import voice_service
 
-if edge_tts is None:
-
-    class _Mock:
-        class Communicate:
-            def __init__(self, *a, **k):
-                pass
-
-            async def save(self, *a, **k):
-                pass
-
-    edge_tts = _Mock()
+# Removido mock de edge_tts pois agora usamos voice_service local
 
 
 def _suppress_alsa_errors():
@@ -449,27 +436,22 @@ class VoiceSensing:
         try:
             tmp_path = None
             try:
-                VOICE = "pt-BR-AntonioNeural"
-                if edge_tts is None:
-                    raise RuntimeError("edge-tts is not installed")
-                communicate = edge_tts.Communicate(
-                    spoken_text, VOICE, rate="+5%", pitch="-2Hz"
-                )
+                audio_wav = await voice_service.generate_speech_wav(spoken_text)
+                if not audio_wav:
+                    raise RuntimeError("Falha na síntese Kokoro")
 
                 with tempfile.NamedTemporaryFile(
-                    suffix=".mp3", delete=False, prefix="nexus_tts_"
+                    suffix=".wav", delete=False, prefix="nexus_tts_"
                 ) as tmp:
                     tmp_path = tmp.name
-
-                tts_timeout = float(os.getenv("NEXUS_TTS_TIMEOUT_SEC", "12"))
-                await asyncio.wait_for(communicate.save(tmp_path), timeout=tts_timeout)
+                    tmp.write(audio_wav)
 
                 if self.broadcast:
                     await self._send_status("Falando...")
 
                 play_timeout = float(os.getenv("NEXUS_AUDIO_PLAY_TIMEOUT_SEC", "45"))
 
-                # Tocar MP3 diretamente para evitar delay de conversão
+                # Tocar WAV via ffplay
                 proc = await asyncio.create_subprocess_exec(
                     "ffplay",
                     "-nodisp",
@@ -494,27 +476,24 @@ class VoiceSensing:
                     raise RuntimeError(
                         f"ffplay falhou (rc={rc}){': ' + err if err else ''}"
                     )
-            except Exception as edge_err:
-                # Fallback offline via Speech Dispatcher (spd-say), se disponível.
-                spd = shutil.which("spd-say")
+            except Exception as kokoro_err:
+                # Fallback offline via Speech Dispatcher (spd-say) ou espeak-ng
+                logger.warning(f"Kokoro falhou, tentando fallback: {kokoro_err}")
+                spd = shutil.which("spd-say") or shutil.which("espeak-ng")
                 if not spd:
-                    raise edge_err
+                    raise kokoro_err
 
                 if self.broadcast:
                     await self._send_status("Falando (fallback local)...")
 
                 speak_timeout = float(os.getenv("NEXUS_SPD_SAY_TIMEOUT_SEC", "20"))
+                cmd = [spd, spoken_text] if "espeak" in spd else [spd, "-w", "-l", "pt", spoken_text]
                 proc = await asyncio.create_subprocess_exec(
-                    spd,
-                    "-w",
-                    "-l",
-                    "pt",
-                    spoken_text,
+                    *cmd,
                     stdout=subprocess.DEVNULL,
                     stderr=asyncio.subprocess.PIPE,
                 )
                 try:
-                    # Evita travar indefinidamente em setups sem speech-dispatcher/voz.
                     _out, stderr = await asyncio.wait_for(
                         proc.communicate(), timeout=speak_timeout
                     )
@@ -522,14 +501,14 @@ class VoiceSensing:
                     proc.kill()
                     await proc.wait()
                     raise RuntimeError(
-                        f"spd-say travou (timeout={speak_timeout}s)"
-                    ) from edge_err
+                        f"Speech fallback travou (timeout={speak_timeout}s)"
+                    ) from kokoro_err
                 rc = proc.returncode
                 if rc != 0:
                     err = stderr.decode(errors="ignore").strip()
                     raise RuntimeError(
-                        f"spd-say falhou (rc={rc}){': ' + err if err else ''}"
-                    ) from edge_err
+                        f"Speech fallback falhou (rc={rc}){': ' + err if err else ''}"
+                    ) from kokoro_err
             finally:
                 if tmp_path:
                     try:

@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 import httpx
 from datetime import datetime
@@ -55,9 +54,9 @@ class SyncEngine:
                 # Intervalo de 15 minutos para sincronização de fundo
                 await asyncio.sleep(900)
                 
-                snapshot = await self.export_neural_snapshot()
+                _snapshot = await self.export_neural_snapshot()
                 # Aqui seria a chamada real para o relay
-                # await self._post_to_relay(snapshot)
+                # await self._post_to_relay(_snapshot)
                 
                 logger.info("📡 [SYNC] Snapshot neural enviado para o Relay.")
             except Exception as e:

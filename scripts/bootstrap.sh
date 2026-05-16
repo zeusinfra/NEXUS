@@ -13,14 +13,8 @@ fi
 
 "$VENV_DIR/bin/python" -m pip install --upgrade pip
 "$VENV_DIR/bin/python" -m pip install -r requirements/dev.txt
-"$VENV_DIR/bin/python" -m pip install pyinstaller
-
-echo "🛠️ Preparando ambiente de build Rust..."
-if ! command -v cargo &> /dev/null; then
-    echo "⚠️ Rust/Cargo não encontrado. Instale via https://rustup.rs para compilar o shell."
-else
-    # Garante que o target do Tauri esteja pronto
-    rustup target add $(rustc -Vv | grep host | cut -d ' ' -f 2) 2>/dev/null || true
-fi
+  # Garante que o core Rust seja compilado
+  cargo build --manifest-path core-rust/Cargo.toml --release
+  cargo build --manifest-path nexus-iced/Cargo.toml --release
 
 echo "✅ Bootstrap complete. Activate with: source $VENV_DIR/bin/activate"

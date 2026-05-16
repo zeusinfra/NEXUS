@@ -39,12 +39,13 @@ class RustConnect:
             print("🔌 Disconnected from NEXUS CORE")
 
     async def execute_command(
-        self, command: str, target_files: List[str] = None
+        self, command: str, target_files: Optional[List[str]] = None
     ) -> Dict:
         """Sends command for execution via Rust Core."""
         request = nexus_core_pb2.ActionRequest(
             command=command, target_files=target_files or []
         )
+        assert self.stub is not None
         try:
             response = await self.stub.ExecuteAction(request)
             return {
@@ -60,12 +61,13 @@ class RustConnect:
             }
 
     async def simulate_command(
-        self, command: str, target_files: List[str] = None
+        self, command: str, target_files: Optional[List[str]] = None
     ) -> Dict:
         """Simulates command in Rust Shadow Environment."""
         request = nexus_core_pb2.SimulationRequest(
             command=command, target_files=target_files or []
         )
+        assert self.stub is not None
         try:
             response = await self.stub.SimulateAction(request)
             return {
@@ -84,6 +86,7 @@ class RustConnect:
     async def stream_telemetry(self) -> AsyncGenerator[Dict, None]:
         """Receives realtime telemetry stream from Rust."""
         request = nexus_core_pb2.TelemetryRequest(include_processes=True)
+        assert self.stub is not None
 
         try:
             async for telemetry in self.stub.StreamTelemetry(request):
@@ -100,6 +103,7 @@ class RustConnect:
     async def set_mode(self, mode: str) -> bool:
         """Sets Rust Core mode (SAFE, DEV, AUTONOMOUS)."""
         request = nexus_core_pb2.ModeRequest(mode=mode)
+        assert self.stub is not None
         try:
             resp = await self.stub.SetMode(request)
             print(f"🛡️ Core Mode set to: {resp.current_mode}")

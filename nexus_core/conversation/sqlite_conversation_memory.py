@@ -60,10 +60,12 @@ class SQLiteConversationMemory:
             "NEXUS_CONVERSATION_DB_PATH",
             str(root / "data" / "conversation_memory.db"),
         )
+        assert self.db_path is not None
         Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
 
     def _connect(self) -> sqlite3.Connection:
+        assert self.db_path is not None
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         return conn
