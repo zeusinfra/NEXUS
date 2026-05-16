@@ -1,4 +1,4 @@
-# NEXUS by NEXUS Protocol
+# NEXUS by Zeus Protocol
 
 > Local-first cognitive operations for Linux desktops. Current focus:
 > persistent organizational runtime, verifiable execution, and supervised
