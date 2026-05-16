@@ -32,7 +32,7 @@ jobs:
           - language: rust
             build-mode: none
           - language: go
-            build-mode: none
+            build-mode: autobuild
 
     steps:
       - name: Checkout repository
