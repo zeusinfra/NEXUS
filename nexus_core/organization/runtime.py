@@ -15,6 +15,7 @@ from nexus_core.organization.config import NexusOrgConfig
 from nexus_core.organization.memory import OrganizationalMemoryStore
 from nexus_core.organization.security import ApprovalQueue
 from nexus_core.organization.verification import VerificationEngine
+from nexus_core.sentry_observability import add_breadcrumb, capture_message
 from nexus_core.tools import ToolError
 
 
@@ -54,6 +55,19 @@ class RuntimeEngine:
 
         command_id = f"cmd_{uuid.uuid4().hex[:12]}"
         started = time.perf_counter()
+        self.memory.record_command(
+            {
+                "command_id": command_id,
+                "agent_id": agent,
+                "task_id": item.get("task_id"),
+                "proposal_id": proposal_id,
+                "command": item.get("command", ""),
+                "cwd": item.get("cwd", ""),
+                "status": "running",
+                "risk_level": item.get("risk_level", "LOW"),
+                "metadata": {"approval_id": approval_id},
+            }
+        )
         self.memory.record_runtime_event(
             command_id=command_id,
             proposal_id=proposal_id,
@@ -68,6 +82,16 @@ class RuntimeEngine:
         self.blackboard.append_event(
             "ORG_RUNTIME_COMMAND_STARTED",
             {"command_id": command_id, "proposal_id": proposal_id, "agent": agent},
+        )
+        add_breadcrumb(
+            "command executed",
+            category="runtime",
+            data={
+                "agent_id": agent,
+                "command_id": command_id,
+                "proposal_id": proposal_id,
+                "risk_level": item.get("risk_level"),
+            },
         )
 
         async def on_event(payload: dict[str, Any]) -> None:
@@ -103,6 +127,29 @@ class RuntimeEngine:
             and verification.get("status") == "passed"
             else "failed"
         )
+        self.memory.record_command(
+            {
+                "command_id": command_id,
+                "agent_id": agent,
+                "task_id": item.get("task_id"),
+                "proposal_id": proposal_id,
+                "command": item.get("command", ""),
+                "cwd": item.get("cwd", ""),
+                "status": final_status,
+                "pid": result_with_output.get("pid") or result.get("pid"),
+                "exit_code": result.get("exit_code"),
+                "duration_ms": duration_ms,
+                "stdout_path": result_with_output.get("stdout_path"),
+                "stderr_path": result_with_output.get("stderr_path"),
+                "evidence_path": result_with_output.get("evidence_path"),
+                "risk_level": item.get("risk_level", "LOW"),
+                "finished_at": verification.get("created_at"),
+                "metadata": {
+                    "ledger_status": result.get("status"),
+                    "verification_status": verification.get("status"),
+                },
+            }
+        )
         updated = self.queue.upsert(
             {
                 **item,
@@ -115,6 +162,7 @@ class RuntimeEngine:
                 "verification_status": verification.get("status"),
             }
         )
+        self.memory.record_approval(updated)
         self.memory.record_runtime_event(
             command_id=command_id,
             proposal_id=proposal_id,
@@ -132,6 +180,48 @@ class RuntimeEngine:
             {
                 "command_id": command_id,
                 "proposal_id": proposal_id,
+                "status": final_status,
+                "verification_status": verification.get("status"),
+            },
+        )
+        if final_status == "failed":
+            self.memory.record_incident(
+                severity="error",
+                module="runtime",
+                message=result.get("summary") or "Command execution failed",
+                agent_id=agent,
+                task_id=item.get("task_id"),
+                command_id=command_id,
+                risk_level=item.get("risk_level"),
+                metadata={
+                    "proposal_id": proposal_id,
+                    "exit_code": result.get("exit_code"),
+                    "verification_status": verification.get("status"),
+                },
+            )
+            capture_message(
+                "Command execution failed",
+                module="runtime",
+                level="error",
+                tags={
+                    "agent_id": agent,
+                    "task_id": item.get("task_id"),
+                    "command_id": command_id,
+                    "risk_level": item.get("risk_level"),
+                    "execution_status": final_status,
+                },
+                context={
+                    "proposal_id": proposal_id,
+                    "exit_code": result.get("exit_code"),
+                    "verification": verification,
+                },
+            )
+        add_breadcrumb(
+            "verification completed",
+            category="runtime",
+            data={
+                "agent_id": agent,
+                "command_id": command_id,
                 "status": final_status,
                 "verification_status": verification.get("status"),
             },

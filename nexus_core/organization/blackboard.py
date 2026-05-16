@@ -18,10 +18,16 @@ def _empty_state() -> dict[str, Any]:
     return {
         "schema_version": 1,
         "mode": "IDLE",
+        "current_goal": None,
+        "plan": [],
         "health": {"status": "starting", "last_heartbeat": None},
         "agents": {},
         "tasks": {},
         "decisions": [],
+        "blockers": [],
+        "errors": [],
+        "partial_results": [],
+        "evidence": [],
         "events": [],
         "updated_at": utc_now(),
     }
@@ -53,6 +59,14 @@ class Blackboard:
         existing = agents.get(agent["role"], {})
         merged = dict(existing)
         merged.update(dict(agent))
+        merged.setdefault("agent_id", f"agent_{agent['role']}")
+        merged.setdefault("status", "idle")
+        merged.setdefault("current_task", None)
+        merged.setdefault("confidence", 0.0)
+        merged.setdefault("risk_level", agent.get("risk_level", "low"))
+        merged.setdefault("last_heartbeat", None)
+        merged.setdefault("permissions", list(agent.get("capabilities", [])))
+        merged.setdefault("memory_scope", agent.get("department", agent["role"]))
         agents[agent["role"]] = merged
         self._touch()
         self.save()
@@ -60,7 +74,20 @@ class Blackboard:
     def update_agent_status(self, role: str, **changes: Any) -> dict[str, Any]:
         agents = self._state.setdefault("agents", {})
         if role not in agents:
-            agents[role] = {"role": role}
+            agents[role] = {
+                "agent_id": f"agent_{role}",
+                "role": role,
+                "status": "idle",
+                "current_task": None,
+                "confidence": 0.0,
+                "risk_level": "low",
+                "last_heartbeat": None,
+                "permissions": [],
+                "memory_scope": role,
+            }
+        for key, value in changes.items():
+            agents[role][key] = value
+        agents[role]["last_heartbeat"] = utc_now()
         runtime = dict(agents[role].get("runtime", {}))
         runtime.update(changes)
         runtime["updated_at"] = utc_now()
@@ -148,6 +175,28 @@ class Blackboard:
         self._touch()
         self.save()
 
+    def set_current_goal(self, goal: str | None) -> None:
+        self._state["current_goal"] = goal
+        self._touch()
+        self.save()
+
+    def set_plan(self, plan: list[dict[str, Any]]) -> None:
+        self._state["plan"] = plan
+        self._touch()
+        self.save()
+
+    def append_blocker(self, blocker: dict[str, Any]) -> None:
+        self._append_limited("blockers", blocker)
+
+    def append_error(self, error: dict[str, Any]) -> None:
+        self._append_limited("errors", error)
+
+    def append_partial_result(self, result: dict[str, Any]) -> None:
+        self._append_limited("partial_results", result)
+
+    def append_evidence(self, evidence: dict[str, Any]) -> None:
+        self._append_limited("evidence", evidence)
+
     def heartbeat(self, status: str = "online") -> None:
         self._state["health"] = {"status": status, "last_heartbeat": utc_now()}
         self._touch()
@@ -174,3 +223,14 @@ class Blackboard:
 
     def _touch(self) -> None:
         self._state["updated_at"] = utc_now()
+
+    def _append_limited(
+        self, key: str, value: dict[str, Any], limit: int = 200
+    ) -> None:
+        item = dict(value)
+        item.setdefault("created_at", utc_now())
+        items = self._state.setdefault(key, [])
+        items.append(item)
+        self._state[key] = items[-limit:]
+        self._touch()
+        self.save()

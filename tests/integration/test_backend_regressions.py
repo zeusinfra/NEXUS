@@ -4,14 +4,20 @@ from unittest.mock import patch
 import os
 import sys
 import time
+import tempfile
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from nexus_core.core_system import _extract_message_content
 from nexus_core import core_system
-from nexus_core.health_status import build_external_watcher_status, build_watcher_status
+from nexus_core.health_status import (
+    build_external_watcher_status,
+    build_watcher_status,
+    check_memory_service,
+)
+from nexus_core.memory_manager import MemoryManager
 from pattern_engine import PatternEngine
-import web_gui
+from apps import web_gui
 
 
 class BackendRegressionTests(unittest.TestCase):
@@ -71,6 +77,53 @@ class BackendRegressionTests(unittest.TestCase):
         self.assertIn("Ollama Cloud", msg)
         self.assertIn("ollama signin", msg)
         self.assertIn("OLLAMA_API_KEY", msg)
+
+    def test_llm_router_prefers_fast_model_for_short_prompts(self):
+        original_fast = core_system.FAST_MODEL
+        original_heavy = core_system.HEAVY_MODEL
+        try:
+            core_system.FAST_MODEL = "fast-model"
+            core_system.HEAVY_MODEL = "heavy-model"
+
+            selected = core_system._select_model(
+                [{"role": "user", "content": "status rapido"}],
+                provider="ollama",
+            )
+
+            self.assertEqual(selected, "fast-model")
+        finally:
+            core_system.FAST_MODEL = original_fast
+            core_system.HEAVY_MODEL = original_heavy
+
+    def test_llm_router_prefers_heavy_model_for_complex_prompts(self):
+        original_fast = core_system.FAST_MODEL
+        original_heavy = core_system.HEAVY_MODEL
+        try:
+            core_system.FAST_MODEL = "fast-model"
+            core_system.HEAVY_MODEL = "heavy-model"
+
+            selected = core_system._select_model(
+                [{"role": "user", "content": "analise profundamente esta arquitetura"}],
+                provider="ollama",
+            )
+
+            self.assertEqual(selected, "heavy-model")
+        finally:
+            core_system.FAST_MODEL = original_fast
+            core_system.HEAVY_MODEL = original_heavy
+
+    def test_memory_service_health_defaults_to_memory_service_port(self):
+        class Response:
+            status_code = 200
+
+        with patch(
+            "nexus_core.health_status.requests.get", return_value=Response()
+        ) as get:
+            status = check_memory_service()
+
+        self.assertEqual(status["status"], "online")
+        self.assertEqual(status["url"], "http://127.0.0.1:8085/health")
+        get.assert_called_once()
 
     def test_watcher_status_reports_offline_without_process(self):
         status = build_watcher_status(None, None, None)
@@ -150,38 +203,46 @@ class BackendRegressionTests(unittest.TestCase):
         )
         self.assertEqual(engine.analyze_behavioral_state(), "BALANCED")
 
-    def test_ensure_memory_entry_normalizes_invalid_memory_shapes(self):
-        original_memory = web_gui.synaptic_memory
+    def test_memory_manager_records_synaptic_context(self):
+        original_manager = web_gui.memory_manager
         try:
-            web_gui.synaptic_memory = {
-                "/tmp/file.py": {"weight": "7", "connections": ["/tmp/other.py"]},
-                "/tmp/broken.py": "invalid",
-            }
-            valid = web_gui.ensure_memory_entry("/tmp/file.py")
-            broken = web_gui.ensure_memory_entry("/tmp/broken.py")
+            with tempfile.TemporaryDirectory() as tmp:
+                manager = MemoryManager(db_path=os.path.join(tmp, "memory.db"))
+                manager.rust_synapse = None
+                web_gui.memory_manager = manager
 
-            self.assertEqual(valid["weight"], 7)
-            self.assertEqual(valid["connections"], {"/tmp/other.py"})
-            self.assertEqual(broken["weight"], 0)
-            self.assertEqual(broken["connections"], set())
+                manager.update_synapse(
+                    "/workspace/file.py", "/workspace/other.py", weight_inc=3
+                )
+                context = manager.get_working_context("/workspace/file.py")
+
+                self.assertEqual(context, ["/workspace/other.py"])
         finally:
-            web_gui.synaptic_memory = original_memory
+            web_gui.memory_manager = original_manager
 
     def test_build_memory_summary_reports_recall_and_density(self):
-        original_memory = web_gui.synaptic_memory
+        original_manager = web_gui.memory_manager
         try:
-            web_gui.synaptic_memory = {
-                "/tmp/a.py": {"weight": 8, "connections": {"/tmp/b.py", "/tmp/c.py"}},
-                "/tmp/b.py": {"weight": 4, "connections": {"/tmp/a.py"}},
-            }
-            summary = web_gui.build_memory_summary()
-            self.assertEqual(summary["learned_paths"], 2)
-            self.assertEqual(summary["connection_total"], 3)
-            self.assertEqual(summary["hottest_path"], "/tmp/a.py")
-            self.assertGreater(summary["recall_index"], 0)
-            self.assertGreater(summary["memory_density"], 0)
+            with tempfile.TemporaryDirectory() as tmp:
+                manager = MemoryManager(db_path=os.path.join(tmp, "memory.db"))
+                manager.rust_synapse = None
+                web_gui.memory_manager = manager
+                manager.update_synapse(
+                    "/workspace/a.py", "/workspace/b.py", weight_inc=3
+                )
+                manager.update_synapse(
+                    "/workspace/a.py", "/workspace/c.py", weight_inc=2
+                )
+
+                summary = web_gui.build_memory_summary()
+
+                self.assertEqual(summary["learned_paths"], 3)
+                self.assertEqual(summary["connection_total"], 5)
+                self.assertEqual(summary["hottest_path"], "/workspace/a.py")
+                self.assertGreater(summary["recall_index"], 0)
+                self.assertGreater(summary["memory_density"], 0)
         finally:
-            web_gui.synaptic_memory = original_memory
+            web_gui.memory_manager = original_manager
 
 
 if __name__ == "__main__":

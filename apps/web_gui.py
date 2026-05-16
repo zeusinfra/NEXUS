@@ -91,6 +91,7 @@ from nexus_core.observability import (
     log_event,
     setup_logging,
 )
+from nexus_core.sentry_observability import init_sentry
 from nexus_core.execution_protocol import (
     ApprovalScope,
     cancel_execution,
@@ -110,6 +111,8 @@ from nexus_core.security_guard import (
     require_lan_token_for_socketio,
 )
 from nexus_core.security.daemon_client import daemon_client
+from nexus_core.organization.daemon import OrganizationalDaemon
+from nexus_core.organization.config import load_org_config
 from fastapi import FastAPI, WebSocket, HTTPException, Request
 import socketio
 
@@ -118,6 +121,7 @@ from contextlib import asynccontextmanager
 from pydantic import BaseModel
 
 setup_logging(os.getenv("NEXUS_LOG_LEVEL", "INFO"))
+init_sentry(module="fastapi_backend")
 logger = get_logger("nexus.web")
 
 
@@ -282,6 +286,7 @@ long_term_memory = load_long_memory()
 resource_control = ResourceControl(
     brain.blackboard, {}
 )  # Integrando controle de recursos
+org_daemon = OrganizationalDaemon(load_org_config())
 
 
 async def proactive_observation_loop():
@@ -342,6 +347,9 @@ async def lifespan(app: FastAPI):
     _memory_save_lock = asyncio.Lock()
 
     _validate_lan_security_config()
+
+    # Inicializar Daemon Organizacional (Apenas a camada de estado/swarm)
+    org_daemon.initialize(record_event=False)
 
     # Carregar Memória Sináptica do disco
     load_memory()
@@ -592,6 +600,45 @@ async def architect_build(request: Request):
             f.write(code)
         results.append({"path": file_info["path"], "status": "written"})
     return {"status": "project_build_complete", "files": results}
+
+
+# --- SWARM & ORGANIZATION ENDPOINTS ---
+@app.get("/api/swarm/status")
+async def get_swarm_status(request: Request):
+    _require_lan_token_for_request(request)
+    return org_daemon.swarm.status()
+
+
+@app.post("/api/swarm/submit")
+async def submit_swarm_objective(request: Request):
+    _require_lan_token_for_request(request)
+    data = await request.json()
+    goal = data.get("goal")
+    requested_by = data.get("requested_by", "operator")
+    autonomy_level = data.get("autonomy_level", "LEVEL_1")
+    if not goal:
+        return {"error": "Goal is required"}
+    return org_daemon.submit_swarm_objective(
+        goal, requested_by=requested_by, autonomy_level=autonomy_level
+    )
+
+
+@app.get("/api/org/commands")
+async def list_org_commands(request: Request, status: str = None, limit: int = 50):
+    _require_lan_token_for_request(request)
+    return org_daemon.memory.list_commands(status=status, limit=limit)
+
+
+@app.get("/api/org/incidents")
+async def list_org_incidents(request: Request, severity: str = None, limit: int = 50):
+    _require_lan_token_for_request(request)
+    return org_daemon.memory.list_incidents(severity=severity, limit=limit)
+
+
+@app.get("/api/org/agents")
+async def list_org_agents(request: Request, role: str = None, limit: int = 50):
+    _require_lan_token_for_request(request)
+    return org_daemon.memory.list_agents(role=role, limit=limit)
 
 
 from nexus_core.boot_diagnostics import perform_boot_diagnostic
@@ -1564,6 +1611,17 @@ async def metrics_loop():
                 },
             }
         )
+        # 🐝 Swarm Integration: Real-time status broadcast
+        try:
+            swarm_status = org_daemon.swarm.status()
+            await broadcast_message(
+                {
+                    "type": "SWARM_STATUS",
+                    "payload": swarm_status,
+                }
+            )
+        except Exception as se:
+            logger.error(f"Failed to broadcast swarm status: {se}")
 
 
 async def autonomous_audit():
@@ -2703,6 +2761,57 @@ def _build_api_health_payload() -> dict:
     return health
 
 
+def _build_api_health_compact_payload() -> dict:
+    watcher_status = build_watcher_status(
+        watcher_runner.process,
+        watcher_runner.started_at,
+        watcher_runner.last_event_at,
+    )
+    if watcher_status["status"] == "offline":
+        watcher_port = int(os.getenv("NEXUS_WATCHER_PORT", "8081"))
+        watcher_status = build_external_watcher_status(PROJECT_ROOT, port=watcher_port)
+
+    llm = get_llm_status()
+    return {
+        "ok": True,
+        "online": True,
+        "llm": {
+            "provider": llm.get("provider"),
+            "model": llm.get("model"),
+            "configured": bool(llm.get("configured")),
+        },
+        "watcher": {
+            "status": watcher_status.get("status"),
+            "mode": watcher_status.get("mode"),
+            "port_open": watcher_status.get("port_open"),
+        },
+        "voice": {
+            "enabled": ENABLE_VOICE,
+            "sensing_enabled": ENABLE_VOICE_SENSING,
+        },
+        "second_brain": {
+            "enabled": ENABLE_SECOND_BRAIN,
+            "sync_engine_enabled": ENABLE_SECOND_BRAIN_SYNC_ENGINE,
+        },
+        "security": {
+            "allow_lan": ALLOW_LAN,
+            "lan_auth_enabled": LAN_AUTH_ENABLED,
+            "bind_host": SERVER_HOST,
+        },
+        "metrics": {
+            "http_requests_total": get_metrics_snapshot().get("http_requests_total", 0),
+        },
+    }
+
+
+def _build_sync_status_payload() -> dict:
+    return {
+        "is_running": sync_engine.is_running,
+        "last_sync": sync_engine.last_sync,
+        "relay": sync_engine.relay_url,
+    }
+
+
 @app.get("/api/capabilities")
 async def api_capabilities(request: Request):
     if not _is_trusted_request(request):
@@ -2720,6 +2829,8 @@ app.include_router(
             require_lan_token_for_request=_require_lan_token_for_request,
             build_api_status=_build_api_status_payload,
             build_api_health=_build_api_health_payload,
+            build_api_health_compact=_build_api_health_compact_payload,
+            build_sync_status=_build_sync_status_payload,
             llm_service=llm_service,
         )
     )

@@ -57,6 +57,14 @@ async def test_runtime_executes_approved_command_with_evidence(runtime_daemon):
         runtime_daemon.memory.list_verifications(command_id=command_id)[0]["status"]
         == "passed"
     )
+    assert (
+        runtime_daemon.memory.list_commands(status="executed")[0]["command_id"]
+        == command_id
+    )
+    assert (
+        runtime_daemon.memory.list_approvals(status="executed")[0]["proposal_id"]
+        == item["proposal_id"]
+    )
 
 
 @pytest.mark.asyncio
@@ -84,6 +92,9 @@ async def test_runtime_records_failed_verification(runtime_daemon, tmp_path):
     assert result["execution"]["status"] == ActionState.FAILED.value
     assert result["execution"]["exit_code"] == 9
     assert result["verification"]["status"] == "failed"
+    assert (
+        runtime_daemon.memory.list_incidents()[0]["command_id"] == result["command_id"]
+    )
 
 
 def test_verification_engine_detects_file_changes(tmp_path):

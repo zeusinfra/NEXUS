@@ -1,56 +1,28 @@
-# NEXUS Configs
+# NEXUS Configuration & Deployment
 
-This directory contains configuration files for the NEXUS system, including the
-organizational runtime introduced for persistent supervised autonomy.
+This directory contains the core configuration templates and systemd unit specifications for the **NEXUS Cognitive Operating Layer**.
 
-## Organizational Runtime
+## 🏛️ Configuration Management
 
-Primary files:
+The NEXUS environment is governed by professional-grade configuration standards defined by **Zeus Protocol**. Proper deployment ensures high availability and operational integrity of the organizational runtime.
 
-- `nexus.toml`: daemon, runtime, memory, agents, observer, and interface paths.
-- `permissions.toml`: guarded execution defaults, approval requirements, and
-  destructive command hints.
-- `systemd/nexus-organization.service`: user-level systemd unit template.
+### Contents
+*   **systemd/**: Enterprise unit templates for managing the NEXUS daemon as a background service.
+*   **templates/**: Standardized configuration files for agent roles and system policies.
 
-The runtime is intentionally local-first. It writes state under `runtime/`,
-memory under `memory/`, and logs under `logs/` unless overridden in TOML or the
-environment.
+## 🚀 Deployment Strategy
 
-Useful commands:
+Zeus Protocol recommends deploying the organizational daemon via systemd for persistent operation. The unified NEXUS launcher provides helper commands to plan and install these units:
 
 ```bash
-./bin/nexus org health
-./bin/nexus org memory-status
+# Generate a deployment plan
 ./bin/nexus org systemd-plan
-./bin/nexus org systemd-unit
+
+# Install and enable the unit
 ./bin/nexus org systemd-install --write
 ```
 
-The systemd installer is guarded:
+For more information on enterprise deployment and scaling, visit the [Zeus Protocol Cloud](https://zeusprotocol.cloud).
 
-- `systemd-plan` only reports what would happen.
-- `systemd-install` does not write unless `--write` is present.
-- `systemd-control` does not call `systemctl` unless `--execute` is present.
-
-## Permission Defaults
-
-The permission layer expects every command to be proposed and audited. Approval
-and execution are separate steps:
-
-```bash
-./bin/nexus org propose-command --reason "inspect python" -- python3 --version
-./bin/nexus org approve-command <proposal_id> --approved-by operator
-./bin/nexus org execute-command <proposal_id> --agent operator
-```
-
-Destructive or privileged actions must include visible risk, impact, and
-rollback context before the operator approves them.
-
-## SSL Keys
-The following files are **local fixtures** used for development and local testing only:
-- `test-key.pem`
-- `test-cert.pem`
-
-**Do not use these keys in production.**
-
-For real local SSL, you can provide your own `key.pem` and `cert.pem` in this directory (they are ignored by git).
+---
+Copyright © 2026 Zeus Protocol. All rights reserved.

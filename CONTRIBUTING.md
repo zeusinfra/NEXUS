@@ -1,162 +1,53 @@
 # Contributing to NEXUS
 
-Thanks for helping improve NEXUS. This project sits close to the operating
-system, so good contributions are clear, tested, and careful with local data,
-credentials, and privileged actions.
+Thank you for your interest in contributing to **NEXUS**, the cognitive operating layer by **Zeus Protocol**. We welcome contributions from the community that align with our mission of providing secure, local-first autonomous systems.
 
-## Before You Start
+By participating in this project, you agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md) and the professional standards of Zeus Protocol.
 
-- Read [README.md](README.md) for the architecture and setup.
-- Read [SECURITY.md](SECURITY.md) before touching auth, RootDaemon, command
-  policy, network access, filesystems, secrets, or integrations.
-- Follow the [Code of Conduct](CODE_OF_CONDUCT.md).
-- Keep real secrets out of commits. Use `.env` locally and update
-  `.env.example` only with safe placeholders.
+---
 
-## Development Setup
+## 🏛️ Professional Standards
 
-```bash
-git clone https://github.com/zeusinfra/NEXUS.git
-cd NEXUS
+At Zeus Protocol, we maintain high standards for code quality, documentation, and operational integrity. All contributions are expected to:
+*   Be **verifiable** and well-tested.
+*   Adhere to our **local-first security model**.
+*   Include appropriate **documentation** and comments.
+*   Follow the project's **architectural patterns** (e.g., separating planning from execution).
 
-./scripts/bootstrap.sh
-source .venv/bin/activate
-cp .env.example .env
-```
+---
 
-Install system dependencies when needed:
+## 🚀 Contribution Workflow
 
-```bash
-sudo apt update
-sudo apt install -y python3-dev libudev-dev build-essential
-```
+### 1. Preparation
+*   Review our [Technical Architecture] in the main README.
+*   Ensure your development environment meets the [System Requirements].
+*   Fork the repository and create a descriptive feature branch.
 
-Build Rust workspaces:
+### 2. Development Guidelines
+*   **Python**: Follow PEP 8 standards; use `ruff` for linting and formatting.
+*   **Rust**: Use `cargo fmt` and `cargo clippy`. Ensure all tests pass in the `core-rust` and `nexus-iced` crates.
+*   **Testing**: New features must include unit or integration tests. Run the full suite with `make test` and `make rust`.
 
-```bash
-cargo build --manifest-path core-rust/Cargo.toml
-cargo build --manifest-path watcher_rs/Cargo.toml
-cargo check --manifest-path nexus-iced/Cargo.toml
-```
+### 3. Submission (Pull Requests)
+*   Fill out the provided Pull Request template in detail.
+*   Ensure all CI/CD checks (GitHub Actions) pass.
+*   Reference any related issues or Strategic Goals from the Zeus Protocol roadmap.
 
-## Workflow
+---
 
-1. Create a branch from `main`.
-2. Use a descriptive branch name, such as `fix/root-daemon-audit-path` or
-   `feat/second-brain-sync`.
-3. Keep changes focused. Avoid unrelated refactors in the same pull request.
-4. Add or update tests for behavior changes.
-5. Update docs when behavior, setup, configuration, or security posture
-   changes.
-6. Run the relevant local checks before opening a pull request.
+## ⚖️ Contributor License Agreement (CLA)
 
-## Local Checks
+By contributing code to NEXUS, you grant Zeus Protocol a non-exclusive, irrevocable, worldwide, royalty-free license to use, modify, and distribute your contributions as part of the NEXUS project under the MIT License.
 
-Python:
+---
 
-```bash
-python -m ruff check .
-python -m ruff format --check .
-python -m pytest
-python -m pytest -q tests/unit/test_organization_daemon.py tests/unit/test_organization_security.py tests/unit/test_organization_memory.py tests/unit/test_organization_runtime.py tests/unit/test_organization_observer.py tests/unit/test_organization_health.py
-```
+## 🛠️ Community & Support
 
-Rust:
+*   **Discussions**: Use GitHub Discussions for high-level architectural proposals.
+*   **Issues**: Use GitHub Issues for bug reports and verified feature requests.
+*   **Website**: [zeusprotocol.cloud](https://zeusprotocol.cloud)
 
-```bash
-cd core-rust
-cargo fmt --all -- --check
-cargo clippy --all-targets -- -D warnings
-cargo test --all-targets
+For enterprise-level support or proprietary integrations, please contact the Zeus Protocol team at [solutions@zeusprotocol.cloud](mailto:solutions@zeusprotocol.cloud).
 
-cd ../watcher_rs
-cargo fmt --all -- --check
-cargo clippy --all-targets -- -D warnings
-cargo test --all-targets
-```
-
-Convenience targets:
-
-```bash
-make lint
-make test
-make rust
-make ci
-```
-
-## Pull Requests
-
-Open pull requests against `main`.
-
-Include:
-
-- What changed.
-- Why it changed.
-- How it was tested.
-- Any configuration or migration notes.
-- Screenshots or terminal output for UI and operator-surface changes.
-- Security impact, if any.
-
-Do not include:
-
-- Real API keys, tokens, private keys, cookies, database dumps, personal vaults,
-  or production logs.
-- Generated caches or large local artifacts.
-- Broad formatting churn outside the change area.
-
-## Security-Sensitive Changes
-
-Call out security-sensitive changes clearly in the pull request title or body.
-This includes changes to:
-
-- RootDaemon and privileged execution.
-- Command classification, allowlists, blocklists, and approval flows.
-- Authentication, tokens, secrets, CORS, host checks, or LAN exposure.
-- File path validation, backup/restore, vault sync, or external integrations.
-- CI security scanning, CodeQL, Gitleaks, Trivy, or Dependabot policy.
-
-Security-sensitive changes should include tests for both allowed and rejected
-paths where practical.
-
-## Organizational Runtime Changes
-
-Changes under `nexus_core/organization/`, `configs/nexus.toml`,
-`configs/permissions.toml`, `interfaces/`, or `nexus-iced/` can affect the
-operator-facing autonomy model.
-
-Preserve these invariants:
-
-- Do not claim execution without evidence.
-- Keep proposal, approval, execution, verification, and memory as separate
-  auditable steps.
-- Store runtime state under configured runtime/log/memory paths, not arbitrary
-  user locations.
-- Default systemd and service-management helpers to dry-run or reporting modes.
-- Keep GUI/TUI controls explicit about risk, impact, rollback, and failure.
-- Add tests when policy, approval, runtime, observer, health, or memory
-  behavior changes.
-
-## Coding Guidelines
-
-- Prefer existing project patterns over new abstractions.
-- Keep runtime defaults local-first and conservative.
-- Use structured parsing and APIs instead of ad hoc string manipulation when
-  possible.
-- Keep test fixtures isolated from developer runtime state.
-- Avoid `shell=True` for new execution paths unless there is a documented
-  policy reason and review coverage.
-- Add comments only where they clarify non-obvious behavior.
-
-## Documentation
-
-Update documentation when you change:
-
-- Setup steps or dependencies.
-- Launcher commands.
-- Environment variables.
-- Security behavior.
-- Integration behavior.
-- Test or CI expectations.
-
-Small docs improvements are welcome even when they are not tied to code
-changes.
+---
+Copyright © 2026 Zeus Protocol. All rights reserved.

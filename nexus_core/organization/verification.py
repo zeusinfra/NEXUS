@@ -6,6 +6,7 @@ from typing import Any
 
 from nexus_core.execution_protocol import ActionState
 from nexus_core.organization.memory import OrganizationalMemoryStore
+from nexus_core.sentry_observability import capture_message
 
 
 class VerificationEngine:
@@ -41,7 +42,7 @@ class VerificationEngine:
             if ok
             else result.get("summary") or "Execution did not pass verification."
         )
-        return self._record(
+        recorded = self._record(
             target_type="execution",
             target=str(result.get("proposal_id") or "unknown"),
             status=status,
@@ -49,6 +50,18 @@ class VerificationEngine:
             evidence=evidence,
             error=error,
         )
+        if status == "failed":
+            capture_message(
+                "Verification failed",
+                module="verification",
+                level="error",
+                tags={
+                    "command_id": command_id,
+                    "execution_status": result.get("status"),
+                },
+                context=recorded,
+            )
+        return recorded
 
     def fingerprint_file(self, path: str | Path) -> dict[str, Any]:
         target = Path(path).expanduser()

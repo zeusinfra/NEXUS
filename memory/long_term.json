@@ -75,6 +75,22 @@
         "value": "['melhoria de desempenho', 'estabilidade', 'eficiência de recursos', 'segurança de memória']",
         "updated": "2026-05-15"
       }
+    },
+    "NEXUS": {
+      "infrastructure": {
+        "orchestration": {
+          "value": "Swarm",
+          "updated": "2026-05-16"
+        },
+        "observability": {
+          "value": "Sentry",
+          "updated": "2026-05-16"
+        }
+      },
+      "architecture": {
+        "value": "specialized agent stages",
+        "updated": "2026-05-16"
+      }
     }
   },
   "relationships": {},

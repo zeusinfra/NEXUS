@@ -1,77 +1,44 @@
-# Code of Conduct
+# Code of Conduct — Zeus Protocol
 
-## Our Pledge
+## 🏛️ Our Commitment
 
-We pledge to make participation in the NEXUS community a respectful,
-harassment-free experience for everyone, regardless of age, body size,
-visible or invisible disability, ethnicity, sex characteristics, gender
-identity and expression, level of experience, education, socio-economic
-status, nationality, personal appearance, race, religion, or sexual identity
-and orientation.
+As the developers of **NEXUS**, the team at **Zeus Protocol** is committed to fostering a professional, inclusive, and collaborative environment for all participants. We believe that a high-integrity system requires a high-integrity community.
 
-We commit to acting in ways that support an open, welcoming, diverse,
-inclusive, and healthy technical community.
+This Code of Conduct outlines our expectations for participants and the consequences for unacceptable behavior.
 
-## Our Standards
+## 🤝 Professional Standards
 
-Examples of behavior that contributes to a positive environment include:
+We expect all contributors, maintainers, and community members to:
+*   **Be Respectful**: Treat everyone with professional courtesy.
+*   **Be Collaborative**: Share knowledge and help others grow within the NEXUS ecosystem.
+*   **Maintain Integrity**: Provide honest feedback and verifiable technical contributions.
+*   **Focus on the Mission**: Align actions with the advancement of local-first cognitive systems.
 
-- Using welcoming and inclusive language.
-- Respecting different viewpoints and experiences.
-- Giving and receiving constructive feedback with care.
-- Accepting responsibility, apologizing when needed, and learning from
-  mistakes.
-- Focusing on what is best for the project and its users.
-- Treating security, privacy, and safety concerns with seriousness.
+## 🚫 Unacceptable Behavior
 
-Examples of unacceptable behavior include:
+Unacceptable behaviors include, but are not limited to:
+*   Harassment, bullying, or discrimination of any kind.
+*   The use of sexualized language or imagery.
+*   Personal attacks or derogatory comments.
+*   Public or private harassment.
+*   Publishing others' private information without explicit permission (doxing).
+*   Any conduct that would be considered unprofessional in a high-stakes enterprise environment.
 
-- Sexualized language, imagery, attention, or advances.
-- Insults, harassment, threats, intimidation, or personal attacks.
-- Trolling, sustained disruption, or bad-faith argument.
-- Publishing private information without explicit permission.
-- Encouraging unsafe system actions, credential exposure, or privacy
-  violations.
-- Pressuring maintainers or operators to bypass NEXUS approval, audit, or
-  rollback safeguards for privileged or destructive commands.
-- Misrepresenting execution evidence, test results, security posture, or
-  operational state.
-- Any conduct that would reasonably be considered inappropriate in a
-  professional open-source setting.
+## ⚖️ Enforcement and Reporting
 
-## Scope
+Maintainers have the right and responsibility to remove, edit, or reject comments, commits, code, and other contributions that are not aligned with this Code of Conduct.
 
-This Code of Conduct applies in all project spaces, including GitHub issues,
-pull requests, discussions, reviews, community channels, documentation, and
-events where someone represents NEXUS or NEXUS Protocol.
+### Reporting an Incident
+If you witness or are subject to unacceptable behavior, please report it immediately to the Zeus Protocol Oversight Team at [conduct@zeusprotocol.cloud](mailto:conduct@zeusprotocol.cloud).
 
-## Enforcement
+### Consequences
+Participants asked to stop unacceptable behavior are expected to comply immediately. If a participant engages in unacceptable behavior, the maintainers may take any action they deem appropriate, including a formal warning, temporary ban, or permanent expulsion from the NEXUS project.
 
-Project maintainers are responsible for clarifying and enforcing these
-standards. Maintainers may remove comments, commits, code, issues, pull
-requests, or other contributions that violate this Code of Conduct.
+---
 
-Maintainers may also temporarily or permanently restrict participation for
-behavior they consider inappropriate, threatening, harmful, or disruptive.
+## 🌐 Scope
 
-## Reporting
+This Code of Conduct applies within all project spaces (GitHub repositories, discussions, issues) and in public spaces when an individual is representing the project or the **Zeus Protocol** brand.
 
-If you experience or witness unacceptable behavior, report it privately to the
-project maintainers. If the concern includes a security vulnerability, use the
-private reporting process in [SECURITY.md](SECURITY.md).
-
-Reports should include:
-
-- A short description of what happened.
-- Links or screenshots when available.
-- Any relevant usernames or context.
-- Whether immediate safety or privacy action is needed.
-
-Maintainers will review reports fairly and respectfully. Retaliation against a
-person who reports a concern or participates in an investigation is not
-tolerated.
-
-## Attribution
-
-This Code of Conduct is adapted from the Contributor Covenant, version 2.1:
-https://www.contributor-covenant.org/version/2/1/code_of_conduct/
+---
+Copyright © 2026 Zeus Protocol. All rights reserved.

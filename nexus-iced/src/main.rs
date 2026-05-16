@@ -76,6 +76,8 @@ struct OrgDashboard {
     runtime_events: Vec<RuntimeEvent>,
     verifications: Vec<VerificationItem>,
     org_events: Vec<OrgEvent>,
+    swarm: Option<SwarmStatus>,
+    incidents: Vec<IncidentItem>,
     updated_at: Option<String>,
     error: Option<String>,
 }
@@ -107,7 +109,7 @@ struct OrgMemoryStatus {
 
 #[derive(Clone, Debug, Deserialize)]
 struct AgentTick {
-    #[serde(alias = "agent_role", alias = "id")]
+    #[serde(alias = "agent_role")]
     agent_id: String,
     status: String,
     summary: String,
@@ -162,6 +164,81 @@ struct OrgEvent {
     payload: serde_json::Value,
 }
 
+#[allow(dead_code)]
+#[derive(Clone, Debug, Deserialize)]
+struct SwarmStatus {
+    current_goal: Option<String>,
+    #[serde(default)]
+    plan: Vec<SwarmPlanItem>,
+    #[serde(default)]
+    agents: Vec<SwarmAgent>,
+    #[serde(default)]
+    tasks: Vec<SwarmTask>,
+    #[serde(default)]
+    blockers: Vec<String>,
+    #[serde(default)]
+    errors: Vec<String>,
+    #[serde(default)]
+    evidence: Vec<serde_json::Value>,
+    #[serde(default)]
+    memory: std::collections::HashMap<String, i64>,
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Debug, Deserialize)]
+struct SwarmPlanItem {
+    #[serde(alias = "owner")]
+    role: String,
+    #[serde(alias = "title")]
+    task: String,
+    status: String,
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Debug, Deserialize)]
+struct SwarmAgent {
+    agent_id: String,
+    role: String,
+    status: String,
+    current_task: Option<String>,
+    confidence: f32,
+    risk_level: String,
+    last_heartbeat: String,
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Debug, Deserialize)]
+struct SwarmTask {
+    id: String,
+    title: String,
+    owner: String,
+    status: String,
+    created_at: String,
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Debug, Deserialize)]
+struct IncidentItem {
+    severity: String,
+    module: String,
+    message: String,
+    created_at: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct OrgDashboardPayload {
+    health: OrgHealth,
+    memory_status: OrgMemoryStatus,
+    agent_ticks: Vec<AgentTick>,
+    approvals: Vec<ApprovalItem>,
+    approved_commands: Vec<ApprovalItem>,
+    runtime_events: Vec<RuntimeEvent>,
+    verifications: Vec<VerificationItem>,
+    org_events: Vec<OrgEvent>,
+    swarm: Option<SwarmStatus>,
+    incidents: Vec<IncidentItem>,
+}
+
 #[derive(Debug, Clone)]
 enum Message {
     InputChanged(String),
@@ -180,6 +257,17 @@ enum Message {
 
 const SCROLLABLE_ID: &str = "chat_scroll";
 const HEALTH_CHECK_INTERVAL: u32 = 5;
+const BG: Color = Color::from_rgb(0.035, 0.043, 0.055);
+const SURFACE: Color = Color::from_rgb(0.07, 0.085, 0.105);
+const SURFACE_HIGH: Color = Color::from_rgb(0.095, 0.115, 0.14);
+const STROKE: Color = Color::from_rgb(0.19, 0.23, 0.28);
+const TEXT_PRIMARY: Color = Color::from_rgb(0.91, 0.94, 0.96);
+const TEXT_SECONDARY: Color = Color::from_rgb(0.58, 0.65, 0.72);
+const TEXT_MUTED: Color = Color::from_rgb(0.38, 0.45, 0.52);
+const ACCENT: Color = Color::from_rgb(0.28, 0.68, 0.96);
+const SUCCESS: Color = Color::from_rgb(0.36, 0.86, 0.62);
+const WARNING: Color = Color::from_rgb(0.96, 0.72, 0.28);
+const DANGER: Color = Color::from_rgb(0.96, 0.32, 0.38);
 
 impl Application for NexusApp {
     type Executor = iced::executor::Default;
@@ -490,255 +578,104 @@ impl Application for NexusApp {
         );
 
         let is_online = self.status == "ONLINE";
-        let status_color = if is_online {
-            Color::from_rgb8(0, 255, 136)
-        } else {
-            Color::from_rgb8(255, 60, 80)
-        };
-
-        let mut hud_row = Row::new()
-            .spacing(28)
-            .align_items(Alignment::Center)
-            .push(
-                Column::new()
-                    .push(
-                        text("NEXUS CORE")
-                            .size(16)
-                            .style(Color::from_rgb8(220, 230, 238)),
-                    )
-                    .push(
-                        text(&uptime_str)
-                            .size(11)
-                            .style(Color::from_rgb8(132, 145, 160)),
-                    ),
-            )
-            .push(telemetry_item(
-                "CPU",
-                format!("{:.1}%", self.cpu_usage),
-                self.cpu_usage > 80.0,
-            ))
-            .push(telemetry_item(
-                "RAM",
-                format!("{:.1}%", self.ram_usage),
-                self.ram_usage > 85.0,
-            ))
-            .push(
-                Column::new()
-                    .push(
-                        text("SYNAPSE STATUS")
-                            .size(10)
-                            .style(Color::from_rgb8(100, 100, 120)),
-                    )
-                    .push(
-                        Row::new()
-                            .spacing(6)
-                            .align_items(Alignment::Center)
-                            .push(
-                                container(iced::widget::Space::with_width(8))
-                                    .width(8)
-                                    .height(8)
-                                    .style(if is_online {
-                                        success_dot_style
-                                    } else {
-                                        error_dot_style
-                                    }),
-                            )
-                            .push(text(&self.status).size(16).style(status_color)),
-                    ),
-            )
-            .push(
-                Column::new()
-                    .push(
-                        text("ESTADO ATUAL")
-                            .size(10)
-                            .style(Color::from_rgb8(100, 100, 120)),
-                    )
-                    .push(
-                        text(&self.current_stage)
-                            .size(15)
-                            .style(Color::from_rgb8(230, 236, 242)),
-                    ),
-            )
-            .push(
-                Column::new()
-                    .push(
-                        text("LATENCIA")
-                            .size(10)
-                            .style(Color::from_rgb8(100, 100, 120)),
-                    )
-                    .push(
-                        text(
-                            self.last_latency_ms
-                                .map(|ms| format!("{}ms", ms))
-                                .unwrap_or_else(|| "---".into()),
-                        )
-                        .size(16)
-                        .style(Color::from_rgb8(112, 224, 180)),
-                    ),
-            );
-
-        if self.is_playing_audio {
-            hud_row = hud_row.push(
-                text("VOZ ATIVA")
-                    .size(12)
-                    .style(Color::from_rgb8(255, 200, 50)),
-            );
-        }
-
-        let hud_top = container(hud_row.padding([18, 22]))
-            .width(Length::Fill)
-            .style(hud_top_style);
-
-        let mut messages_column =
-            self.messages
-                .iter()
-                .fold(Column::new().spacing(18).padding(24), |col, msg| {
-                    let is_nexus = msg.role == "NEXUS";
-                    let is_error = msg.role == "CORE_ERROR";
-                    let align = if is_nexus {
-                        Alignment::Start
-                    } else {
-                        Alignment::End
-                    };
-                    let bubble_style = if is_nexus {
-                        nexus_bubble_modern
-                    } else if is_error {
-                        error_bubble_modern
-                    } else {
-                        operator_bubble_modern
-                    };
-                    let role_color = if is_nexus {
-                        Color::from_rgb8(0, 240, 255)
-                    } else if is_error {
-                        Color::from_rgb8(255, 60, 80)
-                    } else {
-                        Color::from_rgb8(255, 200, 50)
-                    };
-
-                    col.push(
-                        Column::new()
-                            .spacing(8)
-                            .align_items(align)
-                            .push(
-                                Row::new()
-                                    .spacing(10)
-                                    .push(text(&msg.role).size(11).style(role_color))
-                                    .push(
-                                        text(&msg.timestamp)
-                                            .size(10)
-                                            .style(Color::from_rgb8(60, 60, 80)),
-                                    ),
-                            )
-                            .push(
-                                container(text(&msg.content).size(15))
-                                    .padding([14, 18])
-                                    .max_width(700.0)
-                                    .style(bubble_style),
-                            ),
-                    )
-                });
-
-        if self.is_thinking {
-            let elapsed = self
-                .pending_since
-                .map(|start| format!("{}s", start.elapsed().as_secs()))
-                .unwrap_or_else(|| "0s".to_string());
-            messages_column = messages_column.push(
-                Column::new()
-                    .spacing(8)
-                    .align_items(Alignment::Start)
-                    .push(
-                        Row::new()
-                            .spacing(10)
-                            .push(text("NEXUS").size(11).style(Color::from_rgb8(0, 240, 255)))
-                            .push(
-                                text(format!("processando ha {}", elapsed))
-                                    .size(10)
-                                    .style(Color::from_rgb8(132, 145, 160)),
-                            ),
-                    )
-                    .push(
-                        container(text(self.processing_stage()).size(15))
-                            .padding([14, 18])
-                            .max_width(700.0)
-                            .style(progress_bubble_modern),
-                    ),
-            );
-        }
-
-        let chat_scroll = scrollable(messages_column)
-            .id(scrollable::Id::new(SCROLLABLE_ID))
-            .height(Length::Fill)
-            .width(Length::Fill);
-
-        let dots = match self.tick_counter % 4 {
-            0 => ".  ",
-            1 => ".. ",
-            2 => "...",
-            _ => "   ",
-        };
-        let input_placeholder = if self.is_thinking {
-            format!("NEURAL PROCESSING IN PROGRESS{}", dots)
-        } else {
-            "TRANSMIT DIRECTIVE TO CORE...".into()
-        };
-
-        let input_field = text_input(&input_placeholder, &self.input_value)
-            .on_input(Message::InputChanged)
-            .on_submit(Message::Submit)
-            .padding(15)
-            .size(16);
-
-        let mut transmit_btn = button(
-            container(
-                text(if self.is_thinking {
-                    "AGUARDE"
-                } else {
-                    "ENVIAR"
-                })
-                .size(14)
-                .style(Color::WHITE),
-            )
-            .padding([12, 24])
-            .style(transmit_btn_style),
-        );
-        if !self.is_thinking {
-            transmit_btn = transmit_btn.on_press(Message::Submit);
-        }
-
-        let bottom_bar = container(
+        let status_pill = container(
             Row::new()
-                .spacing(14)
+                .spacing(8)
+                .align_items(Alignment::Center)
+                .push(container(Space::new(8, 8)).style(if is_online { success_dot_style } else { danger_dot_style }))
+                .push(text(&self.status).size(12).style(TEXT_PRIMARY)),
+        )
+        .padding([4, 12])
+        .style(status_pill_style);
+
+        let header = container(
+            Row::new()
+                .spacing(24)
                 .align_items(Alignment::Center)
                 .push(
-                    container(input_field)
-                        .width(Length::Fill)
-                        .style(input_field_style),
+                    Column::new()
+                        .push(text("NEXUS").size(24).style(TEXT_PRIMARY))
+                        .push(
+                            text(format!("NEURAL COMMAND HUD · {}", uptime_str))
+                                .size(10)
+                                .style(TEXT_MUTED),
+                        ),
                 )
-                .push(transmit_btn)
-                .padding(18),
+                .push(Space::with_width(Length::Fill))
+                .push(telemetry_item(
+                    "CPU",
+                    format!("{:.1}%", self.cpu_usage),
+                    self.cpu_usage > 80.0,
+                ))
+                .push(telemetry_item(
+                    "RAM",
+                    format!("{:.1}%", self.ram_usage),
+                    self.ram_usage > 85.0,
+                ))
+                .push(status_pill),
         )
-        .width(Length::Fill)
-        .style(bottom_bar_style);
-
-        let activity_panel = self.activity_panel();
-        let left_pane = Column::new()
-            .push(self.operations_console())
-            .push(chat_scroll)
-            .height(Length::Fill)
-            .width(Length::Fill);
+        .padding([16, 32])
+        .style(header_style);
 
         let body = Row::new()
-            .push(left_pane)
-            .push(activity_panel)
-            .height(Length::Fill);
+            .push(
+                container(self.chat_panel())
+                    .width(Length::FillPortion(2))
+                    .style(panel_style),
+            )
+            .push(
+                container(self.swarm_dashboard())
+                    .width(Length::FillPortion(3))
+                    .style(panel_center_style),
+            )
+            .push(
+                container(self.ops_panel())
+                    .width(Length::FillPortion(2))
+                    .style(panel_style),
+            );
 
-        Column::new()
-            .push(hud_top)
-            .push(Rule::horizontal(1))
-            .push(body)
-            .push(bottom_bar)
-            .into()
+        let footer = container(
+            Row::new()
+                .spacing(16)
+                .align_items(Alignment::Center)
+                .push(
+                    text("DIRECTIVE:")
+                        .size(12)
+                        .style(ACCENT)
+                        .width(80),
+                )
+                .push(
+                    text_input("TRANSMIT DIRECTIVE TO CORE...", &self.input_value)
+                        .on_input(Message::InputChanged)
+                        .on_submit(Message::Submit)
+                        .padding(12)
+                )
+                .push(
+                    {
+                        let mut btn = button(text("TRANSMIT").size(14))
+                            .padding([10, 24]);
+                        if !self.is_thinking {
+                            btn = btn.on_press(Message::Submit);
+                        }
+                        btn
+                    }
+                ),
+        )
+        .padding([20, 32])
+        .style(footer_style);
+
+        container(
+            Column::new()
+                .push(header)
+                .push(Rule::horizontal(1).style(rule_style))
+                .push(body.height(Length::Fill))
+                .push(Rule::horizontal(1).style(rule_style))
+                .push(footer),
+        )
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .style(app_shell_style)
+        .into()
     }
 
     fn theme(&self) -> Theme {
@@ -747,6 +684,160 @@ impl Application for NexusApp {
 }
 
 impl NexusApp {
+    fn chat_panel(&self) -> Element<'_, Message> {
+        let mut chat_col = Column::new()
+            .spacing(16)
+            .padding(24);
+
+        for msg in &self.messages {
+            let is_nexus = msg.role == "NEXUS";
+            
+            chat_col = chat_col.push(
+                Column::new()
+                    .spacing(4)
+                    .push(text(&msg.role).size(10).style(TEXT_MUTED))
+                    .push(
+                        container(text(&msg.content).size(14).style(TEXT_PRIMARY))
+                            .padding(14)
+                            .width(Length::Fill)
+                            .style(if is_nexus { chat_msg_nexus_style } else { chat_msg_user_style })
+                    )
+            );
+        }
+
+        if self.is_thinking {
+            chat_col = chat_col.push(
+                text(self.processing_stage())
+                    .size(12)
+                    .style(ACCENT)
+            );
+        }
+
+        scrollable(chat_col)
+            .id(scrollable::Id::new(SCROLLABLE_ID))
+            .height(Length::Fill)
+            .into()
+    }
+
+    fn swarm_dashboard(&self) -> Element<'_, Message> {
+        let mut agents_grid = Row::new().spacing(16);
+        
+        if let Some(swarm) = &self.org.swarm {
+            let mut col1 = Column::new().spacing(16).width(Length::Fill);
+            let mut col2 = Column::new().spacing(16).width(Length::Fill);
+            
+            for (i, agent) in swarm.agents.iter().enumerate() {
+                let card = self.agent_card(agent);
+                if i % 2 == 0 {
+                    col1 = col1.push(card);
+                } else {
+                    col2 = col2.push(card);
+                }
+            }
+            agents_grid = agents_grid.push(col1).push(col2);
+        } else {
+            agents_grid = agents_grid.push(text("Aguardando conexao com o Swarm...").style(TEXT_MUTED));
+        }
+
+        Column::new()
+            .spacing(24)
+            .padding(24)
+            .push(text("SWARM ORCHESTRATION").size(14).style(TEXT_PRIMARY))
+            .push(scrollable(agents_grid).height(Length::Fill))
+            .into()
+    }
+
+    fn agent_card(&self, agent: &SwarmAgent) -> Element<'_, Message> {
+        let status_color = match agent.status.as_str() {
+            "assigned" | "running" => SUCCESS,
+            "idle" => TEXT_MUTED,
+            _ => ACCENT,
+        };
+
+        container(
+            Column::new()
+                .spacing(10)
+                .push(
+                    Row::new()
+                        .spacing(12)
+                        .align_items(Alignment::Center)
+                        .push(text(&agent.role.to_uppercase()).size(12).style(ACCENT))
+                        .push(Space::with_width(Length::Fill))
+                        .push(
+                            container(text(&agent.status).size(9).style(status_color))
+                                .padding([2, 8])
+                                .style(status_pill_style)
+                        )
+                )
+                .push(
+                    text(agent.current_task.as_deref().unwrap_or("Waiting for assignment..."))
+                        .size(11)
+                        .style(TEXT_PRIMARY)
+                )
+                .push(
+                    Row::new()
+                        .spacing(8)
+                        .align_items(Alignment::Center)
+                        .push(text(format!("{:.0}%", agent.confidence * 100.0)).size(10).style(TEXT_MUTED))
+                        .push(container(Space::with_width(Length::Fill).height(2)).style(confidence_bar_style))
+                )
+        )
+        .padding(16)
+        .style(agent_card_style)
+        .into()
+    }
+
+    fn ops_panel(&self) -> Element<'_, Message> {
+        let mut plan_col = Column::new().spacing(10);
+        if let Some(swarm) = &self.org.swarm {
+            for item in swarm.plan.iter().take(6) {
+                plan_col = plan_col.push(
+                    Row::new()
+                        .spacing(10)
+                        .push(text(&item.role).size(10).width(60).style(ACCENT))
+                        .push(text(&item.task).size(10).width(Length::Fill).style(TEXT_PRIMARY))
+                );
+            }
+        }
+
+        let mut incident_col = Column::new().spacing(8);
+        for inc in self.org.incidents.iter().take(3) {
+            incident_col = incident_col.push(
+                text(format!("[{}] {}", inc.severity, inc.message))
+                    .size(10)
+                    .style(DANGER)
+            );
+        }
+
+        scrollable(
+            Column::new()
+                .spacing(24)
+                .padding(24)
+                .push(text("STRATEGY PLAN").size(12).style(TEXT_SECONDARY))
+                .push(plan_col)
+                .push(Rule::horizontal(1).style(rule_style))
+                .push(text("INCIDENTS").size(12).style(DANGER))
+                .push(incident_col)
+                .push(Rule::horizontal(1).style(rule_style))
+                .push(self.activity_panel_compact())
+        )
+        .height(Length::Fill)
+        .into()
+    }
+
+    fn activity_panel_compact(&self) -> Element<'_, Message> {
+        let mut col = Column::new().spacing(8);
+        col = col.push(text("ACTIVITY LOG").size(12).style(TEXT_SECONDARY));
+        for item in self.visible_activity().iter().rev().take(5) {
+            col = col.push(
+                text(format!("{} {}", trim_text(&item.timestamp, 8), item.label))
+                    .size(10)
+                    .style(TEXT_MUTED)
+            );
+        }
+        col.into()
+    }
+
     fn push_activity(&mut self, label: &str, detail: &str, level: ActivityLevel) {
         self.activity.push(ActivityItem {
             label: label.to_string(),
@@ -754,8 +845,8 @@ impl NexusApp {
             timestamp: current_time(),
             level,
         });
-        if self.activity.len() > 8 {
-            let drain_count = self.activity.len() - 8;
+        if self.activity.len() > 12 {
+            let drain_count = self.activity.len() - 12;
             self.activity.drain(0..drain_count);
         }
     }
@@ -773,432 +864,22 @@ impl NexusApp {
         }
     }
 
-    fn operations_console(&self) -> Element<'_, Message> {
-        let health_status = self
-            .org
-            .health
-            .as_ref()
-            .map(|health| health.status.clone())
-            .unwrap_or_else(|| "sem leitura".to_string());
-        let health_mode = self
-            .org
-            .health
-            .as_ref()
-            .map(|health| health.mode.clone())
-            .unwrap_or_else(|| "---".to_string());
-        let last_runtime = self
-            .org
-            .runtime_events
-            .first()
-            .map(|event| {
-                let command = event
-                    .command_id
-                    .as_deref()
-                    .map(short_id)
-                    .unwrap_or_else(|| "sem comando".to_string());
-                format!(
-                    "{} {} {}",
-                    command,
-                    event.event_type,
-                    trim_text(&event.created_at, 19)
-                )
-            })
-            .unwrap_or_else(|| "nenhuma execucao registrada".to_string());
-        let last_verification = self
-            .org
-            .verifications
-            .first()
-            .map(|verification| {
-                let passed = verification
-                    .passed
-                    .unwrap_or_else(|| verification.status.eq_ignore_ascii_case("passed"));
-                format!(
-                    "{} {} {}",
-                    trim_text(&verification.target, 18),
-                    verification.status,
-                    if passed { "validado" } else { "falhou" }
-                )
-            })
-            .unwrap_or_else(|| "nenhuma verificacao registrada".to_string());
-
-        let mut log_column = Column::new().spacing(6).push(
-            text("LOG ORGANIZACIONAL")
-                .size(11)
-                .style(Color::from_rgb8(170, 185, 200)),
-        );
-        for event in self.org.org_events.iter().take(4) {
-            log_column = log_column.push(
-                text(format!(
-                    "{} {} {}",
-                    trim_text(&event.created_at, 19),
-                    event.event_type,
-                    compact_json(&event.payload, 52)
-                ))
-                .size(11)
-                .style(Color::from_rgb8(150, 165, 180)),
-            );
-        }
-        if self.org.org_events.is_empty() {
-            log_column = log_column.push(
-                text("Nenhum evento organizacional carregado.")
-                    .size(11)
-                    .style(Color::from_rgb8(150, 165, 180)),
-            );
-        }
-
-        let console = Column::new()
-            .spacing(12)
-            .push(
-                Row::new()
-                    .spacing(14)
-                    .align_items(Alignment::Center)
-                    .push(
-                        text("CENTRO OPERACIONAL")
-                            .size(13)
-                            .style(Color::from_rgb8(230, 236, 242)),
-                    )
-                    .push(Space::with_width(Length::Fill))
-                    .push(
-                        text(
-                            self.org
-                                .updated_at
-                                .as_ref()
-                                .map(|value| format!("refresh {}", value))
-                                .unwrap_or_else(|| "aguardando refresh".to_string()),
-                        )
-                        .size(10)
-                        .style(Color::from_rgb8(92, 105, 120)),
-                    ),
-            )
-            .push(
-                Row::new()
-                    .spacing(18)
-                    .align_items(Alignment::Start)
-                    .push(ops_metric("Daemon", health_status, false))
-                    .push(ops_metric("Modo", health_mode, false))
-                    .push(ops_metric(
-                        "Aprovacoes",
-                        self.org.approvals.len().to_string(),
-                        !self.org.approvals.is_empty(),
-                    ))
-                    .push(ops_metric("Runtime", trim_text(&last_runtime, 42), false))
-                    .push(ops_metric(
-                        "Verificacao",
-                        trim_text(&last_verification, 42),
-                        false,
-                    )),
-            )
-            .push(log_column);
-
-        container(console)
-            .padding([14, 18])
-            .width(Length::Fill)
-            .style(ops_console_style)
-            .into()
-    }
-
-    fn activity_panel(&self) -> Element<'_, Message> {
-        let last_latency = self
-            .last_latency_ms
-            .map(|ms| format!("{}ms", ms))
-            .unwrap_or_else(|| "sem dado".to_string());
-        let pending = self
+    fn visible_activity(&self) -> Vec<ActivityItem> {
+        let mut items = self.activity.clone();
+        if self
             .pending_since
-            .map(|start| format!("{}s", start.elapsed().as_secs()))
-            .unwrap_or_else(|| "nenhum".to_string());
-
-        let visible_activity = self.visible_activity();
-        let mut activity_col = Column::new().spacing(12).push(
-            text("TRILHA DE ATIVIDADE")
-                .size(12)
-                .style(Color::from_rgb8(170, 185, 200)),
-        );
-
-        for item in visible_activity.iter().rev() {
-            let dot_style = match item.level {
-                ActivityLevel::Info => info_activity_dot_style,
-                ActivityLevel::Success => success_activity_dot_style,
-                ActivityLevel::Warning => warning_activity_dot_style,
-                ActivityLevel::Error => error_activity_dot_style,
-            };
-            activity_col = activity_col.push(
-                container(
-                    Column::new()
-                        .spacing(4)
-                        .push(
-                            Row::new()
-                                .spacing(8)
-                                .align_items(Alignment::Center)
-                                .push(
-                                    container(Space::with_width(7))
-                                        .width(7)
-                                        .height(7)
-                                        .style(dot_style),
-                                )
-                                .push(
-                                    text(&item.label)
-                                        .size(13)
-                                        .style(Color::from_rgb8(230, 236, 242)),
-                                )
-                                .push(
-                                    text(&item.timestamp)
-                                        .size(10)
-                                        .style(Color::from_rgb8(92, 105, 120)),
-                                ),
-                        )
-                        .push(
-                            text(&item.detail)
-                                .size(12)
-                                .style(Color::from_rgb8(150, 165, 180)),
-                        ),
-                )
-                .padding(10)
-                .width(Length::Fill)
-                .style(activity_item_style),
-            );
+            .map(|start| start.elapsed().as_secs() > 15)
+            .unwrap_or(false)
+        {
+            items.push(ActivityItem {
+                label: "Atraso percebido".to_string(),
+                detail: "A requisicao ainda nao voltou. O estado continua pendente, nao concluido."
+                    .to_string(),
+                timestamp: current_time(),
+                level: ActivityLevel::Warning,
+            });
         }
-
-        let status_card = container(
-            Column::new()
-                .spacing(10)
-                .push(text("CONTRATO DE EXECUCAO").size(12).style(Color::from_rgb8(170, 185, 200)))
-                .push(text("O Nexus nao deve marcar acao como feita sem confirmacao do backend/ledger. Pendencias e falhas ficam visiveis aqui.").size(12).style(Color::from_rgb8(150, 165, 180)))
-                .push(Rule::horizontal(1))
-                .push(metric_row("Pendente", pending))
-                .push(metric_row("Ultima latencia", last_latency))
-        )
-        .padding(14)
-        .width(Length::Fill)
-        .style(side_card_style);
-
-        container(
-            Column::new()
-                .spacing(16)
-                .push(status_card)
-                .push(self.org_panel())
-                .push(activity_col),
-        )
-        .padding([18, 18])
-        .width(310)
-        .height(Length::Fill)
-        .style(side_panel_style)
-        .into()
-    }
-
-    fn org_panel(&self) -> Element<'_, Message> {
-        let mut panel = Column::new().spacing(10).push(
-            text("EMPRESA NEXUS")
-                .size(12)
-                .style(Color::from_rgb8(170, 185, 200)),
-        );
-
-        if let Some(error) = &self.org.error {
-            panel = panel.push(
-                text(format!("Estado indisponivel: {}", error))
-                    .size(12)
-                    .style(Color::from_rgb8(255, 200, 90)),
-            );
-        }
-
-        if let Some(health) = &self.org.health {
-            let heartbeat = health
-                .heartbeat_age_seconds
-                .map(|age| format!("{:.0}s", age))
-                .unwrap_or_else(|| "sem heartbeat".to_string());
-            panel = panel
-                .push(metric_row("Daemon", health.status.clone()))
-                .push(metric_row("Modo", health.mode.clone()))
-                .push(metric_row("Agentes", health.agents_registered.to_string()))
-                .push(metric_row("Tarefas", health.tasks_total.to_string()))
-                .push(metric_row("Heartbeat", heartbeat))
-                .push(
-                    text(&health.detail)
-                        .size(11)
-                        .style(Color::from_rgb8(150, 165, 180)),
-                );
-        } else {
-            panel = panel.push(
-                text("Aguardando leitura do daemon organizacional.")
-                    .size(12)
-                    .style(Color::from_rgb8(150, 165, 180)),
-            );
-        }
-
-        if let Some(memory) = &self.org.memory {
-            panel = panel
-                .push(Rule::horizontal(1))
-                .push(metric_row("Memoria", format!("{} eventos", memory.events)))
-                .push(metric_row("Decisoes", memory.decisions.to_string()))
-                .push(metric_row("Tasks", memory.tasks.to_string()))
-                .push(metric_row("Summaries", memory.summaries.to_string()))
-                .push(metric_row(
-                    "Execucoes",
-                    format!("{}/{}", memory.runtime_events, memory.verifications),
-                ))
-                .push(metric_row("Observer", memory.observations.to_string()))
-                .push(metric_row("Ticks", memory.agent_ticks.to_string()));
-        }
-
-        panel = panel.push(Rule::horizontal(1)).push(metric_row(
-            "Aprovacoes",
-            self.org.approvals.len().to_string(),
-        ));
-        for approval in self.org.approvals.iter().take(2) {
-            let proposal_id = approval_proposal_id(approval);
-            panel = panel.push(
-                Row::new()
-                    .spacing(8)
-                    .align_items(Alignment::Center)
-                    .push(
-                        Column::new()
-                            .spacing(2)
-                            .width(Length::Fill)
-                            .push(
-                                text(format!(
-                                    "{} [{}] {}",
-                                    short_id(&proposal_id),
-                                    format!("{}/{}", approval.risk, approval.status),
-                                    trim_text(&approval.command, 30)
-                                ))
-                                .size(11)
-                                .style(Color::from_rgb8(255, 200, 90)),
-                            )
-                            .push(
-                                text(approval_impact_line(approval))
-                                    .size(10)
-                                    .style(Color::from_rgb8(150, 165, 180)),
-                            ),
-                    )
-                    .push(
-                        button(text("ver").size(11))
-                            .on_press(Message::SelectPendingApproval(proposal_id)),
-                    ),
-            );
-        }
-
-        if let Some(selected) = self.selected_pending_approval() {
-            panel = panel.push(self.approval_detail_card(
-                "PENDENTE SELECIONADO",
-                selected,
-                Some(Message::ApproveSelected),
-                "aprovar uma vez",
-            ));
-        }
-
-        if !self.org.approved_commands.is_empty() {
-            panel = panel.push(Rule::horizontal(1)).push(metric_row(
-                "Executaveis",
-                self.org.approved_commands.len().to_string(),
-            ));
-            for approval in self.org.approved_commands.iter().take(2) {
-                let proposal_id = approval_proposal_id(approval);
-                panel = panel.push(
-                    Row::new()
-                        .spacing(8)
-                        .align_items(Alignment::Center)
-                        .push(
-                            text(format!(
-                                "{} {}",
-                                short_id(&proposal_id),
-                                trim_text(&approval.command, 34)
-                            ))
-                            .size(11)
-                            .style(Color::from_rgb8(112, 224, 180))
-                            .width(Length::Fill),
-                        )
-                        .push(
-                            button(text("ver").size(11))
-                                .on_press(Message::SelectApprovedCommand(proposal_id)),
-                        ),
-                );
-            }
-        }
-
-        if let Some(selected) = self.selected_approved_command() {
-            panel = panel.push(self.approval_detail_card(
-                "APROVADO SELECIONADO",
-                selected,
-                Some(Message::ExecuteSelected),
-                "executar",
-            ));
-        }
-
-        if !self.org.agent_ticks.is_empty() {
-            panel = panel.push(Rule::horizontal(1)).push(
-                text("AGENTES ATIVOS")
-                    .size(11)
-                    .style(Color::from_rgb8(170, 185, 200)),
-            );
-            for tick in self.org.agent_ticks.iter().take(4) {
-                panel = panel.push(
-                    text(format!(
-                        "{}: {} - {} ({})",
-                        tick.agent_id,
-                        tick.status,
-                        trim_text(&tick.summary, 32),
-                        tick.created_at
-                    ))
-                    .size(11)
-                    .style(Color::from_rgb8(150, 165, 180)),
-                );
-            }
-        }
-
-        if let Some(event) = self.org.runtime_events.first() {
-            let command = event
-                .command_id
-                .as_deref()
-                .map(short_id)
-                .unwrap_or_else(|| "sem comando".to_string());
-            panel = panel.push(Rule::horizontal(1)).push(
-                text(format!(
-                    "Runtime {}: {} - {} ({})",
-                    command,
-                    event.event_type,
-                    trim_text(&event.message, 42),
-                    event.created_at
-                ))
-                .size(11)
-                .style(Color::from_rgb8(150, 165, 180)),
-            );
-        }
-
-        if let Some(verification) = self.org.verifications.first() {
-            let passed = verification
-                .passed
-                .unwrap_or_else(|| verification.status.eq_ignore_ascii_case("passed"));
-            let color = if passed {
-                Color::from_rgb8(112, 224, 180)
-            } else {
-                Color::from_rgb8(255, 95, 110)
-            };
-            panel = panel.push(
-                text(format!(
-                    "Verify {}: {} {} - {} ({})",
-                    verification.target,
-                    verification.status,
-                    if passed { "ok" } else { "falhou" },
-                    trim_text(&verification_evidence_line(verification), 32),
-                    verification.created_at
-                ))
-                .size(11)
-                .style(color),
-            );
-        }
-
-        if let Some(updated_at) = &self.org.updated_at {
-            panel = panel.push(
-                text(format!("Atualizado {}", updated_at))
-                    .size(10)
-                    .style(Color::from_rgb8(92, 105, 120)),
-            );
-        }
-
-        container(panel)
-            .padding(14)
-            .width(Length::Fill)
-            .style(side_card_style)
-            .into()
+        items
     }
 
     fn selected_pending_approval(&self) -> Option<&ApprovalItem> {
@@ -1283,56 +964,40 @@ impl NexusApp {
             .style(activity_item_style)
             .into()
     }
-
-    fn visible_activity(&self) -> Vec<ActivityItem> {
-        let mut items = self.activity.clone();
-        if self
-            .pending_since
-            .map(|start| start.elapsed().as_secs() > 15)
-            .unwrap_or(false)
-        {
-            items.push(ActivityItem {
-                label: "Atraso percebido".to_string(),
-                detail: "A requisicao ainda nao voltou. O estado continua pendente, nao concluido."
-                    .to_string(),
-                timestamp: current_time(),
-                level: ActivityLevel::Warning,
-            });
-        }
-        items
-    }
 }
 
 fn metric_row<'a>(label: &'static str, value: String) -> Row<'a, Message> {
     Row::new()
         .align_items(Alignment::Center)
-        .push(text(label).size(12).style(Color::from_rgb8(132, 145, 160)))
+        .push(text(label).size(12).style(TEXT_SECONDARY))
         .push(Space::with_width(Length::Fill))
-        .push(text(value).size(12).style(Color::from_rgb8(230, 236, 242)))
+        .push(text(value).size(12).style(TEXT_PRIMARY))
 }
 
 fn ops_metric<'a>(label: &'static str, value: String, alert: bool) -> Column<'a, Message> {
-    let value_color = if alert {
-        Color::from_rgb8(255, 200, 90)
-    } else {
-        Color::from_rgb8(230, 236, 242)
-    };
+    let value_color = if alert { WARNING } else { TEXT_PRIMARY };
     Column::new()
         .spacing(3)
         .width(Length::FillPortion(1))
-        .push(text(label).size(10).style(Color::from_rgb8(132, 145, 160)))
-        .push(text(value).size(12).style(value_color))
+        .push(text(label).size(10).style(TEXT_MUTED))
+        .push(
+            container(text(value).size(12).style(value_color))
+                .padding([8, 10])
+                .width(Length::Fill)
+                .style(metric_card_style),
+        )
 }
 
 fn telemetry_item<'a>(label: &'static str, val: String, alert: bool) -> Column<'a, Message> {
-    let val_color = if alert {
-        Color::from_rgb8(255, 60, 80)
-    } else {
-        Color::from_rgb8(255, 255, 255)
-    };
+    let val_color = if alert { DANGER } else { TEXT_PRIMARY };
     Column::new()
-        .push(text(label).size(10).style(Color::from_rgb8(132, 145, 160)))
-        .push(text(val).size(18).style(val_color))
+        .spacing(3)
+        .push(text(label).size(10).style(TEXT_MUTED))
+        .push(
+            container(text(val).size(16).style(val_color))
+                .padding([8, 12])
+                .style(metric_card_style),
+        )
 }
 
 fn current_time() -> String {
@@ -1418,17 +1083,29 @@ fn play_audio(base64_data: String) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+fn app_shell_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(BG.into()),
+        text_color: Some(TEXT_PRIMARY),
+        ..Default::default()
+    }
+}
 fn hud_top_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb8(13, 18, 24).into()),
+        background: Some(Color::from_rgb(0.055, 0.068, 0.085).into()),
+        border: Border {
+            color: STROKE,
+            width: 0.0,
+            radius: 0.0.into(),
+        },
         ..Default::default()
     }
 }
 fn bottom_bar_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb8(15, 20, 27).into()),
+        background: Some(SURFACE.into()),
         border: Border {
-            color: Color::from_rgb8(38, 48, 60),
+            color: STROKE,
             width: 1.0,
             radius: 0.0.into(),
         },
@@ -1437,9 +1114,9 @@ fn bottom_bar_style(_theme: &Theme) -> container::Appearance {
 }
 fn input_field_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb8(22, 28, 36).into()),
+        background: Some(SURFACE_HIGH.into()),
         border: Border {
-            color: Color::from_rgb8(58, 70, 84),
+            color: STROKE,
             width: 1.0,
             radius: 8.0.into(),
         },
@@ -1448,9 +1125,9 @@ fn input_field_style(_theme: &Theme) -> container::Appearance {
 }
 fn transmit_btn_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb8(28, 115, 184).into()),
+        background: Some(ACCENT.into()),
         border: Border {
-            color: Color::from_rgb8(86, 160, 220),
+            color: Color::from_rgb(0.48, 0.78, 1.0),
             width: 1.0,
             radius: 8.0.into(),
         },
@@ -1459,9 +1136,9 @@ fn transmit_btn_style(_theme: &Theme) -> container::Appearance {
 }
 fn nexus_bubble_modern(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb8(24, 32, 42).into()),
+        background: Some(SURFACE_HIGH.into()),
         border: Border {
-            color: Color::from_rgb8(64, 105, 140),
+            color: Color::from_rgb(0.24, 0.39, 0.52),
             width: 1.0,
             radius: [8.0, 8.0, 8.0, 2.0].into(),
         },
@@ -1470,9 +1147,9 @@ fn nexus_bubble_modern(_theme: &Theme) -> container::Appearance {
 }
 fn operator_bubble_modern(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb8(38, 34, 27).into()),
+        background: Some(Color::from_rgb(0.16, 0.135, 0.095).into()),
         border: Border {
-            color: Color::from_rgb8(180, 140, 64),
+            color: Color::from_rgb(0.66, 0.52, 0.28),
             width: 1.0,
             radius: [8.0, 8.0, 2.0, 8.0].into(),
         },
@@ -1481,9 +1158,9 @@ fn operator_bubble_modern(_theme: &Theme) -> container::Appearance {
 }
 fn error_bubble_modern(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb8(48, 25, 29).into()),
+        background: Some(Color::from_rgb(0.19, 0.08, 0.095).into()),
         border: Border {
-            color: Color::from_rgb8(255, 95, 110),
+            color: DANGER,
             width: 1.0,
             radius: 8.0.into(),
         },
@@ -1492,9 +1169,9 @@ fn error_bubble_modern(_theme: &Theme) -> container::Appearance {
 }
 fn progress_bubble_modern(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb8(30, 39, 50).into()),
+        background: Some(Color::from_rgb(0.12, 0.15, 0.19).into()),
         border: Border {
-            color: Color::from_rgb8(86, 160, 220),
+            color: ACCENT,
             width: 1.0,
             radius: [8.0, 8.0, 8.0, 2.0].into(),
         },
@@ -1503,9 +1180,9 @@ fn progress_bubble_modern(_theme: &Theme) -> container::Appearance {
 }
 fn side_panel_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb8(16, 21, 28).into()),
+        background: Some(Color::from_rgb(0.055, 0.068, 0.085).into()),
         border: Border {
-            color: Color::from_rgb8(38, 48, 60),
+            color: STROKE,
             width: 1.0,
             radius: 0.0.into(),
         },
@@ -1514,9 +1191,9 @@ fn side_panel_style(_theme: &Theme) -> container::Appearance {
 }
 fn side_card_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb8(22, 28, 36).into()),
+        background: Some(SURFACE.into()),
         border: Border {
-            color: Color::from_rgb8(48, 60, 74),
+            color: STROKE,
             width: 1.0,
             radius: 8.0.into(),
         },
@@ -1525,20 +1202,20 @@ fn side_card_style(_theme: &Theme) -> container::Appearance {
 }
 fn ops_console_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb8(18, 24, 32).into()),
+        background: Some(SURFACE.into()),
         border: Border {
-            color: Color::from_rgb8(48, 60, 74),
+            color: STROKE,
             width: 1.0,
-            radius: 0.0.into(),
+            radius: 8.0.into(),
         },
         ..Default::default()
     }
 }
 fn activity_item_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb8(18, 24, 32).into()),
+        background: Some(SURFACE_HIGH.into()),
         border: Border {
-            color: Color::from_rgb8(34, 45, 58),
+            color: Color::from_rgb(0.16, 0.20, 0.25),
             width: 1.0,
             radius: 8.0.into(),
         },
@@ -1547,7 +1224,7 @@ fn activity_item_style(_theme: &Theme) -> container::Appearance {
 }
 fn info_activity_dot_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb8(130, 180, 235).into()),
+        background: Some(ACCENT.into()),
         border: Border {
             radius: 100.0.into(),
             ..Default::default()
@@ -1557,7 +1234,7 @@ fn info_activity_dot_style(_theme: &Theme) -> container::Appearance {
 }
 fn success_activity_dot_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb8(112, 224, 180).into()),
+        background: Some(SUCCESS.into()),
         border: Border {
             radius: 100.0.into(),
             ..Default::default()
@@ -1567,7 +1244,7 @@ fn success_activity_dot_style(_theme: &Theme) -> container::Appearance {
 }
 fn warning_activity_dot_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb8(255, 200, 90).into()),
+        background: Some(WARNING.into()),
         border: Border {
             radius: 100.0.into(),
             ..Default::default()
@@ -1577,7 +1254,7 @@ fn warning_activity_dot_style(_theme: &Theme) -> container::Appearance {
 }
 fn error_activity_dot_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb8(255, 95, 110).into()),
+        background: Some(DANGER.into()),
         border: Border {
             radius: 100.0.into(),
             ..Default::default()
@@ -1587,7 +1264,7 @@ fn error_activity_dot_style(_theme: &Theme) -> container::Appearance {
 }
 fn success_dot_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb8(0, 255, 136).into()),
+        background: Some(SUCCESS.into()),
         border: Border {
             radius: 100.0.into(),
             ..Default::default()
@@ -1597,12 +1274,136 @@ fn success_dot_style(_theme: &Theme) -> container::Appearance {
 }
 fn error_dot_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb8(255, 60, 80).into()),
+        background: Some(DANGER.into()),
         border: Border {
             radius: 100.0.into(),
             ..Default::default()
         },
         ..Default::default()
+    }
+}
+
+fn status_pill_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.075, 0.095, 0.12).into()),
+        border: Border {
+            color: STROKE,
+            width: 1.0,
+            radius: 100.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+fn metric_card_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.06, 0.075, 0.095).into()),
+        border: Border {
+            color: Color::from_rgb(0.14, 0.18, 0.22),
+            width: 1.0,
+            radius: 6.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+fn header_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.04, 0.05, 0.06).into()),
+        ..Default::default()
+    }
+}
+
+fn panel_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.03, 0.04, 0.05).into()),
+        ..Default::default()
+    }
+}
+
+fn panel_center_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.02, 0.03, 0.04).into()),
+        ..Default::default()
+    }
+}
+
+fn footer_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.04, 0.05, 0.06).into()),
+        ..Default::default()
+    }
+}
+
+fn chat_msg_user_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.08, 0.1, 0.12).into()),
+        border: Border {
+            color: Color::from_rgb(0.15, 0.18, 0.22),
+            width: 1.0,
+            radius: 8.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+fn chat_msg_nexus_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.05, 0.07, 0.09).into()),
+        border: Border {
+            color: ACCENT,
+            width: 1.0,
+            radius: 8.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+fn agent_card_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.06, 0.08, 0.1).into()),
+        border: Border {
+            color: Color::from_rgb(0.12, 0.15, 0.18),
+            width: 1.0,
+            radius: 10.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+
+fn btn_primary_style(_theme: &Theme) -> button::Appearance {
+    button::Appearance {
+        background: Some(ACCENT.into()),
+        border: Border {
+            radius: 6.0.into(),
+            ..Default::default()
+        },
+        text_color: Color::WHITE,
+        ..Default::default()
+    }
+}
+
+fn btn_disabled_style(_theme: &Theme) -> button::Appearance {
+    button::Appearance {
+        background: Some(Color::from_rgb(0.1, 0.12, 0.15).into()),
+        border: Border {
+            radius: 6.0.into(),
+            ..Default::default()
+        },
+        text_color: Color::from_rgb(0.4, 0.4, 0.4),
+        ..Default::default()
+    }
+}
+
+
+
+fn rule_style(_theme: &Theme) -> iced::widget::rule::Appearance {
+    iced::widget::rule::Appearance {
+        color: Color::from_rgb(0.1, 0.12, 0.15),
+        width: 1,
+        radius: 0.0.into(),
+        fill_mode: iced::widget::rule::FillMode::Full,
     }
 }
 
@@ -1618,28 +1419,19 @@ async fn check_status() -> Result<String, String> {
 }
 
 async fn load_org_dashboard() -> Result<OrgDashboard, String> {
-    let health = run_org_json::<OrgHealth>(&["health"]).await?;
-    let memory = run_org_json::<OrgMemoryStatus>(&["memory-status"]).await?;
-    let agent_ticks = run_org_json::<Vec<AgentTick>>(&["agent-ticks", "--limit", "6"]).await?;
-    let approvals =
-        run_org_json::<Vec<ApprovalItem>>(&["approvals", "--status", "pending_approval"]).await?;
-    let runtime_events =
-        run_org_json::<Vec<RuntimeEvent>>(&["runtime-events", "--limit", "3"]).await?;
-    let verifications =
-        run_org_json::<Vec<VerificationItem>>(&["verifications", "--limit", "3"]).await?;
-    let org_events = run_org_json::<Vec<OrgEvent>>(&["memory-events", "--limit", "6"]).await?;
-    let approved_commands =
-        run_org_json::<Vec<ApprovalItem>>(&["approvals", "--status", "approved"]).await?;
+    let payload = run_org_json::<OrgDashboardPayload>(&["dashboard"]).await?;
 
     Ok(OrgDashboard {
-        health: Some(health),
-        memory: Some(memory),
-        agent_ticks,
-        approvals,
-        approved_commands,
-        runtime_events,
-        verifications,
-        org_events,
+        health: Some(payload.health),
+        memory: Some(payload.memory_status),
+        agent_ticks: payload.agent_ticks,
+        approvals: payload.approvals,
+        approved_commands: payload.approved_commands,
+        runtime_events: payload.runtime_events,
+        verifications: payload.verifications,
+        org_events: payload.org_events,
+        swarm: payload.swarm,
+        incidents: payload.incidents,
         updated_at: Some(current_time()),
         error: None,
     })
@@ -1723,6 +1515,24 @@ async fn execute_org_command(proposal_id: String) -> Result<String, String> {
         Ok(detail)
     } else {
         Err(detail)
+    }
+}
+
+fn danger_dot_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(DANGER.into()),
+        border: Border {
+            radius: 100.0.into(),
+            ..Default::default()
+        },
+        ..Default::default()
+    }
+}
+
+fn confidence_bar_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.1, 0.12, 0.15).into()),
+        ..Default::default()
     }
 }
 

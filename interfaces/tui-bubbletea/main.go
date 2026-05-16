@@ -54,6 +54,8 @@ type dashboardData struct {
 	RuntimeEvents []map[string]any
 	Verifications []map[string]any
 	Observations  []map[string]any
+	SwarmStatus   map[string]any
+	Incidents     []map[string]any
 }
 
 type tickMsg time.Time
@@ -126,7 +128,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-var tabs = []string{"Overview", "Agents", "Approvals", "Runtime", "Verification", "Observer"}
+var tabs = []string{"Overview", "Swarm", "Agents", "Approvals", "Runtime", "Verification", "Incidents"}
 
 func (m model) View() string {
 	var b strings.Builder
@@ -151,6 +153,8 @@ func (m model) View() string {
 	switch tabs[m.tab] {
 	case "Overview":
 		content = m.viewOverview()
+	case "Swarm":
+		content = m.viewSwarm()
 	case "Agents":
 		content = m.viewAgents()
 	case "Approvals":
@@ -159,8 +163,8 @@ func (m model) View() string {
 		content = m.viewRuntimeEvents()
 	case "Verification":
 		content = m.viewVerifications()
-	case "Observer":
-		content = m.viewObservations()
+	case "Incidents":
+		content = m.viewIncidents()
 	}
 	b.WriteString(panelStyle.Width(max(40, m.width-6)).Render(content))
 	b.WriteString("\n\n")
@@ -276,6 +280,60 @@ func (m model) viewObservations() string {
 	return strings.Join(lines, "\n")
 }
 
+func (m model) viewSwarm() string {
+	swarm := m.data.SwarmStatus
+	if swarm == nil || value(swarm, "current_goal") == "-" {
+		return mutedStyle.Render("No active Swarm goal. Submit one via `./bin/nexus org swarm-submit`")
+	}
+
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("%s %s\n\n", titleStyle.Render("Objective:"), value(swarm, "current_goal")))
+
+	b.WriteString(titleStyle.Render("Plan Execution") + "\n")
+	if plan, ok := swarm["plan"].([]any); ok && len(plan) > 0 {
+		for _, p := range plan {
+			item := p.(map[string]any)
+			b.WriteString(fmt.Sprintf("%-12s %-30s %s\n",
+				value(item, "role"),
+				value(item, "task"),
+				statusText(value(item, "status")),
+			))
+		}
+	} else {
+		b.WriteString(mutedStyle.Render("No plan items yet.") + "\n")
+	}
+
+	b.WriteString("\n" + titleStyle.Render("Agent Status") + "\n")
+	if agents, ok := swarm["agents"].([]any); ok && len(agents) > 0 {
+		for _, a := range agents {
+			agent := a.(map[string]any)
+			b.WriteString(fmt.Sprintf("%-12s %-12s conf=%-4s risk=%s\n",
+				value(agent, "role"),
+				statusText(value(agent, "status")),
+				value(agent, "confidence"),
+				value(agent, "risk_level"),
+			))
+		}
+	}
+
+	return b.String()
+}
+
+func (m model) viewIncidents() string {
+	if len(m.data.Incidents) == 0 {
+		return okStyle.Render("No incidents reported.")
+	}
+	var lines []string
+	for _, item := range m.data.Incidents {
+		lines = append(lines, fmt.Sprintf("%-8s %-12s %s",
+			statusText(value(item, "severity")),
+			value(item, "module"),
+			value(item, "message"),
+		))
+	}
+	return strings.Join(lines, "\n")
+}
+
 func tick() tea.Cmd {
 	return tea.Tick(refreshEvery, func(t time.Time) tea.Msg { return tickMsg(t) })
 }
@@ -310,6 +368,12 @@ func fetchDashboard(root, python string) (dashboardData, error) {
 		errs = append(errs, err.Error())
 	}
 	if err := loadJSON(root, python, []string{"observations", "--limit", "12"}, &data.Observations); err != nil {
+		errs = append(errs, err.Error())
+	}
+	if err := loadJSON(root, python, []string{"swarm-status"}, &data.SwarmStatus); err != nil {
+		errs = append(errs, err.Error())
+	}
+	if err := loadJSON(root, python, []string{"incidents", "--limit", "12"}, &data.Incidents); err != nil {
 		errs = append(errs, err.Error())
 	}
 

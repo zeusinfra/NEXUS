@@ -36,6 +36,15 @@ class StatusRoutesTests(unittest.IsolatedAsyncioTestCase):
                     "config": {"warnings": []},
                     "second_brain": {"enabled": True, "sync_engine_enabled": False},
                 },
+                build_api_health_compact=lambda: {
+                    "ok": True,
+                    "llm": {"provider": "test"},
+                },
+                build_sync_status=lambda: {
+                    "is_running": False,
+                    "last_sync": None,
+                    "relay": None,
+                },
                 llm_service=LLMService(
                     get_status=lambda: {"provider": "test", "configured": True},
                     call_llm=lambda messages: "NEXUS LLM OK",
@@ -50,6 +59,16 @@ class StatusRoutesTests(unittest.IsolatedAsyncioTestCase):
 
         result = await endpoint(SimpleNamespace())
 
+        self.assertEqual(result["llm"]["provider"], "test")
+        self.assertEqual(calls["token"], 1)
+
+    async def test_compact_health_route_requires_access_and_returns_payload(self):
+        router, calls = self._router()
+        endpoint = _endpoint(router, "/api/health/compact", "GET")
+
+        result = await endpoint(SimpleNamespace())
+
+        self.assertTrue(result["ok"])
         self.assertEqual(result["llm"]["provider"], "test")
         self.assertEqual(calls["token"], 1)
 

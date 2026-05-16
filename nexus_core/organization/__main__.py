@@ -56,6 +56,13 @@ def main() -> None:
     submit.add_argument("goal", nargs="+")
     submit.add_argument("--role", default=None)
 
+    swarm_submit = sub.add_parser("swarm-submit")
+    swarm_submit.add_argument("goal", nargs="+")
+    swarm_submit.add_argument("--requested-by", default="operator")
+    swarm_submit.add_argument("--autonomy-level", default="LEVEL_1")
+
+    sub.add_parser("swarm-status")
+
     propose = sub.add_parser("propose-command")
     propose.add_argument("--cwd", default=None)
     propose.add_argument("--reason", default="")
@@ -64,6 +71,23 @@ def main() -> None:
 
     approvals = sub.add_parser("approvals")
     approvals.add_argument("--status", default=None)
+
+    commands = sub.add_parser("commands")
+    commands.add_argument("--status", default=None)
+    commands.add_argument("--task-id", default=None)
+    commands.add_argument("--limit", type=int, default=50)
+
+    incidents = sub.add_parser("incidents")
+    incidents.add_argument("--severity", default=None)
+    incidents.add_argument("--limit", type=int, default=50)
+
+    memory_agents = sub.add_parser("memory-agents")
+    memory_agents.add_argument("--role", default=None)
+    memory_agents.add_argument("--limit", type=int, default=50)
+
+    memory_entries = sub.add_parser("memory-entries")
+    memory_entries.add_argument("--scope", default=None)
+    memory_entries.add_argument("--limit", type=int, default=50)
 
     memory_status = sub.add_parser("memory-status")
     memory_status.add_argument("--json", action="store_true")
@@ -114,6 +138,7 @@ def main() -> None:
     agent_ticks.add_argument("--limit", type=int, default=50)
 
     sub.add_parser("tick-agents")
+    sub.add_parser("dashboard")
 
     args = parser.parse_args()
     command = args.command or "run"
@@ -168,15 +193,29 @@ def main() -> None:
         "memory-tasks",
         "memory-decisions",
         "memory-events",
+        "memory-agents",
+        "memory-entries",
+        "swarm-status",
+        "commands",
+        "incidents",
         "runtime-events",
         "verifications",
         "observations",
         "agent-ticks",
+        "dashboard",
     }
     daemon.initialize(record_event=command not in read_only_commands)
 
     if command == "submit":
         payload = daemon.submit_goal(" ".join(args.goal), role=args.role).__dict__
+    elif command == "swarm-submit":
+        payload = daemon.submit_swarm_objective(
+            " ".join(args.goal),
+            requested_by=args.requested_by,
+            autonomy_level=args.autonomy_level,
+        )
+    elif command == "swarm-status":
+        payload = daemon.swarm.status()
     elif command == "propose-command":
         if args.shell_command and args.shell_command[0] == "--":
             args.shell_command = args.shell_command[1:]
@@ -188,6 +227,16 @@ def main() -> None:
         )
     elif command == "approvals":
         payload = daemon.permissions.queue.list(status=args.status)
+    elif command == "commands":
+        payload = daemon.memory.list_commands(
+            status=args.status, task_id=args.task_id, limit=args.limit
+        )
+    elif command == "incidents":
+        payload = daemon.memory.list_incidents(severity=args.severity, limit=args.limit)
+    elif command == "memory-agents":
+        payload = daemon.memory.list_agents(role=args.role, limit=args.limit)
+    elif command == "memory-entries":
+        payload = daemon.memory.list_memory_entries(scope=args.scope, limit=args.limit)
     elif command == "memory-status":
         payload = daemon.memory_status()
     elif command == "memory-tasks":
@@ -234,6 +283,19 @@ def main() -> None:
         payload = daemon.tick_agents_once()
     elif command == "agent-ticks":
         payload = daemon.memory.list_agent_ticks(agent_role=args.role, limit=args.limit)
+    elif command == "dashboard":
+        payload = {
+            "health": build_health_report(config).to_dict(),
+            "memory_status": daemon.memory_status(),
+            "agent_ticks": daemon.memory.list_agent_ticks(limit=6),
+            "approvals": daemon.permissions.queue.list(status="pending_approval"),
+            "approved_commands": daemon.permissions.queue.list(status="approved"),
+            "runtime_events": daemon.memory.list_runtime_events(limit=3),
+            "verifications": daemon.memory.list_verifications(limit=3),
+            "org_events": daemon.memory.list_events(limit=6),
+            "swarm": daemon.swarm.status(),
+            "incidents": daemon.memory.list_incidents(limit=4),
+        }
     else:  # pragma: no cover - argparse prevents this branch
         raise SystemExit(f"Unknown command: {command}")
     _print(payload)

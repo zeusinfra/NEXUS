@@ -21,6 +21,8 @@ from nexus_core.execution_protocol import (
 )
 from nexus_core.organization.blackboard import Blackboard, utc_now
 from nexus_core.organization.config import NexusOrgConfig
+from nexus_core.organization.memory import OrganizationalMemoryStore
+from nexus_core.sentry_observability import add_breadcrumb, capture_message
 from nexus_core.tools import ToolError
 
 
@@ -173,6 +175,7 @@ class PermissionManager:
         policy: PolicyEngine | None = None,
         ledger: ExecutionLedger | None = None,
         queue: ApprovalQueue | None = None,
+        memory: OrganizationalMemoryStore | None = None,
     ) -> None:
         self.config = config
         self.blackboard = blackboard
@@ -181,6 +184,7 @@ class PermissionManager:
         self.queue = queue or ApprovalQueue(
             config.approvals_dir / "pending_commands.json"
         )
+        self.memory = memory
 
     def propose_command(
         self,
@@ -227,6 +231,29 @@ class PermissionManager:
                 "command": command,
             },
         )
+        add_breadcrumb(
+            "command proposed",
+            category="permission",
+            data={
+                "proposal_id": proposal["proposal_id"],
+                "risk_level": item["risk_level"],
+                "status": queue_status,
+                "requested_by": requested_by,
+            },
+        )
+        if self.memory:
+            self.memory.record_approval(item)
+        if queue_status == "blocked":
+            capture_message(
+                "Command blocked by policy",
+                module="permission",
+                level="warning",
+                tags={
+                    "risk_level": item["risk_level"],
+                    "execution_status": queue_status,
+                },
+                context={"proposal_id": proposal["proposal_id"], "command": command},
+            )
         return item
 
     def approve_command(
@@ -263,6 +290,13 @@ class PermissionManager:
                 "approved_by": approved_by,
             },
         )
+        add_breadcrumb(
+            "command approved",
+            category="permission",
+            data={"proposal_id": proposal_id, "approved_by": approved_by},
+        )
+        if self.memory:
+            self.memory.record_approval(updated)
         return updated
 
     async def execute_command(
@@ -301,6 +335,8 @@ class PermissionManager:
                 "exit_code": result.get("exit_code"),
             },
         )
+        if self.memory:
+            self.memory.record_approval(updated)
         return {**updated, "execution": read_execution_result(proposal_id)}
 
     def execute_command_sync(

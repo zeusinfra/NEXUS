@@ -21,6 +21,7 @@ from nexus_core.organization.memory import OrganizationalMemoryStore
 from nexus_core.organization.observer import ObserverEngine
 from nexus_core.organization.runtime import RuntimeEngine
 from nexus_core.organization.security import PermissionManager
+from nexus_core.organization.swarm import SwarmOrchestrator
 
 
 @dataclass
@@ -56,11 +57,14 @@ class OrganizationalDaemon:
         if self.blackboard.memory is None:
             self.blackboard.memory = self.memory
         self.registry = registry or build_default_registry()
-        self.permissions = PermissionManager(self.config, self.blackboard)
+        self.permissions = PermissionManager(
+            self.config, self.blackboard, memory=self.memory
+        )
         self.observer = ObserverEngine(memory=self.memory)
         self.continuous_agents = ContinuousAgentRuntime(
             self.registry, self.blackboard, self.memory
         )
+        self.swarm = SwarmOrchestrator(self.registry, self.blackboard, self.memory)
         self.runtime = RuntimeEngine(
             self.config,
             self.blackboard,
@@ -181,6 +185,19 @@ class OrganizationalDaemon:
             },
         )
         return result
+
+    def submit_swarm_objective(
+        self,
+        goal: str,
+        *,
+        requested_by: str = "operator",
+        autonomy_level: str = "LEVEL_1",
+    ) -> dict[str, Any]:
+        return self.swarm.submit_objective(
+            goal,
+            requested_by=requested_by,
+            autonomy_level=autonomy_level,
+        )
 
     def propose_command(
         self,

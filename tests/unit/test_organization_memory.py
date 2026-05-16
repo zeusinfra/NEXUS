@@ -59,3 +59,68 @@ def test_task_updates_are_reflected_in_memory(tmp_path):
     tasks = store.list_tasks(status="done")
     assert len(tasks) == 1
     assert tasks[0]["id"] == task["id"]
+
+
+def test_memory_store_persists_swarm_runtime_tables(tmp_path):
+    store = OrganizationalMemoryStore(tmp_path / "org.sqlite3")
+
+    agent = store.record_agent_state(
+        agent_id="agent_coder",
+        role="coder",
+        status="assigned",
+        current_task="task_1",
+        confidence=0.8,
+        risk_level="medium",
+        permissions=["coding"],
+        memory_scope="engineering",
+    )
+    command = store.record_command(
+        {
+            "command_id": "cmd_1",
+            "agent_id": "agent_coder",
+            "task_id": "task_1",
+            "proposal_id": "prop_1",
+            "command": "python3 --version",
+            "cwd": str(tmp_path),
+            "status": "running",
+        }
+    )
+    store.record_command({**command, "status": "executed", "exit_code": 0})
+    incident = store.record_incident(
+        severity="error",
+        module="runtime",
+        message="failed",
+        agent_id="agent_coder",
+        command_id="cmd_1",
+    )
+    approval = store.record_approval(
+        {
+            "proposal_id": "prop_1",
+            "command": "python3 --version",
+            "cwd": str(tmp_path),
+            "status": "pending_approval",
+            "requested_by": "tester",
+            "risk_level": "LOW",
+        }
+    )
+    entry = store.record_memory_entry(
+        scope="swarm",
+        kind="lesson",
+        content="Verify before saying done.",
+        source="test",
+    )
+
+    assert store.list_agents(role="coder")[0]["agent_id"] == agent["agent_id"]
+    assert store.list_commands(status="executed")[0]["command_id"] == "cmd_1"
+    assert store.list_incidents()[0]["id"] == incident["id"]
+    assert (
+        store.list_approvals(status="pending_approval")[0]["proposal_id"]
+        == approval["proposal_id"]
+    )
+    assert store.list_memory_entries(scope="swarm")[0]["id"] == entry["id"]
+    counts = store.counts()
+    assert counts["agents"] == 1
+    assert counts["commands"] == 1
+    assert counts["incidents"] == 1
+    assert counts["approvals"] == 1
+    assert counts["memory_entries"] == 1

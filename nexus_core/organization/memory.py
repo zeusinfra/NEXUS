@@ -22,8 +22,12 @@ class OrganizationalMemoryStore:
 
     @contextmanager
     def connect(self) -> Generator[sqlite3.Connection, None, None]:
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=5.0)
         conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute("PRAGMA temp_store=MEMORY")
+        conn.execute("PRAGMA busy_timeout=5000")
         try:
             yield conn
             conn.commit()
@@ -122,6 +126,84 @@ class OrganizationalMemoryStore:
                     created_at TEXT NOT NULL
                 )
             """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS org_agents (
+                    agent_id TEXT PRIMARY KEY,
+                    role TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'idle',
+                    current_task TEXT,
+                    confidence REAL NOT NULL DEFAULT 0,
+                    risk_level TEXT NOT NULL DEFAULT 'low',
+                    permissions_json TEXT NOT NULL DEFAULT '[]',
+                    memory_scope TEXT NOT NULL DEFAULT '',
+                    last_heartbeat TEXT NOT NULL,
+                    metadata_json TEXT NOT NULL DEFAULT '{}'
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS org_commands (
+                    command_id TEXT PRIMARY KEY,
+                    agent_id TEXT,
+                    task_id TEXT,
+                    proposal_id TEXT,
+                    command TEXT NOT NULL,
+                    cwd TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    pid INTEGER,
+                    exit_code INTEGER,
+                    duration_ms INTEGER,
+                    stdout_path TEXT,
+                    stderr_path TEXT,
+                    evidence_path TEXT,
+                    risk_level TEXT NOT NULL DEFAULT 'LOW',
+                    created_at TEXT NOT NULL,
+                    finished_at TEXT,
+                    metadata_json TEXT NOT NULL DEFAULT '{}'
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS org_incidents (
+                    id TEXT PRIMARY KEY,
+                    severity TEXT NOT NULL,
+                    module TEXT NOT NULL,
+                    message TEXT NOT NULL,
+                    agent_id TEXT,
+                    task_id TEXT,
+                    command_id TEXT,
+                    risk_level TEXT,
+                    sentry_event_id TEXT,
+                    metadata_json TEXT NOT NULL DEFAULT '{}',
+                    created_at TEXT NOT NULL
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS org_approvals (
+                    proposal_id TEXT PRIMARY KEY,
+                    approval_id TEXT,
+                    command TEXT NOT NULL,
+                    cwd TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    requested_by TEXT NOT NULL,
+                    risk_level TEXT NOT NULL,
+                    impact TEXT NOT NULL DEFAULT '',
+                    rollback TEXT NOT NULL DEFAULT '',
+                    reason TEXT NOT NULL DEFAULT '',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    metadata_json TEXT NOT NULL DEFAULT '{}'
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS org_memory_entries (
+                    id TEXT PRIMARY KEY,
+                    scope TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    source TEXT NOT NULL DEFAULT '',
+                    metadata_json TEXT NOT NULL DEFAULT '{}',
+                    created_at TEXT NOT NULL
+                )
+            """)
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_org_tasks_status ON org_tasks(status)"
             )
@@ -151,6 +233,24 @@ class OrganizationalMemoryStore:
             )
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_org_agent_ticks_role ON org_agent_ticks(agent_role)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_org_agents_role ON org_agents(role)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_org_commands_status ON org_commands(status)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_org_commands_task ON org_commands(task_id)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_org_incidents_command ON org_incidents(command_id)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_org_approvals_status ON org_approvals(status)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_org_memory_scope ON org_memory_entries(scope)"
             )
 
     def upsert_task(self, task: dict[str, Any]) -> None:
@@ -385,6 +485,240 @@ class OrganizationalMemoryStore:
             )
         return item
 
+    def record_agent_state(
+        self,
+        *,
+        agent_id: str,
+        role: str,
+        status: str,
+        current_task: str | None = None,
+        confidence: float = 0.0,
+        risk_level: str = "low",
+        permissions: list[str] | None = None,
+        memory_scope: str = "",
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        item = {
+            "agent_id": agent_id,
+            "role": role,
+            "status": status,
+            "current_task": current_task,
+            "confidence": float(confidence),
+            "risk_level": risk_level,
+            "permissions": permissions or [],
+            "memory_scope": memory_scope,
+            "last_heartbeat": utc_now(),
+            "metadata": metadata or {},
+        }
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO org_agents (
+                    agent_id, role, status, current_task, confidence, risk_level,
+                    permissions_json, memory_scope, last_heartbeat, metadata_json
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(agent_id) DO UPDATE SET
+                    role = excluded.role,
+                    status = excluded.status,
+                    current_task = excluded.current_task,
+                    confidence = excluded.confidence,
+                    risk_level = excluded.risk_level,
+                    permissions_json = excluded.permissions_json,
+                    memory_scope = excluded.memory_scope,
+                    last_heartbeat = excluded.last_heartbeat,
+                    metadata_json = excluded.metadata_json
+                """,
+                (
+                    agent_id,
+                    role,
+                    status,
+                    current_task,
+                    float(confidence),
+                    risk_level,
+                    _json(item["permissions"]),
+                    memory_scope,
+                    item["last_heartbeat"],
+                    _json(item["metadata"]),
+                ),
+            )
+        return item
+
+    def record_command(self, command: dict[str, Any]) -> dict[str, Any]:
+        item = dict(command)
+        item.setdefault("command_id", f"cmd_{uuid.uuid4().hex[:12]}")
+        item.setdefault("created_at", utc_now())
+        item.setdefault("metadata", {})
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO org_commands (
+                    command_id, agent_id, task_id, proposal_id, command, cwd, status,
+                    pid, exit_code, duration_ms, stdout_path, stderr_path, evidence_path,
+                    risk_level, created_at, finished_at, metadata_json
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(command_id) DO UPDATE SET
+                    status = excluded.status,
+                    pid = excluded.pid,
+                    exit_code = excluded.exit_code,
+                    duration_ms = excluded.duration_ms,
+                    stdout_path = excluded.stdout_path,
+                    stderr_path = excluded.stderr_path,
+                    evidence_path = excluded.evidence_path,
+                    finished_at = excluded.finished_at,
+                    metadata_json = excluded.metadata_json
+                """,
+                (
+                    item["command_id"],
+                    item.get("agent_id"),
+                    item.get("task_id"),
+                    item.get("proposal_id"),
+                    item.get("command", ""),
+                    item.get("cwd", ""),
+                    item.get("status", "unknown"),
+                    item.get("pid"),
+                    item.get("exit_code"),
+                    item.get("duration_ms"),
+                    item.get("stdout_path"),
+                    item.get("stderr_path"),
+                    item.get("evidence_path"),
+                    item.get("risk_level", "LOW"),
+                    item["created_at"],
+                    item.get("finished_at"),
+                    _json(item["metadata"]),
+                ),
+            )
+        return item
+
+    def record_incident(
+        self,
+        *,
+        severity: str,
+        module: str,
+        message: str,
+        agent_id: str | None = None,
+        task_id: str | None = None,
+        command_id: str | None = None,
+        risk_level: str | None = None,
+        sentry_event_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        item = {
+            "id": f"inc_{uuid.uuid4().hex[:12]}",
+            "severity": severity,
+            "module": module,
+            "message": message,
+            "agent_id": agent_id,
+            "task_id": task_id,
+            "command_id": command_id,
+            "risk_level": risk_level,
+            "sentry_event_id": sentry_event_id,
+            "metadata": metadata or {},
+            "created_at": utc_now(),
+        }
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO org_incidents (
+                    id, severity, module, message, agent_id, task_id, command_id,
+                    risk_level, sentry_event_id, metadata_json, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    item["id"],
+                    severity,
+                    module,
+                    message,
+                    agent_id,
+                    task_id,
+                    command_id,
+                    risk_level,
+                    sentry_event_id,
+                    _json(item["metadata"]),
+                    item["created_at"],
+                ),
+            )
+        return item
+
+    def record_approval(self, approval: dict[str, Any]) -> dict[str, Any]:
+        item = dict(approval)
+        item.setdefault("created_at", utc_now())
+        item.setdefault("updated_at", utc_now())
+        item.setdefault("metadata", {})
+        assessment = item.get("assessment") or {}
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO org_approvals (
+                    proposal_id, approval_id, command, cwd, status, requested_by,
+                    risk_level, impact, rollback, reason, created_at, updated_at,
+                    metadata_json
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(proposal_id) DO UPDATE SET
+                    approval_id = excluded.approval_id,
+                    status = excluded.status,
+                    updated_at = excluded.updated_at,
+                    metadata_json = excluded.metadata_json
+                """,
+                (
+                    item["proposal_id"],
+                    item.get("approval_id"),
+                    item.get("command", ""),
+                    item.get("cwd", ""),
+                    item.get("status", "unknown"),
+                    item.get("requested_by", "unknown"),
+                    item.get("risk_level", "LOW"),
+                    assessment.get("impact", ""),
+                    assessment.get("rollback", ""),
+                    item.get("reason", ""),
+                    item["created_at"],
+                    item["updated_at"],
+                    _json(item["metadata"]),
+                ),
+            )
+        return item
+
+    def record_memory_entry(
+        self,
+        *,
+        scope: str,
+        kind: str,
+        content: str,
+        source: str = "",
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        item = {
+            "id": f"mem_{uuid.uuid4().hex[:12]}",
+            "scope": scope,
+            "kind": kind,
+            "content": content,
+            "source": source,
+            "metadata": metadata or {},
+            "created_at": utc_now(),
+        }
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO org_memory_entries (
+                    id, scope, kind, content, source, metadata_json, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    item["id"],
+                    scope,
+                    kind,
+                    content,
+                    source,
+                    _json(item["metadata"]),
+                    item["created_at"],
+                ),
+            )
+        return item
+
     def summarize_recent(self, *, limit: int = 20) -> str:
         tasks = self.list_tasks(limit=limit)
         decisions = self.list_decisions(limit=limit)
@@ -579,6 +913,159 @@ class OrganizationalMemoryStore:
             for row in rows
         ]
 
+    def list_agents(
+        self, *, role: str | None = None, limit: int = 50
+    ) -> list[dict[str, Any]]:
+        query = "SELECT * FROM org_agents"
+        params: list[Any] = []
+        if role:
+            query += " WHERE role = ?"
+            params.append(role)
+        query += " ORDER BY last_heartbeat DESC LIMIT ?"
+        params.append(limit)
+        rows = self._fetch(query, params)
+        return [
+            {
+                "agent_id": row["agent_id"],
+                "role": row["role"],
+                "status": row["status"],
+                "current_task": row["current_task"],
+                "confidence": row["confidence"],
+                "risk_level": row["risk_level"],
+                "permissions": _loads(row["permissions_json"], default=[]),
+                "memory_scope": row["memory_scope"],
+                "last_heartbeat": row["last_heartbeat"],
+                "metadata": _loads(row["metadata_json"]),
+            }
+            for row in rows
+        ]
+
+    def list_commands(
+        self,
+        *,
+        status: str | None = None,
+        task_id: str | None = None,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        query = "SELECT * FROM org_commands"
+        params: list[Any] = []
+        conditions = []
+        if status:
+            conditions.append("status = ?")
+            params.append(status)
+        if task_id:
+            conditions.append("task_id = ?")
+            params.append(task_id)
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        query += " ORDER BY created_at DESC LIMIT ?"
+        params.append(limit)
+        rows = self._fetch(query, params)
+        return [
+            {
+                "command_id": row["command_id"],
+                "agent_id": row["agent_id"],
+                "task_id": row["task_id"],
+                "proposal_id": row["proposal_id"],
+                "command": row["command"],
+                "cwd": row["cwd"],
+                "status": row["status"],
+                "pid": row["pid"],
+                "exit_code": row["exit_code"],
+                "duration_ms": row["duration_ms"],
+                "stdout_path": row["stdout_path"],
+                "stderr_path": row["stderr_path"],
+                "evidence_path": row["evidence_path"],
+                "risk_level": row["risk_level"],
+                "created_at": row["created_at"],
+                "finished_at": row["finished_at"],
+                "metadata": _loads(row["metadata_json"]),
+            }
+            for row in rows
+        ]
+
+    def list_incidents(
+        self, *, severity: str | None = None, limit: int = 50
+    ) -> list[dict[str, Any]]:
+        query = "SELECT * FROM org_incidents"
+        params: list[Any] = []
+        if severity:
+            query += " WHERE severity = ?"
+            params.append(severity)
+        query += " ORDER BY created_at DESC LIMIT ?"
+        params.append(limit)
+        rows = self._fetch(query, params)
+        return [
+            {
+                "id": row["id"],
+                "severity": row["severity"],
+                "module": row["module"],
+                "message": row["message"],
+                "agent_id": row["agent_id"],
+                "task_id": row["task_id"],
+                "command_id": row["command_id"],
+                "risk_level": row["risk_level"],
+                "sentry_event_id": row["sentry_event_id"],
+                "metadata": _loads(row["metadata_json"]),
+                "created_at": row["created_at"],
+            }
+            for row in rows
+        ]
+
+    def list_approvals(
+        self, *, status: str | None = None, limit: int = 50
+    ) -> list[dict[str, Any]]:
+        query = "SELECT * FROM org_approvals"
+        params: list[Any] = []
+        if status:
+            query += " WHERE status = ?"
+            params.append(status)
+        query += " ORDER BY updated_at DESC LIMIT ?"
+        params.append(limit)
+        rows = self._fetch(query, params)
+        return [
+            {
+                "proposal_id": row["proposal_id"],
+                "approval_id": row["approval_id"],
+                "command": row["command"],
+                "cwd": row["cwd"],
+                "status": row["status"],
+                "requested_by": row["requested_by"],
+                "risk_level": row["risk_level"],
+                "impact": row["impact"],
+                "rollback": row["rollback"],
+                "reason": row["reason"],
+                "created_at": row["created_at"],
+                "updated_at": row["updated_at"],
+                "metadata": _loads(row["metadata_json"]),
+            }
+            for row in rows
+        ]
+
+    def list_memory_entries(
+        self, *, scope: str | None = None, limit: int = 50
+    ) -> list[dict[str, Any]]:
+        query = "SELECT * FROM org_memory_entries"
+        params: list[Any] = []
+        if scope:
+            query += " WHERE scope = ?"
+            params.append(scope)
+        query += " ORDER BY created_at DESC LIMIT ?"
+        params.append(limit)
+        rows = self._fetch(query, params)
+        return [
+            {
+                "id": row["id"],
+                "scope": row["scope"],
+                "kind": row["kind"],
+                "content": row["content"],
+                "source": row["source"],
+                "metadata": _loads(row["metadata_json"]),
+                "created_at": row["created_at"],
+            }
+            for row in rows
+        ]
+
     def counts(self) -> dict[str, int]:
         with self.connect() as conn:
             return {
@@ -601,6 +1088,19 @@ class OrganizationalMemoryStore:
                 ).fetchone()[0],
                 "agent_ticks": conn.execute(
                     "SELECT COUNT(*) FROM org_agent_ticks"
+                ).fetchone()[0],
+                "agents": conn.execute("SELECT COUNT(*) FROM org_agents").fetchone()[0],
+                "commands": conn.execute(
+                    "SELECT COUNT(*) FROM org_commands"
+                ).fetchone()[0],
+                "incidents": conn.execute(
+                    "SELECT COUNT(*) FROM org_incidents"
+                ).fetchone()[0],
+                "approvals": conn.execute(
+                    "SELECT COUNT(*) FROM org_approvals"
+                ).fetchone()[0],
+                "memory_entries": conn.execute(
+                    "SELECT COUNT(*) FROM org_memory_entries"
                 ).fetchone()[0],
             }
 
@@ -626,5 +1126,7 @@ def _json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=True, sort_keys=True)
 
 
-def _loads(value: str) -> Any:
-    return json.loads(value or "{}")
+def _loads(value: str, *, default: Any | None = None) -> Any:
+    if default is None:
+        default = {}
+    return json.loads(value or _json(default))

@@ -33,10 +33,14 @@ LLM_PROVIDER = os.getenv("NEXUS_LLM_PROVIDER", "").strip().lower()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", os.getenv("NEXUS_OPENAI_MODEL", "gpt-4o-mini"))
+OPENAI_FAST_MODEL = os.getenv("NEXUS_OPENAI_FAST_MODEL", "").strip()
+OPENAI_HEAVY_MODEL = os.getenv("NEXUS_OPENAI_HEAVY_MODEL", "").strip()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 OLLAMA_URL = os.getenv("NEXUS_LLM_URL", "http://127.0.0.1:11434/api/chat")
 OLLAMA_API_KEY = os.getenv("NEXUS_LLM_API_KEY", os.getenv("OLLAMA_API_KEY", ""))
 MODEL = os.getenv("NEXUS_LLM_MODEL", "gemma4:31b-cloud")
+FAST_MODEL = os.getenv("NEXUS_LLM_FAST_MODEL", "").strip()
+HEAVY_MODEL = os.getenv("NEXUS_LLM_HEAVY_MODEL", "").strip()
 DISABLE_OLLAMA = os.getenv("NEXUS_DISABLE_OLLAMA", "0").strip().lower() in {
     "1",
     "true",
@@ -52,6 +56,17 @@ PREFER_OLLAMA = os.getenv("NEXUS_PREFER_OLLAMA", "0").strip().lower() in {
 MAX_PROMPT_CHARS = int(os.getenv("NEXUS_MAX_PROMPT_CHARS", "16000") or "16000")
 
 GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
+GEMINI_FAST_MODEL = os.getenv("NEXUS_GEMINI_FAST_MODEL", "").strip()
+GEMINI_HEAVY_MODEL = os.getenv("NEXUS_GEMINI_HEAVY_MODEL", "").strip()
+FAST_MODEL_MAX_CHARS = int(os.getenv("NEXUS_LLM_FAST_MAX_CHARS", "3500") or "3500")
+HEAVY_MODEL_KEYWORDS = {
+    item.strip().lower()
+    for item in os.getenv(
+        "NEXUS_LLM_HEAVY_KEYWORDS",
+        "arquitetura,refator,debug,investigue,analise profundamente,complexo,plano detalhado",
+    ).split(",")
+    if item.strip()
+}
 
 # Cliente Global do Gemini (Novo SDK google-genai)
 _GEMINI_CLIENT = None
@@ -259,6 +274,19 @@ def get_llm_status() -> dict:
             "gemini_configured": bool(GEMINI_API_KEY and _GEMINI_CLIENT),
             "ollama_enabled": not DISABLE_OLLAMA,
         },
+        "routing": {
+            "fast_model": {
+                "openai": OPENAI_FAST_MODEL or None,
+                "gemini": GEMINI_FAST_MODEL or None,
+                "ollama": FAST_MODEL or None,
+            }.get(provider),
+            "heavy_model": {
+                "openai": OPENAI_HEAVY_MODEL or None,
+                "gemini": GEMINI_HEAVY_MODEL or None,
+                "ollama": HEAVY_MODEL or None,
+            }.get(provider),
+            "fast_max_chars": FAST_MODEL_MAX_CHARS,
+        },
         "base_url": OPENAI_BASE_URL
         if provider == "openai"
         else OLLAMA_URL
@@ -304,12 +332,48 @@ def _format_messages_for_openai(messages):
     return formatted or [{"role": "user", "content": "Continue."}]
 
 
+def _message_chars(messages) -> int:
+    total = 0
+    for message in messages:
+        if isinstance(message, dict):
+            total += len(str(message.get("content", "")))
+    return total
+
+
+def _should_use_heavy_model(messages) -> bool:
+    content = "\n".join(
+        str(message.get("content", ""))
+        for message in messages
+        if isinstance(message, dict)
+    )
+    lowered = content.lower()
+    return _message_chars(messages) > FAST_MODEL_MAX_CHARS or any(
+        keyword in lowered for keyword in HEAVY_MODEL_KEYWORDS
+    )
+
+
+def _select_model(messages, *, provider: str) -> str:
+    if provider == "openai":
+        if _should_use_heavy_model(messages):
+            return OPENAI_HEAVY_MODEL or OPENAI_MODEL
+        return OPENAI_FAST_MODEL or OPENAI_MODEL
+    if provider == "gemini":
+        if _should_use_heavy_model(messages):
+            return GEMINI_HEAVY_MODEL or GEMINI_MODEL_NAME
+        return GEMINI_FAST_MODEL or GEMINI_MODEL_NAME
+    if provider == "ollama":
+        if _should_use_heavy_model(messages):
+            return HEAVY_MODEL or MODEL
+        return FAST_MODEL or MODEL
+    return MODEL
+
+
 def _call_openai_chat(messages, *, stream: bool = False):
     if not OPENAI_API_KEY:
         raise RuntimeError("OPENAI_API_KEY não configurada.")
 
     payload = {
-        "model": OPENAI_MODEL,
+        "model": _select_model(messages, provider="openai"),
         "messages": _format_messages_for_openai(messages),
         "stream": stream,
     }
@@ -359,7 +423,9 @@ def call_cloud_llm(messages):
 
             if contents:
                 response = _GEMINI_CLIENT.models.generate_content(
-                    model=GEMINI_MODEL_NAME, contents=contents, config=config
+                    model=_select_model(messages, provider="gemini"),
+                    contents=contents,
+                    config=config,
                 )
             else:
                 return "Error: No messages to process."
@@ -402,13 +468,13 @@ def _call_ollama_chat(messages):
             if isinstance(m, dict)
         )
         payload = {
-            "model": MODEL,
+            "model": _select_model(messages, provider="ollama"),
             "prompt": prompt,
             "stream": False,
         }
     else:
         payload = {
-            "model": MODEL,
+            "model": _select_model(messages, provider="ollama"),
             "messages": messages,
             "stream": False,
         }
@@ -547,9 +613,15 @@ class LibrarianAgent:
         # 4. SKILLS (O que eu já aprendi a fazer?)
         skills_path = os.path.join(os.path.dirname(self.core_path), "skills")
         if os.path.exists(skills_path):
-            skills = [f.stem for f in Path(skills_path).glob("*.py") if f.name != "__init__.py"]
+            skills = [
+                f.stem
+                for f in Path(skills_path).glob("*.py")
+                if f.name != "__init__.py"
+            ]
             if skills:
-                relevant_data.append(f"--- SKILLS ASSIMILADAS ---\n{', '.join(skills)}\n--------------------------")
+                relevant_data.append(
+                    f"--- SKILLS ASSIMILADAS ---\n{', '.join(skills)}\n--------------------------"
+                )
 
         return "\n\n".join(relevant_data)
 

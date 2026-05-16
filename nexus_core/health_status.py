@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import socket
 import shutil
 import time
@@ -12,13 +13,17 @@ import requests
 
 
 def check_memory_service(
-    url: str = "http://127.0.0.1:8082/health", timeout: float = 0.35
+    url: str | None = None, timeout: float = 0.35
 ) -> dict[str, Any]:
+    url = url or os.getenv("NEXUS_MEMORY_SERVICE_URL", "http://127.0.0.1:8085/health")
     try:
         resp = requests.get(url, timeout=timeout)
-        return {"status": "online" if resp.status_code == 200 else "offline"}
-    except Exception:
-        return {"status": "offline"}
+        return {
+            "status": "online" if resp.status_code == 200 else "offline",
+            "url": url,
+        }
+    except Exception as exc:
+        return {"status": "offline", "url": url, "error": str(exc)}
 
 
 def build_watcher_status(

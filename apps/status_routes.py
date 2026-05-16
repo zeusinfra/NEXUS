@@ -14,6 +14,8 @@ class StatusRouteDeps:
     require_lan_token_for_request: Callable[[Request], None]
     build_api_status: Callable[[], dict]
     build_api_health: Callable[[], dict]
+    build_api_health_compact: Callable[[], dict]
+    build_sync_status: Callable[[], dict]
     llm_service: LLMService
 
 
@@ -47,6 +49,11 @@ def create_status_router(deps: StatusRouteDeps) -> APIRouter:
         require_access(request)
         return deps.build_api_health()
 
+    @router.get("/api/health/compact")
+    async def get_api_health_compact(request: Request):
+        require_access(request)
+        return deps.build_api_health_compact()
+
     @router.get("/api/applet/status")
     async def get_api_applet_status(request: Request):
         require_access(request)
@@ -65,13 +72,12 @@ def create_status_router(deps: StatusRouteDeps) -> APIRouter:
         try:
             from nexus_core.memory_manager import memory_manager
             import sqlite3
+
             conn = sqlite3.connect(memory_manager.db_path)
             synapse_count = conn.execute("SELECT COUNT(*) FROM synapses").fetchone()[0]
             conn.close()
         except Exception:
             pass
-
-        from apps.web_gui import sync_engine
 
         return {
             "ok": True,
@@ -90,11 +96,7 @@ def create_status_router(deps: StatusRouteDeps) -> APIRouter:
                 "privacy_shield": state.privacy_status.get("shield"),
                 "synapse_count": synapse_count,
             },
-            "sync": {
-                "is_running": sync_engine.is_running,
-                "last_sync": sync_engine.last_sync,
-                "relay": sync_engine.relay_url
-            },
+            "sync": deps.build_sync_status(),
             "voice": health.get("voice", {}),
             "vision": health.get("vision", {}),
             "second_brain": health.get("second_brain", {}),

@@ -10,7 +10,17 @@ DB_PATH = os.getenv("NEXUS_DB_PATH", "./nexus_events.db")
 
 
 def get_connection(db_path: str | None = None):
-    return sqlite3.connect(db_path or os.getenv("NEXUS_DB_PATH", DB_PATH))
+    conn = sqlite3.connect(
+        db_path or os.getenv("NEXUS_DB_PATH", DB_PATH),
+        timeout=float(os.getenv("NEXUS_SQLITE_BUSY_TIMEOUT_SEC", "5")),
+    )
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA temp_store=MEMORY")
+    conn.execute(
+        f"PRAGMA busy_timeout={int(float(os.getenv('NEXUS_SQLITE_BUSY_TIMEOUT_SEC', '5')) * 1000)}"
+    )
+    return conn
 
 
 def init_db(db_path: str | None = None):
@@ -70,6 +80,23 @@ def init_db(db_path: str | None = None):
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_status ON events(status)")
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_events_created_at ON events(created_at)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_events_source_path ON events(source_path)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_processed_files_path ON processed_files(file_path)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_sync_logs_status ON sync_logs(status)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_sync_logs_source_target_path ON sync_logs(source, target, source_path)"
+    )
 
     conn.commit()
     conn.close()
