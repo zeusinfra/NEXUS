@@ -4,11 +4,11 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/zeus/Documentos/ZEUS_SYSTEM
-ExecStart=/home/zeus/Documentos/ZEUS_SYSTEM/.venv/bin/python -m nexus_core.cognitive.cognition_service
+WorkingDirectory=/home/nexus/Documentos/NEXUS/NEXUS
+ExecStart=/home/nexus/Documentos/NEXUS/NEXUS/.venv/bin/python -m nexus_core.cognitive.cognition_service
 Restart=on-failure
 RestartSec=5
-EnvironmentFile=/home/zeus/Documentos/ZEUS_SYSTEM/.env
+EnvironmentFile=/home/nexus/Documentos/NEXUS/NEXUS/.env
 
 [Install]
 WantedBy=default.target

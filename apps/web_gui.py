@@ -120,6 +120,7 @@ from pydantic import BaseModel
 setup_logging(os.getenv("NEXUS_LOG_LEVEL", "INFO"))
 logger = get_logger("nexus.web")
 
+
 # --- CONFIGURAÇÕES ---
 def _default_watch_dirs() -> list[str]:
     candidates = [
@@ -131,7 +132,9 @@ def _default_watch_dirs() -> list[str]:
 
 WATCH_DIRS = [
     str(Path(path).expanduser().resolve())
-    for path in os.getenv("NEXUS_WATCH_DIRS", ",".join(_default_watch_dirs())).split(",")
+    for path in os.getenv("NEXUS_WATCH_DIRS", ",".join(_default_watch_dirs())).split(
+        ","
+    )
     if path.strip() and Path(path).expanduser().exists()
 ]
 BASE_DIR = str(PROJECT_ROOT)
@@ -241,9 +244,6 @@ IGNORED_DIRS = {
 }
 
 
-
-
-
 # --- STATE ---
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=ALLOWED_ORIGINS)
 
@@ -283,6 +283,7 @@ resource_control = ResourceControl(
     brain.blackboard, {}
 )  # Integrando controle de recursos
 
+
 async def proactive_observation_loop():
     """Loop que observa a tela periodicamente para manter consciência situacional."""
     logger.info("👀 [NEXUS VISION] Iniciando Observador Proativo de Tela.")
@@ -291,29 +292,36 @@ async def proactive_observation_loop():
             # Lógica Adaptativa: Se o sistema estiver sob pressão ou ativo, observa mais frequentemente
             snapshot = get_os_snapshot()
             pressure = snapshot.get("pressure", "calm")
-            
+
             base_interval = int(os.getenv("NEXUS_VISION_INTERVAL", "300"))
-            
+
             if pressure == "critical":
                 current_interval = base_interval // 4  # Observa 4x mais rápido em crise
             elif pressure == "active":
-                current_interval = base_interval // 2  # Observa 2x mais rápido em uso intenso
+                current_interval = (
+                    base_interval // 2
+                )  # Observa 2x mais rápido em uso intenso
             else:
                 current_interval = base_interval
 
-            logger.info(f"👀 [NEXUS VISION] Próxima observação em {current_interval}s (Modo: {pressure})")
+            logger.info(
+                f"👀 [NEXUS VISION] Próxima observação em {current_interval}s (Modo: {pressure})"
+            )
             await asyncio.sleep(current_interval)
 
             if not resource_control.is_critical():
                 observation = await asyncio.to_thread(
                     observer_agent.observe_screen,
                     brain.blackboard,
-                    "Resuma o que o usuário está fazendo agora e identifique o foco principal da atenção dele."
+                    "Resuma o que o usuário está fazendo agora e identifique o foco principal da atenção dele.",
                 )
-                logger.info(f"🧠 [NEXUS VISION] Nova percepção situacional: {observation[:100]}...")
+                logger.info(
+                    f"🧠 [NEXUS VISION] Nova percepção situacional: {observation[:100]}..."
+                )
         except Exception as e:
             logger.error(f"❌ [NEXUS VISION] Erro no loop de observação: {e}")
             await asyncio.sleep(60)
+
 
 lifecycle_manager = LifecycleManager(globals())
 cognition_service = CognitionService()
@@ -323,6 +331,7 @@ observer_agent = ObserverAgent(PROJECT_ROOT)
 
 from nexus_core.synaptic_sync import SyncEngine
 from nexus_core.architect_agent import architect_agent
+
 sync_engine = SyncEngine(memory_manager)
 
 
@@ -391,7 +400,9 @@ async def lifespan(app: FastAPI):
     _watcher_task = None
     _sync_worker_task = None
     _sync_engine_tasks = []
-    vault_path = os.getenv("NEXUS_VAULT_PATH", "/home/zeus/Documentos/Brain")
+    vault_path = os.getenv(
+        "NEXUS_VAULT_PATH", str(Path.home() / "Documentos" / "Brain")
+    )
     if ENABLE_SECOND_BRAIN and os.path.exists(vault_path):
         logger.info(f"[NEXUS] Iniciando Second Brain integrando {vault_path}")
         _watcher_task = asyncio.create_task(watch_vault(vault_path))
@@ -468,8 +479,6 @@ async def lifespan(app: FastAPI):
         pass
 
 
-
-
 async def dreaming_loop():
     """
     Loop de Manutenção: O NEXUS entra em 'Modo Sonho' quando o sistema está calmo.
@@ -480,19 +489,23 @@ async def dreaming_loop():
         try:
             # Verifica o estado a cada hora
             await asyncio.sleep(3600)
-            
+
             snapshot = get_os_snapshot()
             pressure = snapshot.get("pressure", "calm")
-            
+
             # Só 'sonha' se o sistema estiver calmo (madrugada ou inativo)
             if pressure == "calm":
-                logger.info("🌙 [NEXUS DREAMING] Sistema calmo. Iniciando Consolidação...")
+                logger.info(
+                    "🌙 [NEXUS DREAMING] Sistema calmo. Iniciando Consolidação..."
+                )
                 results = await asyncio.to_thread(memory_manager.dream_cycle)
-                await broadcast_message({
-                    "type": "system_alert",
-                    "message": f"Modo Sonho concluído: {results['pruned_synapses']} sinapses podadas.",
-                    "level": "info"
-                })
+                await broadcast_message(
+                    {
+                        "type": "system_alert",
+                        "message": f"Modo Sonho concluído: {results['pruned_synapses']} sinapses podadas.",
+                        "level": "info",
+                    }
+                )
         except Exception as e:
             logger.error(f"❌ [NEXUS DREAMING] Erro no ciclo de sono: {e}")
 
@@ -500,23 +513,32 @@ async def dreaming_loop():
 app = FastAPI(lifespan=lifespan)
 app.middleware("http")(correlation_id_middleware)
 
+
 # --- NEXUS BRAIN ENDPOINTS ---
 @app.get("/api/synapse_graph")
 async def get_synapse_graph():
     """Retorna o grafo de sinapses para visualização 3D."""
     conn = sqlite3.connect(memory_manager.db_path)
     cursor = conn.cursor()
-    
+
     # Busca nós
-    cursor.execute("SELECT path, weight FROM nodes WHERE weight > 1 ORDER BY weight DESC LIMIT 100")
-    nodes = [{"id": r[0], "name": os.path.basename(r[0]), "val": r[1]} for r in cursor.fetchall()]
-    
+    cursor.execute(
+        "SELECT path, weight FROM nodes WHERE weight > 1 ORDER BY weight DESC LIMIT 100"
+    )
+    nodes = [
+        {"id": r[0], "name": os.path.basename(r[0]), "val": r[1]}
+        for r in cursor.fetchall()
+    ]
+
     # Busca arestas (sinapses)
-    cursor.execute("SELECT source, target, weight FROM synapses WHERE weight > 1 LIMIT 200")
+    cursor.execute(
+        "SELECT source, target, weight FROM synapses WHERE weight > 1 LIMIT 200"
+    )
     links = [{"source": r[0], "target": r[1], "value": r[2]} for r in cursor.fetchall()]
-    
+
     conn.close()
     return {"nodes": nodes, "links": links}
+
 
 @app.post("/api/dream")
 async def trigger_dream():
@@ -524,19 +546,22 @@ async def trigger_dream():
     results = await asyncio.to_thread(memory_manager.dream_cycle)
     return results
 
+
 # --- SYNC ENDPOINTS ---
 @app.get("/api/sync/status")
 async def get_sync_status():
     return {
         "is_running": sync_engine.is_running,
         "last_sync": sync_engine.last_sync,
-        "relay": sync_engine.relay_url
+        "relay": sync_engine.relay_url,
     }
+
 
 @app.post("/api/sync/push")
 async def push_sync():
     snapshot = await sync_engine.export_neural_snapshot()
     return {"status": "success", "nodes_exported": len(snapshot["top_nodes"])}
+
 
 # --- ARCHITECT ENDPOINTS ---
 @app.post("/api/architect/plan")
@@ -548,16 +573,19 @@ async def architect_plan(request: Request):
     blueprint = await asyncio.to_thread(architect_agent.plan_project, goal)
     return blueprint
 
+
 @app.post("/api/architect/build")
 async def architect_build(request: Request):
     data = await request.json()
     blueprint = data.get("blueprint")
     if not blueprint:
         return {"error": "Blueprint is required"}
-    
+
     results = []
     for file_info in blueprint.get("files", []):
-        code = await asyncio.to_thread(architect_agent.generate_code, file_info, str(blueprint))
+        code = await asyncio.to_thread(
+            architect_agent.generate_code, file_info, str(blueprint)
+        )
         full_path = os.path.join(PROJECT_ROOT, "generated", file_info["path"])
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
         with open(full_path, "w", encoding="utf-8") as f:
@@ -565,17 +593,19 @@ async def architect_build(request: Request):
         results.append({"path": file_info["path"], "status": "written"})
     return {"status": "project_build_complete", "files": results}
 
+
 from nexus_core.boot_diagnostics import perform_boot_diagnostic
+
 
 async def boot_sequence():
     """Sequência de inicialização: Diagnóstico e Saudação por Voz."""
     logger.info("⚡ [NEXUS BOOT] Iniciando sequência de diagnóstico...")
-    await asyncio.sleep(5) 
-    
+    await asyncio.sleep(5)
+
     # Cooldown para evitar saudações repetidas em restarts rápidos
     last_boot = brain.blackboard.get("last_voice_boot", 0)
     now_ts = time.time()
-    
+
     report, tech_report = perform_boot_diagnostic()
     memory_manager.record_pattern("system_boot", tech_report, importance=1.0)
 
@@ -585,16 +615,24 @@ async def boot_sequence():
         try:
             audio_wav = await voice_service.generate_speech_wav(report)
             if audio_wav:
-                boot_audio_path = os.path.join(PROJECT_ROOT, "data", "voice_temp", "boot_greeting.wav")
+                boot_audio_path = os.path.join(
+                    PROJECT_ROOT, "data", "voice_temp", "boot_greeting.wav"
+                )
                 os.makedirs(os.path.dirname(boot_audio_path), exist_ok=True)
                 with open(boot_audio_path, "wb") as f:
                     f.write(audio_wav)
                 players = ["ffplay", "mpv", "play"]
                 for player in players:
                     if shutil.which(player):
-                        subprocess.Popen([player, "-nodisp", "-autoexit", boot_audio_path] if player == "ffplay" else [player, boot_audio_path])
+                        subprocess.Popen(
+                            [player, "-nodisp", "-autoexit", boot_audio_path]
+                            if player == "ffplay"
+                            else [player, boot_audio_path]
+                        )
                         break
-            await broadcast_message({"type": "voice_response", "text": report, "boot": True})
+            await broadcast_message(
+                {"type": "voice_response", "text": report, "boot": True}
+            )
         except Exception as e:
             logger.error(f"❌ [NEXUS BOOT] Erro na saudação de voz: {e}")
     else:
@@ -803,7 +841,6 @@ def get_os_snapshot():
     return get_rust_os_snapshot()
 
 
-
 def classify_process_family(name: str):
     normalized = (name or "").lower()
     if any(token in normalized for token in ["chrome", "brave", "firefox", "edge"]):
@@ -912,8 +949,12 @@ def assimilate_access_event(path: str, event: dict) -> None:
             similar_contexts = vector_memory.find_similar(path, top_k=3)
             for sim_path, score in similar_contexts:
                 if sim_path != path and score > 0.7:
-                    memory_manager.update_synapse(path, sim_path, weight_inc=int(score * 2))
-                    print(f"🧠 [NEXUS SINAPSE] Conexão orgânica detectada: {os.path.basename(path)} <-> {os.path.basename(sim_path)} ({score:.2f})")
+                    memory_manager.update_synapse(
+                        path, sim_path, weight_inc=int(score * 2)
+                    )
+                    print(
+                        f"🧠 [NEXUS SINAPSE] Conexão orgânica detectada: {os.path.basename(path)} <-> {os.path.basename(sim_path)} ({score:.2f})"
+                    )
         except Exception:
             pass
 
@@ -1088,6 +1129,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 @app.get("/")
 async def root():
@@ -1616,7 +1658,9 @@ class SystemAlertReq(BaseModel):
 
 
 def _build_second_brain_status() -> dict:
-    vault_path = os.getenv("NEXUS_VAULT_PATH", "/home/zeus/Documentos/Brain")
+    vault_path = os.getenv(
+        "NEXUS_VAULT_PATH", str(Path.home() / "Documentos" / "Brain")
+    )
     db_path = os.getenv("NEXUS_DB_PATH", "./nexus_events.db")
     status = {
         "enabled": bool(ENABLE_SECOND_BRAIN),
@@ -1665,7 +1709,7 @@ def _build_operational_capabilities() -> dict:
         item.strip()
         for item in os.getenv(
             "NEXUS_ALLOWED_EDIT_PATHS",
-            "/home/zeus/Documentos/NEXUS,/home/zeus/Documentos/Brain,/tmp/nexus_",
+            f"{PROJECT_ROOT},{Path.home() / 'Documentos' / 'Brain'},/tmp/nexus_",
         ).split(",")
         if item.strip()
     ]
@@ -2858,10 +2902,11 @@ if __name__ == "__main__":
     ssl_opts = _resolve_ssl_opts()
 
     if "--headless" in sys.argv or "--server" in sys.argv:
-        logger.info("🌑 NEXUS em modo HEADLESS operacional em %s:%s", SERVER_HOST, SERVER_PORT)
+        logger.info(
+            "🌑 NEXUS em modo HEADLESS operacional em %s:%s", SERVER_HOST, SERVER_PORT
+        )
         uvicorn.run(
             app, host=SERVER_HOST, port=SERVER_PORT, log_level="warning", **ssl_opts
         )
     else:
         uvicorn.run(app, host=SERVER_HOST, port=SERVER_PORT, **ssl_opts)
-

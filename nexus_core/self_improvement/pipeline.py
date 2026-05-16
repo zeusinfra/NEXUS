@@ -1,6 +1,7 @@
 import os
 import json
 import re
+from pathlib import Path
 from typing import Dict, List, Any
 from nexus_core.self_improvement.audit_log import audit_log
 from nexus_core.self_improvement.patch_manager import patch_manager
@@ -28,7 +29,10 @@ class SelfImprovementPipeline:
         problems = []
         try:
             # 1. Busca Tracebacks reais (mais preciso que apenas ERROR)
-            log_path = "/home/zeus/Documentos/ZEUS_SYSTEM/nexus_core.log"
+            log_path = os.getenv(
+                "NEXUS_CORE_LOG_PATH",
+                str(Path(__file__).resolve().parents[2] / "logs" / "nexus_core.log"),
+            )
             if os.path.exists(log_path):
                 result = await daemon_client.execute(
                     f"tail -n 200 {log_path}",

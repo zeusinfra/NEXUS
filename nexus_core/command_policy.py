@@ -242,12 +242,12 @@ def validate_command(
     autonomy = os.getenv("NEXUS_AUTONOMY_LEVEL", "GUARDED").upper()
 
     try:
-        if autonomy != "FULL" and _contains_shell_control(command):
+        if _contains_shell_control(command):
             raise ToolError(
                 "Encadeamento/redirecionamento de shell bloqueado em cmd_control."
             )
 
-        if decision.exe not in allowlist and autonomy != "FULL":
+        if decision.exe not in allowlist:
             raise ToolError(f"Comando fora da allowlist: {decision.exe}")
 
         if decision.exe in BLOCKED_COMMANDS:

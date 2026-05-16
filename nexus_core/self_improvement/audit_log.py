@@ -2,6 +2,7 @@ import os
 import json
 import sqlite3
 import datetime
+from pathlib import Path
 from nexus_core.observability import get_logger
 
 logger = get_logger("nexus.self_improvement.audit")
@@ -10,7 +11,7 @@ logger = get_logger("nexus.self_improvement.audit")
 class AuditLog:
     def __init__(self):
         self.db_path = os.path.join(
-            os.getenv("NEXUS_VAULT_PATH", "/home/zeus/Documentos/Brain"),
+            os.getenv("NEXUS_VAULT_PATH", str(Path.home() / "Documentos" / "Brain")),
             "logs",
             "self_improvement_audit.db",
         )

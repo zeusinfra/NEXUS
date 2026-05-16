@@ -5,13 +5,13 @@ on:
   push:
     branches: ["main"]
     paths:
-      - "zeus_core/browser_control.py"
+      - "nexus_core/browser_control.py"
       - "requirements/browser.txt"
       - ".github/workflows/browser-stack.yml"
   pull_request:
     branches: ["main"]
     paths:
-      - "zeus_core/browser_control.py"
+      - "nexus_core/browser_control.py"
       - "requirements/browser.txt"
 
 concurrency:
@@ -44,8 +44,8 @@ jobs:
 
       - name: Run Browser Tests
         env:
-          ZEUS_TESTING: "1"
-          ZEUS_SKIP_DOTENV: "1"
+          NEXUS_TESTING: "1"
+          NEXUS_SKIP_DOTENV: "1"
         run: |
           # Run tests specifically related to browser control
           python -m pytest tests/unit/test_browser.py || echo "No specific browser tests found yet"

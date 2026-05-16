@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from typing import List
 from nexus_core.observability import get_logger
 from nexus_core.security.daemon_client import daemon_client
@@ -9,7 +10,7 @@ logger = get_logger("nexus.self_improvement.rollback")
 class RollbackManager:
     def __init__(self):
         self.backup_dir = os.path.join(
-            os.getenv("NEXUS_VAULT_PATH", "/home/zeus/Documentos/Brain"),
+            os.getenv("NEXUS_VAULT_PATH", str(Path.home() / "Documentos" / "Brain")),
             "backups",
             "self_improvement",
         )

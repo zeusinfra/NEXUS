@@ -4,12 +4,12 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/zeus/Documentos/ZEUS_SYSTEM
-ExecStart=/home/zeus/Documentos/ZEUS_SYSTEM/.venv/bin/python -m apps.web_gui --headless
+WorkingDirectory=/home/nexus/Documentos/NEXUS/NEXUS
+ExecStart=/home/nexus/Documentos/NEXUS/NEXUS/.venv/bin/python -m apps.web_gui --headless
 Restart=always
 RestartSec=10
-StandardOutput=append:/home/zeus/Documentos/ZEUS_SYSTEM/logs/systemd_out.log
-StandardError=append:/home/zeus/Documentos/ZEUS_SYSTEM/logs/systemd_err.log
+StandardOutput=append:/home/nexus/Documentos/NEXUS/NEXUS/logs/systemd_out.log
+StandardError=append:/home/nexus/Documentos/NEXUS/NEXUS/logs/systemd_err.log
 
 [Install]
 WantedBy=default.target

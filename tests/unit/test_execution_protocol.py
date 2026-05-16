@@ -7,6 +7,7 @@ from nexus_core.execution_protocol import (
     ApprovalScope,
     ExecutionLedger,
     assert_verified_completion,
+    build_sandbox_invocation,
     cancel_execution,
     command_hash,
     create_command_proposal,
@@ -166,6 +167,50 @@ def test_no_fake_completion_without_exit_code_zero(execution_env):
         guard_agent_claim("concluído", proposal_id=proposal["proposal_id"])
         == "Ainda não executei. Preciso criar uma proposta de comando para aprovação."
     )
+
+
+def test_sandbox_invocation_mounts_cwd_and_maps_local_paths(
+    execution_env, monkeypatch, tmp_path
+):
+    fake_engine_dir = tmp_path / "bin"
+    fake_engine_dir.mkdir()
+    fake_podman = fake_engine_dir / "podman"
+    fake_podman.write_text("#!/bin/sh\n", encoding="utf-8")
+    fake_podman.chmod(0o755)
+    script = execution_env / "script.py"
+    script.write_text("print('ok')\n", encoding="utf-8")
+    monkeypatch.setenv("PATH", str(fake_engine_dir))
+    monkeypatch.setenv("NEXUS_EXECUTION_SANDBOX", "1")
+    monkeypatch.setenv("NEXUS_SANDBOX_ENGINE", "podman")
+    monkeypatch.setenv("NEXUS_SANDBOX_IMAGE", "python:3.12-slim")
+
+    invocation = build_sandbox_invocation(["python3", str(script)], str(execution_env))
+
+    assert invocation.enabled is True
+    assert invocation.engine == "podman"
+    assert invocation.tokens[:2] == ["podman", "run"]
+    assert "--network" in invocation.tokens
+    assert "none" in invocation.tokens
+    assert f"{execution_env}:/workspace:rw" in invocation.tokens
+    assert "/workspace/script.py" in invocation.tokens
+
+
+@pytest.mark.asyncio
+async def test_sandbox_request_blocks_when_engine_is_missing(
+    execution_env, monkeypatch
+):
+    monkeypatch.setenv("NEXUS_EXECUTION_SANDBOX", "1")
+    monkeypatch.setenv("NEXUS_SANDBOX_ENGINE", "nexus-missing-engine")
+    proposal = create_command_proposal("python3 --version", cwd=str(execution_env))
+    approval = request_user_approval(proposal["proposal_id"], approved_by="tester")
+
+    execution = await execute_approved_command(
+        proposal["proposal_id"], approval["approval_id"], timeout_s=5
+    )
+
+    assert execution["status"] == ActionState.BLOCKED.value
+    assert "nexus-missing-engine is not available" in execution["summary"]
+    assert execution["verified_by_executor"] is True
 
 
 @pytest.mark.asyncio

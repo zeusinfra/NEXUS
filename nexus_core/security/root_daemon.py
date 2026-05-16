@@ -180,9 +180,7 @@ APT_ALLOWLIST_DEFAULT = (
 )
 
 # Caminhos permitidos para edição
-ALLOWED_EDIT_PATHS_DEFAULT = (
-    "/home/zeus/Documentos/ZEUS_SYSTEM,/home/zeus/Documentos/Brain,/tmp/nexus_"
-)
+ALLOWED_EDIT_PATHS_DEFAULT = f"{Path(__file__).resolve().parents[2]},{Path.home() / 'Documentos' / 'Brain'},/tmp/nexus_"
 
 
 # ---------------------------------------------------------------------------
@@ -199,7 +197,7 @@ def _get_approval_socket_path() -> str:
 
 
 def _get_vault_path() -> str:
-    return os.getenv("NEXUS_VAULT_PATH", "/home/zeus/Documentos/Brain")
+    return os.getenv("NEXUS_VAULT_PATH", str(Path.home() / "Documentos" / "Brain"))
 
 
 def _get_autonomy_level() -> str:

@@ -11,12 +11,17 @@ import ctypes
 import shutil
 import re
 import unicodedata
+from nexus_core.observability import get_logger
 from nexus_core.response_text import speech_text
+
+logger = get_logger("nexus.voice_sensing")
 
 try:
     import speech_recognition as sr
 except Exception:
     sr = None
+
+SPEECH_RECOGNITION_AVAILABLE = sr is not None
 
 if sr is None:
     # Mock para evitar crashes em ambiente CI sem dependências de áudio
@@ -87,7 +92,7 @@ class VoiceSensing:
     def __init__(self, broadcast_callback=None, wake_word="nexus", llm_callback=None):
         _configure_stdout_encoding()
         _suppress_alsa_errors()
-        self.available = sr is not None and edge_tts is not None
+        self.available = SPEECH_RECOGNITION_AVAILABLE
         self.recognizer = sr.Recognizer() if sr is not None else None
         self.wake_word = wake_word.lower()
         self.llm_callback = llm_callback
@@ -487,7 +492,11 @@ class VoiceSensing:
                     await self._send_status("Falando (fallback local)...")
 
                 speak_timeout = float(os.getenv("NEXUS_SPD_SAY_TIMEOUT_SEC", "20"))
-                cmd = [spd, spoken_text] if "espeak" in spd else [spd, "-w", "-l", "pt", spoken_text]
+                cmd = (
+                    [spd, spoken_text]
+                    if "espeak" in spd
+                    else [spd, "-w", "-l", "pt", spoken_text]
+                )
                 proc = await asyncio.create_subprocess_exec(
                     *cmd,
                     stdout=subprocess.DEVNULL,

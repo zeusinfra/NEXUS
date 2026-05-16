@@ -5,16 +5,16 @@ on:
   push:
     branches: ["main"]
     paths:
-      - "zeus_core/asr.py"
-      - "zeus_core/voice_sensing.py"
+      - "nexus_core/asr.py"
+      - "nexus_core/voice_sensing.py"
       - "communication/voice_service.py"
       - "requirements/voice.txt"
       - ".github/workflows/voice-stack.yml"
   pull_request:
     branches: ["main"]
     paths:
-      - "zeus_core/asr.py"
-      - "zeus_core/voice_sensing.py"
+      - "nexus_core/asr.py"
+      - "nexus_core/voice_sensing.py"
       - "communication/voice_service.py"
       - "requirements/voice.txt"
 
@@ -49,8 +49,8 @@ jobs:
 
       - name: Run Voice Tests
         env:
-          ZEUS_TESTING: "1"
-          ZEUS_SKIP_DOTENV: "1"
+          NEXUS_TESTING: "1"
+          NEXUS_SKIP_DOTENV: "1"
         run: |
           # Run tests specifically related to voice
           python -m pytest tests/unit/test_voice.py || echo "No specific voice tests found yet"

@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import json
 import os
+import shutil
 import shlex
 import signal
 import uuid
@@ -76,6 +77,15 @@ class ExecutionMode(str, Enum):
     DISABLED = "disabled"
 
 
+@dataclass(frozen=True)
+class SandboxInvocation:
+    enabled: bool
+    engine: str | None = None
+    image: str = ""
+    tokens: list[str] = field(default_factory=list)
+    cwd: str | None = None
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
@@ -116,6 +126,80 @@ def execution_mode() -> ExecutionMode:
         return ExecutionMode(raw)
     except ValueError:
         return ExecutionMode.MANUAL
+
+
+def sandbox_requested() -> bool:
+    return os.getenv("NEXUS_EXECUTION_SANDBOX", "0").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def build_sandbox_invocation(tokens: list[str], cwd: str) -> SandboxInvocation:
+    if not sandbox_requested():
+        return SandboxInvocation(enabled=False, tokens=tokens, cwd=cwd)
+
+    preferred = os.getenv("NEXUS_SANDBOX_ENGINE", "auto").strip().lower() or "auto"
+    candidates = ["podman", "docker"] if preferred == "auto" else [preferred]
+    engine = next(
+        (candidate for candidate in candidates if shutil.which(candidate)), None
+    )
+    if engine is None:
+        raise ToolError(
+            "Sandbox requested, but neither podman nor docker is available."
+            if preferred == "auto"
+            else f"Sandbox requested, but {preferred} is not available."
+        )
+
+    image = os.getenv("NEXUS_SANDBOX_IMAGE", "python:3.12-slim").strip()
+    if not image:
+        raise ToolError("NEXUS_SANDBOX_IMAGE is required when sandbox is enabled.")
+
+    root = Path(cwd).expanduser().resolve()
+    container_tokens = [_map_token_into_workspace(token, root) for token in tokens]
+    network = os.getenv("NEXUS_SANDBOX_NETWORK", "none").strip() or "none"
+    mount_mode = os.getenv("NEXUS_SANDBOX_MOUNT_MODE", "rw").strip().lower()
+    if mount_mode not in {"ro", "rw"}:
+        mount_mode = "rw"
+
+    invocation = [
+        engine,
+        "run",
+        "--rm",
+        "--network",
+        network,
+        "--workdir",
+        "/workspace",
+        "--volume",
+        f"{root}:/workspace:{mount_mode}",
+    ]
+    if os.getuid() != 0:
+        invocation.extend(["--user", f"{os.getuid()}:{os.getgid()}"])
+    invocation.append(image)
+    invocation.extend(container_tokens)
+    return SandboxInvocation(
+        enabled=True,
+        engine=engine,
+        image=image,
+        tokens=invocation,
+        cwd=str(root),
+    )
+
+
+def _map_token_into_workspace(token: str, root: Path) -> str:
+    try:
+        path = Path(token)
+    except TypeError:
+        return token
+    if not path.is_absolute():
+        return token
+    try:
+        rel = path.resolve().relative_to(root)
+    except (OSError, ValueError):
+        return token
+    return str(Path("/workspace") / rel)
 
 
 def risk_for_command(command: str) -> tuple[str, bool]:
@@ -477,14 +561,42 @@ async def execute_approved_command(
     ledger.transition(ActionState.APPROVED.value, queued.status)
     ledger.append(queued)
 
+    try:
+        sandbox = build_sandbox_invocation(tokens, cwd)
+    except ToolError as exc:
+        return ledger.append_transition(
+            ActionState.QUEUED.value,
+            ExecutionRecord(
+                proposal_id=proposal_id,
+                approval_id=approval_id,
+                command=command,
+                cwd=cwd,
+                status=ActionState.BLOCKED.value,
+                command_hash=current["command_hash"],
+                risk_level=current["risk_level"],
+                approved_by=approval.get("approved_by"),
+                approval_scope=approval.get("approval_scope"),
+                expires_at=approval.get("expires_at"),
+                summary=str(exc),
+                verified_by_executor=True,
+            ),
+        )
+    exec_tokens = sandbox.tokens if sandbox.enabled else tokens
+    exec_cwd = cwd if not sandbox.enabled else None
+    execution_summary = (
+        f"Process started in sandbox via {sandbox.engine} using {sandbox.image}."
+        if sandbox.enabled
+        else "Process started."
+    )
+
     out_dir = artifacts_dir()
     out_dir.mkdir(parents=True, exist_ok=True)
     stdout_path = out_dir / f"{proposal_id}.stdout.log"
     stderr_path = out_dir / f"{proposal_id}.stderr.log"
 
     proc = await asyncio.create_subprocess_exec(
-        *tokens,
-        cwd=cwd,
+        *exec_tokens,
+        cwd=exec_cwd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
@@ -504,7 +616,7 @@ async def execute_approved_command(
         approved_by=approval.get("approved_by"),
         approval_scope=approval.get("approval_scope"),
         expires_at=approval.get("expires_at"),
-        summary="Process started.",
+        summary=execution_summary,
     )
     ledger.transition(ActionState.QUEUED.value, running.status)
     ledger.append(running)

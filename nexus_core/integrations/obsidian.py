@@ -2,12 +2,13 @@ import os
 import re
 import hashlib
 from datetime import datetime
+from pathlib import Path
 
 from nexus_core.env import load_project_env
 
 load_project_env()
 
-VAULT_PATH = os.getenv("NEXUS_VAULT_PATH", "/home/zeus/Documentos/Brain")
+VAULT_PATH = os.getenv("NEXUS_VAULT_PATH", str(Path.home() / "Documentos" / "Brain"))
 
 
 def calculate_content_hash(content: str) -> str:

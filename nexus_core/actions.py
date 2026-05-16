@@ -368,7 +368,7 @@ def system_capabilities(parameters: dict) -> dict:
         item.strip()
         for item in os.getenv(
             "NEXUS_ALLOWED_EDIT_PATHS",
-            "/home/zeus/Documentos/ZEUS_SYSTEM,/home/zeus/Documentos/Brain,/tmp/nexus_",
+            f"{Path(__file__).resolve().parents[1]},{Path.home() / 'Documentos' / 'Brain'},/tmp/nexus_",
         ).split(",")
         if item.strip()
     ]

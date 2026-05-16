@@ -176,6 +176,10 @@ Important settings:
 - `NEXUS_ENABLE_BROWSER_SENSING`: enable browser sensing
 - `NEXUS_PROJECT_ROOT`: project root used by the organizational runtime
 - `NEXUS_EXECUTION_MODE`: execution mode used by the command ledger
+- `NEXUS_EXECUTION_SANDBOX`: run approved commands inside Docker/Podman when set
+  to `1`
+- `NEXUS_SANDBOX_ENGINE`: `auto`, `podman`, or `docker`
+- `NEXUS_SANDBOX_IMAGE`: container image used by the sandbox runtime
 - `NEXUS_CMD_ALLOWLIST`: command allowlist for guarded execution
 
 Secrets belong in local environment files or secret managers. Do not commit
@@ -187,31 +191,43 @@ real API keys, tokens, private keys, database dumps, or personal vault content.
 flowchart TD
     Operator[Operator] --> Iced[Iced GUI]
     Operator --> TUI[Bubble Tea TUI]
+    Operator --> Voice[Voice Layer]
 
     Iced --> API[FastAPI Backend]
-    Iced --> OrgCLI[bin/nexus org]
-    TUI --> OrgCLI
+    TUI --> OrgCLI[bin/nexus org]
+    Voice --> API
 
-    API --> LLM[LLM Router]
-    API --> Memory[SQLite Memory]
-    API --> Events[Event Bus]
-    API --> Cognition[Cognitive Loop]
-    API --> Security[RootDaemon + Policy]
-    API --> Peripherals[USB + Bluetooth]
-    API --> Watcher[Rust Watcher]
+    API --> OrgDaemon[Organizational Daemon]
     OrgCLI --> OrgDaemon[Organizational Daemon]
+
     OrgDaemon --> Agents[Agent Registry]
-    OrgDaemon --> Runtime[Runtime Engine]
+    OrgDaemon --> Runtime[Reality Runtime Engine]
     OrgDaemon --> Policy[Policy + Permission Manager]
     OrgDaemon --> OrgMemory[SQLite Organizational Memory]
     OrgDaemon --> Observer[Linux Observer]
+    OrgDaemon --> Events[Event Bus]
+    OrgDaemon --> Cognition[Cognitive Loop]
+    OrgDaemon --> LLM[LLM Router]
+
     Runtime --> Verify[Verification Engine]
+    Runtime --> Logs[Execution Logs]
+    Runtime --> Sandbox[Docker/Podman Sandbox]
+
+    Policy --> Security[RootDaemon + Policy]
+    Verify --> OrgMemory
+    Agents --> OrgMemory
+    Observer --> OrgMemory
+    Events --> OrgMemory
 
     Events --> Obsidian[Obsidian Vault]
     Events --> Notion[Notion]
     Events --> Linear[Linear]
+
     LLM --> Local[Local Models]
     LLM --> Hosted[Hosted Providers]
+
+    OrgDaemon --> Peripherals[USB + Bluetooth]
+    OrgDaemon --> Watcher[Rust Watcher]
 ```
 
 ## Security Model

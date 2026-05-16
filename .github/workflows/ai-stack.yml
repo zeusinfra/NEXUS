@@ -5,15 +5,15 @@ on:
   push:
     branches: ["main"]
     paths:
-      - "zeus_core/llm_service.py"
-      - "zeus_core/cognitive/**"
+      - "nexus_core/llm_service.py"
+      - "nexus_core/cognitive/**"
       - "requirements/ai.txt"
       - ".github/workflows/ai-stack.yml"
   pull_request:
     branches: ["main"]
     paths:
-      - "zeus_core/llm_service.py"
-      - "zeus_core/cognitive/**"
+      - "nexus_core/llm_service.py"
+      - "nexus_core/cognitive/**"
       - "requirements/ai.txt"
 
 concurrency:
@@ -42,8 +42,8 @@ jobs:
 
       - name: Run AI Tests
         env:
-          ZEUS_TESTING: "1"
-          ZEUS_SKIP_DOTENV: "1"
+          NEXUS_TESTING: "1"
+          NEXUS_SKIP_DOTENV: "1"
         run: |
           # Run tests specifically related to AI and Cognition
           python -m pytest tests/unit/test_cognitive.py || echo "No specific cognitive tests found yet"

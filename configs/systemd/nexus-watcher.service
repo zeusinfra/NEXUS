@@ -4,14 +4,14 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/zeus/Documentos/ZEUS_SYSTEM/watcher_rs
+WorkingDirectory=/home/nexus/Documentos/NEXUS/NEXUS/watcher_rs
 # Note: To avoid compilation overhead on every start, consider pointing ExecStart directly to the compiled binary:
-# ExecStart=/home/zeus/Documentos/ZEUS_SYSTEM/watcher_rs/target/release/watcher_rs
+# ExecStart=/home/nexus/Documentos/NEXUS/NEXUS/watcher_rs/target/release/watcher_rs
 ExecStart=/usr/bin/env cargo run --release
 Restart=always
 RestartSec=5
-StandardOutput=append:/home/zeus/Documentos/ZEUS_SYSTEM/logs/nexus_watcher_systemd.log
-StandardError=append:/home/zeus/Documentos/ZEUS_SYSTEM/logs/nexus_watcher_systemd.log
+StandardOutput=append:/home/nexus/Documentos/NEXUS/NEXUS/logs/nexus_watcher_systemd.log
+StandardError=append:/home/nexus/Documentos/NEXUS/NEXUS/logs/nexus_watcher_systemd.log
 
 [Install]
 WantedBy=default.target

@@ -4,13 +4,13 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/zeus/Documentos/ZEUS_SYSTEM
+WorkingDirectory=/home/nexus/Documentos/NEXUS/NEXUS
 ExecStartPre=/usr/bin/mkdir -p /tmp/nexus
-ExecStart=/home/zeus/Documentos/ZEUS_SYSTEM/.venv/bin/python3 -m nexus_core.security.root_daemon
+ExecStart=/home/nexus/Documentos/NEXUS/NEXUS/.venv/bin/python3 -m nexus_core.security.root_daemon
 Restart=always
 RestartSec=3
-StandardOutput=append:/home/zeus/Documentos/ZEUS_SYSTEM/logs/root_daemon.log
-StandardError=append:/home/zeus/Documentos/ZEUS_SYSTEM/logs/root_daemon.log
+StandardOutput=append:/home/nexus/Documentos/NEXUS/NEXUS/logs/root_daemon.log
+StandardError=append:/home/nexus/Documentos/NEXUS/NEXUS/logs/root_daemon.log
 
 [Install]
 WantedBy=default.target
