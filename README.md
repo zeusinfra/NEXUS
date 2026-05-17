@@ -73,6 +73,53 @@ For server-only operations or organizational management:
 ./bin/nexus org health
 ```
 
+### Hybrid LLM Product CLI
+NEXUS now includes a Linux product CLI surface for hybrid local/cloud model
+routing. The local path detects an existing Ollama installation and models
+without installing or pulling anything automatically.
+
+The strategic cloud route is `gemma4:31b-cloud` through the Ollama provider
+configuration. It is the default model for complex and critical reasoning in
+the product docs and default config.
+
+```bash
+./bin/nexus status
+./bin/nexus health
+./bin/nexus model status
+./bin/nexus model list-local
+./bin/nexus router explain "planejar pacote .deb com systemd"
+```
+
+Routing policy:
+
+| Task class | Default route | Purpose |
+| :--- | :--- | :--- |
+| `simple` | Ollama local | quick answers, summaries, log classification |
+| `normal` | Ollama local | lightweight offline reasoning |
+| `complex` | `gemma4:31b-cloud` | architecture, package planning, deep debugging |
+| `critical` | `gemma4:31b-cloud` + approval | sudo, systemd, `/etc`, destructive risk |
+
+### Debian Package
+Build a local `.deb` package:
+
+```bash
+make deb
+make test-package
+```
+
+Install flow:
+
+```bash
+sudo apt install ./dist/nexus_0.1.5_amd64.deb
+sudo nexus setup
+sudo systemctl enable --now nexus
+nexus status
+```
+
+See `docs/INSTALL.md`, `docs/PACKAGE.md`, `docs/ARCHITECTURE.md` and
+`docs/SECURITY.md` for the product layout and safety model. The current
+architecture flowchart is in `docs/FLOWCHART.md`.
+
 ---
 
 ## ⚖️ Governance and Compliance

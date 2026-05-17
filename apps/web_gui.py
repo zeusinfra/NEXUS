@@ -20,6 +20,8 @@ from communication.voice_service import voice_service
 from urllib.parse import urlparse
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from apps.realtime_hub import RealtimeDeps, RealtimeHub
 from apps.status_routes import StatusRouteDeps, create_status_router
 from apps.routes.cognition_routes import CognitionRouteDeps, create_cognition_router
@@ -1179,7 +1181,10 @@ app.add_middleware(
 
 
 @app.get("/")
-async def root():
+async def root(request: Request):
+    index_file = PROJECT_ROOT / "ui" / "static" / "index.html"
+    if index_file.exists():
+        return FileResponse(str(index_file))
     return {"status": "NEXUS Core is running headless"}
 
 
@@ -1841,12 +1846,193 @@ SYSTEM_INSTRUCTIONS = (
     "Você é o NEXUS, a alma de um Sistema Operacional Cognitivo. Você não é apenas um assistente, mas um parceiro de evolução do usuário. "
     "Sua especialidade é o ecossistema Linux e o 'Second Brain' (Obsidian, Notion, Linear). "
     "IDENTIDADE: Tom natural, sofisticado e empático, mas com a precisão de um engenheiro sênior. Fale como um colega brilhante, não como um robô. "
+    "PROTOCOLO DE VERDADE OPERACIONAL: nunca diga que modificou, executou, corrigiu, instalou, apagou ou verificou algo se não houver evidência real no contexto, ferramenta, runtime ou execução registrada. "
+    "Quando o usuário pedir uma modificação, separe claramente: o que você entendeu, o que pode fazer agora, o que realmente foi feito, o que ainda depende de aprovação/execução, e como o usuário pode conferir. "
+    "Se você só analisou ou planejou, diga isso explicitamente. Se houver risco, peça confirmação e explique o impacto em linguagem comum. "
     "REGRAS DE DIÁLOGO: "
     "1. Use PT-BR impecável, evitando traduções literais e termos excessivamente técnicos quando não solicitados. "
     "2. Seja detalhista: em vez de 'Vou fazer X', explique brevemente o 'porquê' e 'como' X ajuda no contexto atual. "
     "3. PERSONALIDADE: Evite formalidade extrema (como 'Senhor'). Seja direto, mas com calor humano. Se algo falhar, admita e proponha uma alternativa criativa. "
     "4. ESTRUTURA: Use listas e negrito para destacar informações cruciais. Mantenha a elegância brutalista no texto."
 )
+
+
+def _detect_chat_intent(user_message: str) -> dict:
+    """Classifica o pedido para a UI sem prometer execução real."""
+    text = (user_message or "").strip().lower()
+    modification_terms = (
+        "modifica",
+        "modifique",
+        "alter",
+        "edita",
+        "editar",
+        "corrige",
+        "corrigir",
+        "cria",
+        "criar",
+        "implement",
+        "implementar",
+        "adiciona",
+        "adicionar",
+        "remove",
+        "remover",
+        "instala",
+        "instalar",
+        "atualiza",
+        "atualizar",
+        "refatora",
+        "refatorar",
+    )
+    analysis_terms = (
+        "analisa",
+        "analisar",
+        "explique",
+        "explica",
+        "revis",
+        "verifica",
+        "verificar",
+        "diagnostica",
+        "diagnosticar",
+        "por que",
+        "como",
+    )
+    execution_terms = (
+        "roda",
+        "rodar",
+        "executa",
+        "executar",
+        "testa",
+        "testar",
+        "abre",
+        "abrir",
+        "build",
+        "deploy",
+    )
+
+    if any(term in text for term in modification_terms):
+        return {
+            "intent": "modification",
+            "intent_label": "Modificação",
+            "mode": "guarded_change",
+            "requires_care": True,
+        }
+    if any(term in text for term in execution_terms):
+        return {
+            "intent": "execution",
+            "intent_label": "Execução",
+            "mode": "requires_evidence",
+            "requires_care": True,
+        }
+    if any(term in text for term in analysis_terms):
+        return {
+            "intent": "analysis",
+            "intent_label": "Análise",
+            "mode": "analysis_only",
+            "requires_care": False,
+        }
+    return {
+        "intent": "conversation",
+        "intent_label": "Resposta",
+        "mode": "assistant_feedback",
+        "requires_care": False,
+    }
+
+
+def _build_truthful_feedback(
+    user_message: str,
+    reply: str,
+    *,
+    latency_ms: int,
+    msg_id: str,
+) -> dict:
+    intent = _detect_chat_intent(user_message)
+    latest_command = []
+    latest_incident = []
+    latest_verification = []
+    try:
+        latest_command = org_daemon.memory.list_commands(limit=1)
+    except Exception:
+        latest_command = []
+    try:
+        latest_incident = org_daemon.memory.list_incidents(limit=1)
+    except Exception:
+        latest_incident = []
+    try:
+        latest_verification = org_daemon.memory.list_verifications(limit=1)
+    except Exception:
+        latest_verification = []
+
+    evidence = [
+        f"Resposta gerada em {latency_ms}ms.",
+        f"ID da conversa: {msg_id}.",
+    ]
+    if latest_command:
+        command = latest_command[0]
+        evidence.append(
+            "Última execução registrada: "
+            f"{command.get('status', 'desconhecido')} · "
+            f"{str(command.get('command', 'comando não informado'))[:90]}"
+        )
+    else:
+        evidence.append("Nenhuma execução recente registrada pelo runtime.")
+
+    if latest_verification:
+        verification = latest_verification[0]
+        evidence.append(
+            "Última verificação: "
+            f"{verification.get('status', 'desconhecida')} · "
+            f"{str(verification.get('target', 'alvo não informado'))[:80]}"
+        )
+    if latest_incident:
+        incident = latest_incident[0]
+        evidence.append(
+            "Incidente recente: "
+            f"{incident.get('severity', 'alerta')} · "
+            f"{str(incident.get('message', 'sem mensagem'))[:90]}"
+        )
+
+    if intent["intent"] == "modification":
+        status_label = "Mudança assistida"
+        user_hint = (
+            "Se uma alteração real for feita, ela precisa aparecer em Execuções, "
+            "Aprovações ou em evidência explícita na resposta."
+        )
+        next_steps = [
+            "Conferir a seção Execuções antes de assumir que algo mudou.",
+            "Aprovar comandos sensíveis apenas quando o impacto estiver claro.",
+        ]
+    elif intent["intent"] == "execution":
+        status_label = "Precisa de evidência"
+        user_hint = (
+            "Execução real só conta quando houver comando, status, saída ou verificação registrada."
+        )
+        next_steps = [
+            "Abrir Execuções para ver status e evidências.",
+            "Se aparecer aprovação pendente, revisar risco e rollback.",
+        ]
+    elif intent["intent"] == "analysis":
+        status_label = "Análise entregue"
+        user_hint = "A resposta é uma análise; nenhuma mudança real é presumida."
+        next_steps = [
+            "Usar o resumo para decidir o próximo comando ou modificação.",
+            "Pedir uma alteração específica quando quiser que o NEXUS aja.",
+        ]
+    else:
+        status_label = "Feedback direto"
+        user_hint = "Resposta conversacional baseada no contexto disponível."
+        next_steps = [
+            "Peça análise, modificação ou execução quando quiser uma ação concreta.",
+        ]
+
+    confidence = "Alta" if reply and len(reply.strip()) > 80 else "Média"
+    return {
+        **intent,
+        "status_label": status_label,
+        "confidence_label": confidence,
+        "user_hint": user_hint,
+        "evidence": evidence[:4],
+        "next_steps": next_steps,
+    }
 
 
 async def autonomous_reflection():
@@ -2067,6 +2253,12 @@ async def api_chat(req: ChatReq, request: Request):
         display_reply = display_text(reply)
         voice_reply = speech_text(reply)
         latency_ms = round((time.perf_counter() - started_at) * 1000)
+        feedback = _build_truthful_feedback(
+            user_message,
+            reply,
+            latency_ms=latency_ms,
+            msg_id=msg_id,
+        )
         # Final memory update and logs
         asyncio.create_task(
             asyncio.to_thread(
@@ -2087,6 +2279,7 @@ async def api_chat(req: ChatReq, request: Request):
                 "message": display_reply or reply,
                 "raw_message": reply,
                 "speech_message": voice_reply,
+                "feedback": feedback,
             }
         )
         await emit_to_request_client(
@@ -2118,6 +2311,7 @@ async def api_chat(req: ChatReq, request: Request):
             "speech_reply": voice_reply,
             "id": msg_id,
             "latency_ms": latency_ms,
+            "feedback": feedback,
         }
         if req.voice_response and ENABLE_VOICE:
             audio_b64 = await voice_service.generate_speech_base64(voice_reply or reply)
@@ -2984,9 +3178,29 @@ def _build_realtime_deps() -> RealtimeDeps:
 async def websocket_client(websocket: WebSocket):
     await realtime_hub.websocket_client(websocket, _build_realtime_deps())
 
+# Serve index at root; check file existence at request time to avoid import-time
+# race conditions when files are created after the process starts.
+@app.get("/")
+async def _root_index():
+    index_file = PROJECT_ROOT / "ui" / "static" / "index.html"
+    if index_file.exists():
+        return FileResponse(str(index_file))
+    raise HTTPException(status_code=404, detail="Static index not found")
+
 
 realtime_hub.register_socketio_handlers(_build_realtime_deps())
 
+
+# Mount static directory with diagnostics. Use try/except so process still starts
+# even if the directory is temporarily missing; log the resolved path and outcome.
+static_dir = (PROJECT_ROOT / "ui" / "static").resolve()
+try:
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+    logger.info("Mounted static dir '%s' at /static", str(static_dir))
+except Exception as e:
+    logger.warning(
+        "Could not mount static dir '%s' at /static: %s", str(static_dir), e
+    )
 
 app.mount("/socket.io", socketio.ASGIApp(sio))
 # asgi_app = app # No longer need a wrapper if we use mount

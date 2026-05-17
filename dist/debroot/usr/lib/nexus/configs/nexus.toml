@@ -1,0 +1,28 @@
+[daemon]
+heartbeat_interval_s = 5
+cognitive_tick_s = 15
+
+[runtime]
+dir = "runtime"
+state_dir = "runtime/state"
+tasks_dir = "runtime/tasks"
+approvals_dir = "runtime/approvals"
+pid_dir = "runtime/pids"
+blackboard_path = "runtime/state/blackboard.json"
+daemon_status_path = "runtime/state/daemon_status.json"
+daemon_pid_path = "runtime/pids/organization.pid"
+logs_dir = "logs"
+
+[policy]
+autonomy_level = "GUARDED"
+dry_run_default = true
+
+[interfaces]
+gui = "nexus-iced"
+tui = "interfaces/tui-bubbletea"
+hud = "interfaces/hud-slint"
+
+[memory]
+sqlite_path = "memory/organizational_memory.sqlite3"
+summaries_dir = "memory/summaries"
+decisions_dir = "memory/decisions"

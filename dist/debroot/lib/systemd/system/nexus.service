@@ -1,0 +1,30 @@
+[Unit]
+Description=NEXUS Cognitive OS daemon
+Documentation=https://github.com/zeusinfra/NEXUS
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=nexus
+Group=nexus
+EnvironmentFile=-/etc/nexus/nexus.env
+Environment=NEXUS_PROJECT_ROOT=/usr/lib/nexus
+Environment=NEXUS_CONFIG_PATH=/etc/nexus/config.toml
+Environment=NEXUS_STATE_DIR=/var/lib/nexus/state
+Environment=NEXUS_RUNTIME_DIR=/var/lib/nexus
+Environment=NEXUS_LOG_DIR=/var/log/nexus
+WorkingDirectory=/var/lib/nexus/workspace
+ExecStart=/usr/bin/nexus org --config /etc/nexus/config.toml run
+Restart=on-failure
+RestartSec=5
+StateDirectory=nexus
+LogsDirectory=nexus
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/var/lib/nexus /var/log/nexus /tmp
+
+[Install]
+WantedBy=multi-user.target

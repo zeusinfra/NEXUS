@@ -1,0 +1,73 @@
+[models]
+mode = "hybrid"
+
+[models.local]
+provider = "ollama"
+endpoint = "http://localhost:11434"
+auto_detect = true
+use_existing_models = true
+install_ollama = false
+pull_models_automatically = false
+preferred_model = "auto"
+
+[models.cloud]
+provider = "ollama"
+model = "gemma4:31b-cloud"
+api_key_env = "NEXUS_CLOUD_API_KEY"
+enabled = true
+
+[router]
+simple = "local"
+normal = "local"
+complex = "cloud"
+critical = "cloud"
+fallback_to_local = true
+fallback_to_cloud = false
+explain_routing = true
+
+[safety]
+sudo_requires_approval = true
+dangerous_requires_approval = true
+destructive_commands_blocked = true
+audit_all_actions = true
+allow_sudo = "approval_only"
+
+[execution]
+default_timeout_seconds = 60
+max_timeout_seconds = 600
+capture_stdout = true
+capture_stderr = true
+working_directory_policy = "allowlist"
+
+[paths]
+data_dir = "/var/lib/nexus"
+log_dir = "/var/log/nexus"
+config_dir = "/etc/nexus"
+workspace_dir = "/var/lib/nexus/workspace"
+
+# Compatibility with the current organizational daemon config loader.
+project_root = "/usr/lib/nexus"
+
+[runtime]
+dir = "/var/lib/nexus"
+state_dir = "/var/lib/nexus/state"
+logs_dir = "/var/log/nexus"
+tasks_dir = "/var/lib/nexus/tasks"
+approvals_dir = "/var/lib/nexus/approvals"
+pid_dir = "/var/lib/nexus/pids"
+blackboard_path = "/var/lib/nexus/state/blackboard.json"
+daemon_status_path = "/var/lib/nexus/state/daemon_status.json"
+daemon_pid_path = "/var/lib/nexus/pids/organization.pid"
+
+[daemon]
+heartbeat_interval_s = 5.0
+cognitive_tick_s = 15.0
+
+[policy]
+autonomy_level = "GUARDED"
+dry_run_default = true
+
+[memory]
+sqlite_path = "/var/lib/nexus/memory/organizational_memory.sqlite3"
+summaries_dir = "/var/lib/nexus/memory/summaries"
+decisions_dir = "/var/lib/nexus/memory/decisions"

@@ -1,0 +1,13 @@
+[
+  {
+    "id": "goal_001",
+    "descricao": "Otimizar workflow do usuário",
+    "prioridade": 0.9,
+    "estado": "ativo",
+    "progresso": 0.44999999999999996,
+    "meta": {
+      "created_ts": 1777237681.0634954,
+      "source": "bootstrap"
+    }
+  }
+]

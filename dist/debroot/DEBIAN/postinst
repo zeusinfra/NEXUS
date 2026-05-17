@@ -1,0 +1,37 @@
+#!/bin/sh
+set -e
+
+if ! getent passwd nexus >/dev/null 2>&1; then
+  useradd --system --home-dir /var/lib/nexus --shell /usr/sbin/nologin nexus
+fi
+
+mkdir -p \
+  /etc/nexus \
+  /var/lib/nexus/workspace \
+  /var/lib/nexus/state \
+  /var/lib/nexus/pids \
+  /var/lib/nexus/tasks \
+  /var/lib/nexus/approvals \
+  /var/lib/nexus/memory/summaries \
+  /var/lib/nexus/memory/decisions \
+  /var/log/nexus
+
+chown -R nexus:nexus /var/lib/nexus /var/log/nexus
+chmod 0755 \
+  /etc/nexus \
+  /var/lib/nexus \
+  /var/lib/nexus/workspace \
+  /var/lib/nexus/state \
+  /var/lib/nexus/pids \
+  /var/lib/nexus/tasks \
+  /var/lib/nexus/approvals \
+  /var/lib/nexus/memory \
+  /var/lib/nexus/memory/summaries \
+  /var/lib/nexus/memory/decisions \
+  /var/log/nexus
+
+if command -v systemctl >/dev/null 2>&1; then
+  systemctl daemon-reload || true
+fi
+
+exit 0
