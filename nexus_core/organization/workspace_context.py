@@ -124,9 +124,7 @@ class WorkspaceMemory:
             )
         return context
 
-    def _find_named(
-        self, filename: str, *, max_depth: int, limit: int
-    ) -> list[Path]:
+    def _find_named(self, filename: str, *, max_depth: int, limit: int) -> list[Path]:
         matches: list[Path] = []
         for path in self._walk(max_depth=max_depth):
             if path.name == filename:

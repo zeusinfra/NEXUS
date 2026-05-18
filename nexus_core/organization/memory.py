@@ -1158,7 +1158,9 @@ class OrganizationalMemoryStore:
         ]
 
     def get_command(self, command_id: str) -> dict[str, Any] | None:
-        rows = self._fetch("SELECT * FROM org_commands WHERE command_id = ?", [command_id])
+        rows = self._fetch(
+            "SELECT * FROM org_commands WHERE command_id = ?", [command_id]
+        )
         if not rows:
             return None
         row = rows[0]
@@ -1296,7 +1298,9 @@ class OrganizationalMemoryStore:
             query += " WHERE " + " AND ".join(conditions)
         query += " ORDER BY updated_at DESC LIMIT ?"
         params.append(limit)
-        return [self._execution_plan_from_row(row) for row in self._fetch(query, params)]
+        return [
+            self._execution_plan_from_row(row) for row in self._fetch(query, params)
+        ]
 
     def get_execution_step(self, step_id: str) -> dict[str, Any] | None:
         rows = self._fetch(
@@ -1329,7 +1333,9 @@ class OrganizationalMemoryStore:
         else:
             query += " ORDER BY updated_at DESC LIMIT ?"
         params.append(limit)
-        return [self._execution_step_from_row(row) for row in self._fetch(query, params)]
+        return [
+            self._execution_step_from_row(row) for row in self._fetch(query, params)
+        ]
 
     def counts(self) -> dict[str, int]:
         with self.connect() as conn:

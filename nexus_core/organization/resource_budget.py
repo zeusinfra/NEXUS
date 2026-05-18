@@ -24,9 +24,7 @@ class ExecutionBudget:
         return cls(
             cpu_soft_limit_percent=_float_env("NEXUS_EXEC_CPU_SOFT_LIMIT", 85.0),
             ram_soft_limit_percent=_float_env("NEXUS_EXEC_RAM_SOFT_LIMIT", 88.0),
-            concurrent_task_limit=max(
-                1, _int_env("NEXUS_EXEC_CONCURRENT_LIMIT", 2)
-            ),
+            concurrent_task_limit=max(1, _int_env("NEXUS_EXEC_CONCURRENT_LIMIT", 2)),
             token_budget=max(1, _int_env("NEXUS_EXEC_TOKEN_BUDGET", 120_000)),
             timeout_max_s=max(1, _int_env("NEXUS_EXEC_TIMEOUT_MAX_SEC", 300)),
             block_on_resource_pressure=_bool_env(

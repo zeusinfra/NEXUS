@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from nexus_core.organization.resource_budget import ExecutionBudget, ResourceBudgetGovernor
+from nexus_core.organization.resource_budget import (
+    ExecutionBudget,
+    ResourceBudgetGovernor,
+)
 
 
 def test_resource_budget_caps_timeout_and_blocks_concurrency():

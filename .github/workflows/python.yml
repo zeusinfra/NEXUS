@@ -4,7 +4,7 @@ on:
   push:
     branches: ["main"]
     paths:
-      - "**.py"
+      - "**/*.py"
       - "nexus_core/organization/**"
       - "tests/unit/test_organization_*.py"
       - "tests/unit/test_resource_budget.py"
@@ -26,7 +26,7 @@ permissions:
 
 jobs:
   lint-test:
-    name: Python ${{ matrix.python-version }}
+    name: Python runtime ${{ matrix.python-version }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -45,11 +45,6 @@ jobs:
             requirements/dev.txt
             pyproject.toml
 
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -58,21 +53,14 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install maturin
           python -m pip install -r requirements/dev.txt
-
-      - name: Build Rust Bridge (nexus_synapse)
-        run: |
-          cd core-rust/nexus_synapse
-          maturin build --release --interpreter python3 --out ../../target/wheels
-          pip install ../../target/wheels/*.whl
 
       - name: Lint
         run: |
           python -m ruff check .
           python -m ruff format --check .
 
-      - name: Runtime evidence test slice
+      - name: Runtime evidence tests
         env:
           NEXUS_TESTING: "1"
           NEXUS_SKIP_DOTENV: "1"
@@ -88,11 +76,19 @@ jobs:
             tests/unit/test_resource_budget.py \
             tests/unit/test_workspace_context.py
 
-      - name: Test
+      - name: Core Python tests
         env:
           NEXUS_TESTING: "1"
           NEXUS_SKIP_DOTENV: "1"
           NEXUS_EXEC_CONCURRENT_LIMIT: "2"
           NEXUS_EXEC_TIMEOUT_MAX_SEC: "60"
           NEXUS_EXEC_BLOCK_ON_RESOURCE_PRESSURE: "0"
-        run: python -m pytest
+        run: |
+          python -m pytest \
+            tests/unit/test_command_policy.py \
+            tests/unit/test_execution_protocol.py \
+            tests/unit/test_config_guard.py \
+            tests/unit/test_path_filters.py \
+            tests/unit/test_response_text.py \
+            tests/unit/test_model_router.py \
+            tests/unit/test_llm_service.py

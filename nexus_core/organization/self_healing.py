@@ -119,7 +119,10 @@ def _recovery_steps(command: str, failure_class: str) -> list[dict[str, Any]]:
         ]
     if failure_class == "missing_command":
         return [
-            _step(f"Confirm whether {executable or 'the executable'} is installed", "inspect_environment"),
+            _step(
+                f"Confirm whether {executable or 'the executable'} is installed",
+                "inspect_environment",
+            ),
             _step("Suggest install or project-local alternative", "proposal"),
         ]
     return [

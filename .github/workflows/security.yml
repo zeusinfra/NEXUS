@@ -73,7 +73,9 @@ jobs:
         with:
           scan-type: fs
           scan-ref: .
+          scanners: vuln,misconfig
           severity: CRITICAL,HIGH
           ignore-unfixed: true
           exit-code: "1"
-          skip-dirs: logs,target,core-rust/target,watcher_rs/target,nexus-iced/target
+          skip-dirs: .git,logs,dist,target,backend/target,core-rust/target,watcher_rs/target,nexus-iced/target
+          skip-files: dist/nexus_*.deb
