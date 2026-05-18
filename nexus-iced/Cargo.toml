@@ -4,14 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-iced = { version = "0.12", features = ["tokio", "svg"] }
+iced = { version = "0.14", features = ["tokio", "svg"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 tokio = { version = "1.0", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-sysinfo = "0.30"
+sysinfo = "0.39"
 chrono = "0.4"
-rodio = "0.17"
-base64 = "0.21"
-tokio-tungstenite = "0.24"
+rodio = "0.22"
+base64 = "0.22"
+tokio-tungstenite = "0.29"
 futures-util = "0.3"
