@@ -1,20 +1,193 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Nexus Chat</title>
+  <title>NEXUS Cognitive OS</title>
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
-  <div id="app" class="app">
-    <header class="header">Nexus Chat</header>
-    <main id="messages" class="messages"></main>
-    <form id="composer" class="composer">
-      <input id="input" autocomplete="off" placeholder="Diga algo..." />
-      <button>Enviar</button>
-    </form>
+  <div class="nexus-container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="logo">
+        <div class="logo-icon">N</div>
+        <div>
+          <div class="logo-title">NEXUS</div>
+          <div class="logo-subtitle">Cognitive OS</div>
+        </div>
+      </div>
+      <nav class="nav-menu">
+        <div class="nav-item active" data-view="conversar">
+          <span class="nav-icon">💬</span>
+          <span>Conversar</span>
+        </div>
+        <div class="nav-item" data-view="overview">
+          <span class="nav-icon">📊</span>
+          <span>Visão Geral</span>
+        </div>
+        <div class="nav-item" data-view="messages">
+          <span class="nav-icon">✉️</span>
+          <span>Mensões</span>
+        </div>
+        <div class="nav-item" data-view="executions">
+          <span class="nav-icon">⚙️</span>
+          <span>Execuções</span>
+        </div>
+        <div class="nav-item" data-view="approvals">
+          <span class="nav-icon">✓</span>
+          <span>Aprovações</span>
+        </div>
+        <div class="nav-item" data-view="incidents">
+          <span class="nav-icon">⚠️</span>
+          <span>Incidentes</span>
+        </div>
+        <div class="nav-item" data-view="settings">
+          <span class="nav-icon">⚙️</span>
+          <span>Configurações</span>
+        </div>
+      </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Conversar View -->
+      <section id="conversar-view" class="view active">
+        <div class="conversar-header">
+          <h1>Conversar</h1>
+          <p>Contar direto com o agente cognitivo - uptime On-Site</p>
+        </div>
+        
+        <div class="conversar-content">
+          <div class="messages-panel">
+            <div id="messages" class="messages"></div>
+          </div>
+          
+          <div class="center-panel">
+            <div class="nexus-systems">
+              <h3>NEXUS SYSTEMS</h3>
+              <div class="systems-list">
+                <div class="system-item">
+                  <span class="status-dot online"></span>
+                  <span>CORE</span>
+                </div>
+                <div class="system-item">
+                  <span class="status-dot offline"></span>
+                  <span>Offline</span>
+                </div>
+                <div class="system-metric">
+                  <span>CPU-LOAD</span>
+                  <div class="metric-bar" style="--value: 1%"></div>
+                  <span class="metric-value">1%</span>
+                </div>
+                <div class="system-metric">
+                  <span>MEMORY</span>
+                  <div class="metric-bar" style="--value: 42%"></div>
+                  <span class="metric-value">42%</span>
+                </div>
+                <div class="system-item">
+                  <span>RUNTIME</span>
+                  <span class="status-text">conectado</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="core-circle">
+              <svg viewBox="0 0 200 200" class="circle-chart">
+                <circle cx="100" cy="100" r="80" class="circle-bg" />
+                <circle cx="100" cy="100" r="60" class="circle-inner" />
+              </svg>
+              <div class="circle-content">
+                <div class="circle-title">CORE</div>
+                <div class="circle-subtitle">COGNITIVE OS</div>
+                <div class="circle-text">RUNTIME</div>
+                <div class="circle-metrics">
+                  <span>CPU<br/>1%</span>
+                  <span>MEM<br/>42%</span>
+                  <span>I/O<br/>19</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="message-status">
+              <h4>MISSÃO ATIVA</h4>
+              <p>validar novas interfaces do swarm</p>
+              <p class="status-note">Aguardando parecer</p>
+            </div>
+          </div>
+          
+          <div class="right-panel">
+            <div class="command-link">
+              <div class="command-header">
+                <h3>COMMAND LINK</h3>
+                <span class="status-badge ready">READY</span>
+              </div>
+              <div class="command-content">
+                <div class="command-item">
+                  <p class="command-title">NEXUS - Iniciar</p>
+                  <p class="command-desc">Pronto? você quer pedir uma análise, uma modificação ou outras coisas próximo passo.</p>
+                </div>
+              </div>
+              <div class="input-group">
+                <input id="input" type="text" placeholder="Diretiva para o NEXUS" autocomplete="off" />
+                <button id="send-btn" class="send-btn">SEND</button>
+              </div>
+              <div class="tabs">
+                <div class="tab active">Análise</div>
+                <div class="tab">Modificação</div>
+                <div class="tab">Execução</div>
+              </div>
+              <div class="status-section">
+                <div class="status-item">
+                  <span>O que aconteceu agora</span>
+                  <span class="status-meta">19:38</span>
+                </div>
+                <div class="status-item">
+                  <span>Organização atualizada</span>
+                  <span class="status-meta">19:38</span>
+                </div>
+                <div class="status-item">
+                  <span>Produto Linux</span>
+                  <span class="status-meta">19:38</span>
+                </div>
+                <div class="status-item">
+                  <span>Interface iniciada</span>
+                  <span class="status-meta">Conectando ao localhost local</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Other Views (Placeholder) -->
+      <section id="overview-view" class="view">
+        <h1>Visão Geral</h1>
+        <p>Conteúdo em desenvolvimento...</p>
+      </section>
+      <section id="messages-view" class="view">
+        <h1>Mensões</h1>
+        <p>Conteúdo em desenvolvimento...</p>
+      </section>
+      <section id="executions-view" class="view">
+        <h1>Execuções</h1>
+        <p>Conteúdo em desenvolvimento...</p>
+      </section>
+      <section id="approvals-view" class="view">
+        <h1>Aprovações</h1>
+        <p>Conteúdo em desenvolvimento...</p>
+      </section>
+      <section id="incidents-view" class="view">
+        <h1>Incidentes</h1>
+        <p>Conteúdo em desenvolvimento...</p>
+      </section>
+      <section id="settings-view" class="view">
+        <h1>Configurações</h1>
+        <p>Conteúdo em desenvolvimento...</p>
+      </section>
+    </main>
   </div>
+
   <script src="/static/app.js"></script>
 </body>
 </html>

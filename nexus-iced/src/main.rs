@@ -532,15 +532,16 @@ const HEALTH_CHECK_INTERVAL: u32 = 5;
 const WINDOW_INITIAL_WIDTH: f32 = 1440.0;
 const WINDOW_INITIAL_HEIGHT: f32 = 900.0;
 const BG: Color = Color::from_rgb(0.006, 0.012, 0.024);
-const SURFACE: Color = Color::from_rgb(0.026, 0.040, 0.062);
-const SURFACE_HIGH: Color = Color::from_rgb(0.050, 0.070, 0.100);
-const STROKE: Color = Color::from_rgb(0.095, 0.140, 0.205);
+const SURFACE: Color = Color::from_rgb(0.015, 0.025, 0.045);
+const SURFACE_HIGH: Color = Color::from_rgb(0.025, 0.045, 0.075);
+const STROKE: Color = Color::from_rgb(0.10, 0.35, 0.50);
 const TEXT_PRIMARY: Color = Color::from_rgb(0.93, 0.96, 0.98);
 const TEXT_SECONDARY: Color = Color::from_rgb(0.64, 0.71, 0.78);
 const TEXT_MUTED: Color = Color::from_rgb(0.42, 0.49, 0.57);
-const ACCENT: Color = Color::from_rgb(0.22, 0.55, 0.98);
-const ACCENT_SOFT: Color = Color::from_rgb(0.12, 0.28, 0.58);
+const ACCENT: Color = Color::from_rgb(0.18, 0.78, 0.92);
+const ACCENT_SOFT: Color = Color::from_rgb(0.10, 0.40, 0.55);
 const CYAN: Color = Color::from_rgb(0.18, 0.78, 0.92);
+const CYAN_DARK: Color = Color::from_rgb(0.08, 0.35, 0.45);
 const PURPLE: Color = Color::from_rgb(0.58, 0.36, 0.94);
 const SUCCESS: Color = Color::from_rgb(0.35, 0.82, 0.58);
 const WARNING: Color = Color::from_rgb(0.94, 0.68, 0.24);
@@ -1974,6 +1975,7 @@ impl NexusApp {
 
     fn conversation_page(&self) -> Element<'_, Message> {
         if self.breakpoint().is_tablet_or_smaller() {
+            // Layout móvel/tablet: coluna única
             return scrollable(
                 Column::new()
                     .spacing(14)
@@ -1985,26 +1987,304 @@ impl NexusApp {
             .into();
         }
 
+        // Layout desktop: 3 colunas (conversa | CORE circle | command link)
         Row::new()
             .spacing(14)
+            // LEFT: Conversation panel
             .push(
                 container(self.conversation_panel())
-                    .width(Length::FillPortion(7))
+                    .width(Length::FillPortion(35))
                     .height(Length::Fill),
             )
+            // CENTER: NEXUS SYSTEMS + CORE Circle + Status
+            .push(
+                container(self.nexus_core_panel())
+                    .width(Length::FillPortion(35))
+                    .height(Length::Fill),
+            )
+            // RIGHT: Command Link panel
             .push(
                 scrollable(
                     Column::new()
                         .spacing(14)
-                        .push(self.conversation_helper_panel())
-                        .push(self.system_status_panel())
+                        .push(self.command_link_panel())
                         .push(self.latest_events_simple()),
                 )
-                .width(Length::FillPortion(3))
+                .width(Length::FillPortion(30))
                 .height(Length::Fill),
             )
             .height(Length::Fill)
             .into()
+    }
+
+    fn nexus_core_panel(&self) -> Element<'_, Message> {
+        let cpu_pct = (self.cpu_usage * 100.0).min(100.0) as u32;
+        let mem_pct = (self.ram_usage * 100.0).min(100.0) as u32;
+        
+        container(
+            Column::new()
+                .spacing(16)
+                .push(
+                    // NEXUS SYSTEMS header
+                    Column::new()
+                        .spacing(8)
+                        .push(text("NEXUS SYSTEMS").size(14).style(CYAN))
+                        .push(
+                            Column::new()
+                                .spacing(6)
+                                .push(
+                                    Row::new()
+                                        .spacing(6)
+                                        .push(container(Space::new(8, 8)).style(success_dot_style))
+                                        .push(text("CORE").size(12).style(TEXT_PRIMARY))
+                                )
+                                .push(
+                                    Row::new()
+                                        .spacing(6)
+                                        .push(container(Space::new(8, 8)).style(danger_dot_style))
+                                        .push(text("Offline").size(10).style(TEXT_MUTED))
+                                )
+                                .push(
+                                    Column::new()
+                                        .spacing(3)
+                                        .push(
+                                            Row::new()
+                                                .spacing(8)
+                                                .push(text("CPU-LOAD").size(10).style(TEXT_MUTED))
+                                                .push(text(format!("{}%", cpu_pct)).size(10).style(TEXT_SECONDARY))
+                                        )
+                                        .push(
+                                            container(
+                                                container(Space::new(
+                                                    (cpu_pct as f32 / 100.0) * 60.0, 
+                                                    3.0
+                                                ))
+                                                .style(meter_fill_accent_style)
+                                            )
+                                            .width(Length::Fixed(60.0))
+                                            .style(meter_track_style)
+                                        )
+                                )
+                                .push(
+                                    Column::new()
+                                        .spacing(3)
+                                        .push(
+                                            Row::new()
+                                                .spacing(8)
+                                                .push(text("MEMORY").size(10).style(TEXT_MUTED))
+                                                .push(text(format!("{}%", mem_pct)).size(10).style(TEXT_SECONDARY))
+                                        )
+                                        .push(
+                                            container(
+                                                container(Space::new(
+                                                    (mem_pct as f32 / 100.0) * 60.0,
+                                                    3.0
+                                                ))
+                                                .style(meter_fill_accent_style)
+                                            )
+                                            .width(Length::Fixed(60.0))
+                                            .style(meter_track_style)
+                                        )
+                                )
+                                .push(
+                                    Row::new()
+                                        .spacing(6)
+                                        .push(text("RUNTIME").size(10).style(TEXT_MUTED))
+                                        .push(text("conectado").size(10).style(SUCCESS))
+                                )
+                        )
+                )
+                .push(Rule::horizontal(1).style(rule_style))
+                // CORE Circle
+                .push(
+                    container(self.core_circle_visual())
+                        .width(Length::Fill)
+                        .height(Length::Fixed(180.0))
+                        .center_x()
+                        .center_y()
+                )
+                .push(Rule::horizontal(1).style(rule_style))
+                // Mission Status
+                .push(
+                    Column::new()
+                        .spacing(6)
+                        .push(text("MISSÃO ATIVA").size(12).style(CYAN))
+                        .push(text("validar novas interfaces do swarm").size(11).style(TEXT_PRIMARY))
+                        .push(text("Aguardando parecer").size(10).style(TEXT_MUTED))
+                )
+        )
+        .padding(14)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .style(section_style)
+        .into()
+    }
+
+    fn core_circle_visual(&self) -> Element<'_, Message> {
+        let cpu_pct = (self.cpu_usage * 100.0).min(100.0) as u32;
+        let mem_pct = (self.ram_usage * 100.0).min(100.0) as u32;
+        
+        container(
+            Column::new()
+                .spacing(8)
+                .align_items(Alignment::Center)
+                .width(Length::Fixed(140.0))
+                .push(text("CORE").size(16).style(CYAN))
+                .push(text("COGNITIVE OS".to_string()).size(9).style(TEXT_MUTED))
+                .push(text("RUNTIME").size(10).style(TEXT_SECONDARY))
+                .push(
+                    Row::new()
+                        .spacing(12)
+                        .align_items(Alignment::Center)
+                        .push(
+                            Column::new()
+                                .spacing(1)
+                                .align_items(Alignment::Center)
+                                .push(text("CPU").size(8).style(TEXT_MUTED))
+                                .push(text(format!("{}%", cpu_pct)).size(10).style(CYAN))
+                        )
+                        .push(
+                            Column::new()
+                                .spacing(1)
+                                .align_items(Alignment::Center)
+                                .push(text("MEM").size(8).style(TEXT_MUTED))
+                                .push(text(format!("{}%", mem_pct)).size(10).style(CYAN))
+                        )
+                        .push(
+                            Column::new()
+                                .spacing(1)
+                                .align_items(Alignment::Center)
+                                .push(text("I/O").size(8).style(TEXT_MUTED))
+                                .push(text("19").size(10).style(CYAN))
+                        )
+                )
+        )
+        .width(Length::Fixed(140.0))
+        .center_x()
+        .padding(12)
+        .style(sidebar_card_style)
+        .into()
+    }
+
+    fn command_link_panel(&self) -> Element<'_, Message> {
+        let mut send = button(text("SEND").size(11).style(TEXT_PRIMARY))
+            .padding([10, 16])
+            .style(theme::Button::custom(PrimaryActionButtonStyle));
+        if !self.is_thinking {
+            send = send.on_press(Message::Submit);
+        }
+
+        container(
+            Column::new()
+                .spacing(12)
+                .push(
+                    // Header
+                    Row::new()
+                        .spacing(12)
+                        .align_items(Alignment::Center)
+                        .push(text("COMMAND LINK").size(13).style(CYAN))
+                        .push(container(
+                            text("READY").size(9).style(TEXT_PRIMARY)
+                        )
+                        .padding([4, 8])
+                        .style(meter_fill_success_style))
+                )
+                .push(
+                    // Directive input
+                    container(
+                        Column::new()
+                            .spacing(8)
+                            .push(
+                                text("NEXUS - Iniciar").size(11).style(TEXT_PRIMARY)
+                            )
+                            .push(
+                                text("Pronto? você quer pedir uma análise, uma modificação ou outras coisas próximo passo.")
+                                    .size(9)
+                                    .style(TEXT_SECONDARY)
+                            )
+                    )
+                    .padding(10)
+                    .style(sidebar_card_style)
+                    .width(Length::Fill)
+                )
+                .push(
+                    // Input + Send button
+                    Row::new()
+                        .spacing(8)
+                        .push(
+                            text_input(
+                                "Diretiva para o NEXUS",
+                                &self.input_value,
+                            )
+                            .on_input(Message::InputChanged)
+                            .on_submit(Message::Submit)
+                            .padding(10)
+                            .width(Length::Fill),
+                        )
+                        .push(send)
+                )
+                .push(
+                    // Tabs
+                    Row::new()
+                        .spacing(10)
+                        .push(
+                            container(text("Análise").size(10).style(TEXT_PRIMARY))
+                                .padding([6, 10])
+                                .style(meter_fill_accent_style)
+                        )
+                        .push(
+                            container(text("Modificação").size(10).style(TEXT_MUTED))
+                                .padding([6, 10])
+                                .style(sidebar_card_style)
+                        )
+                        .push(
+                            container(text("Execução").size(10).style(TEXT_MUTED))
+                                .padding([6, 10])
+                                .style(sidebar_card_style)
+                        )
+                )
+                .push(
+                    // Status items
+                    Column::new()
+                        .spacing(6)
+                        .push(
+                            Row::new()
+                                .spacing(8)
+                                .align_items(Alignment::Center)
+                                .push(text("O que aconteceu agora").size(10).style(TEXT_PRIMARY))
+                                .push(Space::with_width(Length::Fill))
+                                .push(text("19:38").size(9).style(TEXT_MUTED))
+                        )
+                        .push(
+                            Row::new()
+                                .spacing(8)
+                                .align_items(Alignment::Center)
+                                .push(text("Organização atualizada").size(10).style(TEXT_PRIMARY))
+                                .push(Space::with_width(Length::Fill))
+                                .push(text("19:38").size(9).style(TEXT_MUTED))
+                        )
+                        .push(
+                            Row::new()
+                                .spacing(8)
+                                .align_items(Alignment::Center)
+                                .push(text("Produto Linux").size(10).style(TEXT_PRIMARY))
+                                .push(Space::with_width(Length::Fill))
+                                .push(text("19:38").size(9).style(TEXT_MUTED))
+                        )
+                        .push(
+                            Row::new()
+                                .spacing(8)
+                                .align_items(Alignment::Start)
+                                .push(text("Interface iniciada").size(10).style(TEXT_PRIMARY))
+                                .push(Space::with_width(Length::Fill))
+                                .push(text("Conectando ao\nlocalhost local").size(8).style(TEXT_MUTED))
+                        )
+                )
+        )
+        .padding(14)
+        .width(Length::Fill)
+        .style(section_style)
+        .into()
     }
 
     fn conversation_helper_panel(&self) -> Element<'_, Message> {
