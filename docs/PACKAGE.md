@@ -32,6 +32,10 @@ Runtime directories:
 - state: `/var/lib/nexus/`
 - logs: `/var/log/nexus/`
 
+Runtime state includes the organizational memory database, blackboard, approval
+queue, execution artifacts, structured execution plans, verification records
+and replayable command evidence.
+
 The service runs as the `nexus` user. Package configuration creates the user
 when missing and owns `/var/lib/nexus` plus `/var/log/nexus` for that runtime.
 
@@ -48,6 +52,15 @@ The systemd daemon starts the organizational runtime with:
 
 ```bash
 /usr/bin/nexus org --config /etc/nexus/config.toml run
+```
+
+Post-install inspection commands:
+
+```bash
+nexus org --config /etc/nexus/config.toml workspace-context
+nexus org --config /etc/nexus/config.toml execution-plans
+nexus org --config /etc/nexus/config.toml replay-command cmd_...
+nexus org --config /etc/nexus/config.toml incidents
 ```
 
 Uninstalling the package stops the service and preserves user data under

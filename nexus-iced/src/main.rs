@@ -1,6 +1,9 @@
 #![allow(dead_code)]
 
-use iced::widget::{button, container, scrollable, text, text_input, Column, Row, Rule, Space};
+use iced::widget::{
+    button, container, scrollable, svg, text, text_input, toggler, tooltip, Column, Row, Rule,
+    Space, Svg, Toggler, Tooltip,
+};
 use iced::{
     theme, Alignment, Application, Border, Color, Command, Element, Event, Length, Settings,
     Subscription, Theme,
@@ -13,6 +16,27 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use sysinfo::System;
 use tokio::process::Command as TokioCommand;
+
+mod websocket;
+
+mod design {
+    use iced::Color;
+
+    pub const BACKGROUND: Color = Color::from_rgb(0.020, 0.031, 0.086);
+    pub const SURFACE: Color = Color::from_rgb(0.030, 0.041, 0.070);
+    pub const SURFACE_HIGH: Color = Color::from_rgb(0.046, 0.062, 0.092);
+    pub const STROKE: Color = Color::from_rgb(0.100, 0.135, 0.180);
+    pub const TEXT_PRIMARY: Color = Color::from_rgb(0.930, 0.950, 0.970);
+    pub const TEXT_SECONDARY: Color = Color::from_rgb(0.650, 0.700, 0.760);
+    pub const TEXT_MUTED: Color = Color::from_rgb(0.430, 0.480, 0.560);
+    pub const ACCENT: Color = Color::from_rgb(0.100, 0.620, 0.700);
+    pub const ACCENT_SOFT: Color = Color::from_rgb(0.035, 0.180, 0.225);
+    pub const CYAN: Color = Color::from_rgb(0.220, 0.860, 0.930);
+    pub const PETROL: Color = Color::from_rgb(0.030, 0.170, 0.220);
+    pub const SUCCESS: Color = Color::from_rgb(0.260, 0.820, 0.580);
+    pub const WARNING: Color = Color::from_rgb(0.900, 0.670, 0.300);
+    pub const DANGER: Color = Color::from_rgb(0.900, 0.330, 0.390);
+}
 
 pub fn main() -> iced::Result {
     NexusApp::run(Settings {
@@ -52,6 +76,7 @@ struct NexusApp {
     product_error: Option<String>,
     engineering_mode: bool,
     active_section: SidebarSection,
+    pending_approval: Option<(String, String, websocket::RiskLevel)>,
 }
 
 #[derive(Clone, Debug)]
@@ -88,6 +113,77 @@ enum ActivityLevel {
     Success,
     Warning,
     Error,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum NexusIcon {
+    Message,
+    Task,
+    Settings,
+    Document,
+    List,
+    Circle,
+    ArrowUpRight,
+    Send,
+    Mic,
+    Paperclip,
+    ChevronDown,
+    ChevronRight,
+    Sparkle,
+    Lock,
+    Check,
+}
+
+impl NexusIcon {
+    fn svg(self) -> &'static str {
+        match self {
+            Self::Message => {
+                r#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6.8A3.8 3.8 0 0 1 8.8 3h6.4A3.8 3.8 0 0 1 19 6.8v5.4a3.8 3.8 0 0 1-3.8 3.8h-4.7L6 20v-4.2a3.8 3.8 0 0 1-1-2.6Z"/></svg>"#
+            }
+            Self::Task => {
+                r#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="3"/><path d="m9 12 2 2 4-5"/><path d="M9 17h6"/><path d="M9 7h6"/></svg>"#
+            }
+            Self::Settings => {
+                r#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v2"/><path d="M12 19v2"/><path d="m4.9 4.9 1.4 1.4"/><path d="m17.7 17.7 1.4 1.4"/><path d="M3 12h2"/><path d="M19 12h2"/><path d="m4.9 19.1 1.4-1.4"/><path d="m17.7 6.3 1.4-1.4"/><circle cx="12" cy="12" r="4"/></svg>"#
+            }
+            Self::Document => {
+                r#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v5h5"/><path d="M10 12h5"/><path d="M10 16h5"/><path d="M10 8h1"/></svg>"#
+            }
+            Self::List => {
+                r#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11"/><path d="M9 12h11"/><path d="M9 18h11"/><path d="M4 6h.01"/><path d="M4 12h.01"/><path d="M4 18h.01"/></svg>"#
+            }
+            Self::Circle => {
+                r#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="6.5"/></svg>"#
+            }
+            Self::ArrowUpRight => {
+                r#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M9 7h8v8"/></svg>"#
+            }
+            Self::Send => {
+                r#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m6 11 6-6 6 6"/></svg>"#
+            }
+            Self::Mic => {
+                r#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg>"#
+            }
+            Self::Paperclip => {
+                r#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m21 11-8.8 8.8a5 5 0 0 1-7.1-7.1L14 3.8a3.2 3.2 0 0 1 4.5 4.5l-8.7 8.7a1.5 1.5 0 0 1-2.1-2.1L16 6.6"/></svg>"#
+            }
+            Self::ChevronDown => {
+                r#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 10 5 5 5-5"/></svg>"#
+            }
+            Self::ChevronRight => {
+                r#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>"#
+            }
+            Self::Sparkle => {
+                r#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 14 9l6 3-6 3-2 6-2-6-6-3 6-3z"/></svg>"#
+            }
+            Self::Lock => {
+                r#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="10" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>"#
+            }
+            Self::Check => {
+                r#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></svg>"#
+            }
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -147,8 +243,8 @@ impl SidebarSection {
     fn label(self) -> &'static str {
         match self {
             Self::Overview => "Visão Geral",
-            Self::Conversation => "Conversar",
-            Self::Missions => "Missões",
+            Self::Conversation => "Conversas",
+            Self::Missions => "Tarefas",
             Self::Swarm => "Swarm",
             Self::Executions => "Execuções",
             Self::Approvals => "Aprovações",
@@ -163,8 +259,8 @@ impl SidebarSection {
     fn title(self) -> &'static str {
         match self {
             Self::Overview => "Visão Geral",
-            Self::Conversation => "Conversar",
-            Self::Missions => "Missões",
+            Self::Conversation => "Conversas",
+            Self::Missions => "Tarefas",
             Self::Swarm => "Swarm",
             Self::Executions => "Execuções",
             Self::Approvals => "Aprovações",
@@ -521,31 +617,35 @@ enum Message {
     ProductStatusLoaded(Result<ProductStatus, String>),
     ToggleEngineeringMode,
     SelectSection(SidebarSection),
+    PromptSelected(&'static str),
     CopyCurrentCommand,
     CopyRuntimeLogs,
     EventOccurred(Event),
     Tick,
+    BackendEventReceived(websocket::Event),
+    ReplyApproval(String, bool), // (command_id, is_approve)
+    ApprovalReplied(Result<String, String>),
 }
 
 const SCROLLABLE_ID: &str = "chat_scroll";
 const HEALTH_CHECK_INTERVAL: u32 = 5;
 const WINDOW_INITIAL_WIDTH: f32 = 1440.0;
 const WINDOW_INITIAL_HEIGHT: f32 = 900.0;
-const BG: Color = Color::from_rgb(0.006, 0.012, 0.024);
-const SURFACE: Color = Color::from_rgb(0.015, 0.025, 0.045);
-const SURFACE_HIGH: Color = Color::from_rgb(0.025, 0.045, 0.075);
-const STROKE: Color = Color::from_rgb(0.10, 0.35, 0.50);
-const TEXT_PRIMARY: Color = Color::from_rgb(0.93, 0.96, 0.98);
-const TEXT_SECONDARY: Color = Color::from_rgb(0.64, 0.71, 0.78);
-const TEXT_MUTED: Color = Color::from_rgb(0.42, 0.49, 0.57);
-const ACCENT: Color = Color::from_rgb(0.18, 0.78, 0.92);
-const ACCENT_SOFT: Color = Color::from_rgb(0.10, 0.40, 0.55);
-const CYAN: Color = Color::from_rgb(0.18, 0.78, 0.92);
-const CYAN_DARK: Color = Color::from_rgb(0.08, 0.35, 0.45);
+const BG: Color = design::BACKGROUND;
+const SURFACE: Color = design::SURFACE;
+const SURFACE_HIGH: Color = design::SURFACE_HIGH;
+const STROKE: Color = design::STROKE;
+const TEXT_PRIMARY: Color = design::TEXT_PRIMARY;
+const TEXT_SECONDARY: Color = design::TEXT_SECONDARY;
+const TEXT_MUTED: Color = design::TEXT_MUTED;
+const ACCENT: Color = design::ACCENT;
+const ACCENT_SOFT: Color = design::ACCENT_SOFT;
+const CYAN: Color = design::CYAN;
+const PETROL: Color = design::PETROL;
 const PURPLE: Color = Color::from_rgb(0.58, 0.36, 0.94);
-const SUCCESS: Color = Color::from_rgb(0.35, 0.82, 0.58);
-const WARNING: Color = Color::from_rgb(0.94, 0.68, 0.24);
-const DANGER: Color = Color::from_rgb(0.92, 0.30, 0.36);
+const SUCCESS: Color = design::SUCCESS;
+const WARNING: Color = design::WARNING;
+const DANGER: Color = design::DANGER;
 
 impl Application for NexusApp {
     type Executor = iced::executor::Default;
@@ -561,7 +661,7 @@ impl Application for NexusApp {
                 input_value: String::new(),
                 messages: vec![ChatMessage {
                     role: "NEXUS".to_string(),
-                    content: "Pronto. Você pode pedir uma análise, uma modificação ou uma execução. Quando eu fizer algo real, eu mostro evidência e próximo passo.".to_string(),
+                    content: "Olá! Eu sou o NEXUS, seu assistente inteligente.\nEm que posso ajudar você hoje?".to_string(),
                     timestamp: current_time(),
                     feedback: None,
                 }],
@@ -594,6 +694,7 @@ impl Application for NexusApp {
                 product_error: None,
                 engineering_mode: false,
                 active_section: SidebarSection::Conversation,
+                pending_approval: None,
             },
             Command::batch(vec![
                 Command::perform(check_status(), Message::StatusChecked),
@@ -637,6 +738,10 @@ impl Application for NexusApp {
             }
             Message::InputChanged(val) => {
                 self.input_value = val;
+                Command::none()
+            }
+            Message::PromptSelected(prompt) => {
+                self.input_value = prompt.to_string();
                 Command::none()
             }
             Message::Submit => {
@@ -927,6 +1032,231 @@ impl Application for NexusApp {
                 self.copied_feedback = Some("runtime evidence copied".to_string());
                 iced::clipboard::write(logs)
             }
+            Message::ReplyApproval(command_id, approve) => {
+                self.pending_approval = None;
+                self.push_activity(
+                    "Aprovacao",
+                    &format!(
+                        "Resposta enviada: {}",
+                        if approve { "Approve" } else { "Deny" }
+                    ),
+                    ActivityLevel::Info,
+                );
+                Command::perform(
+                    reply_approval(command_id, approve),
+                    Message::ApprovalReplied,
+                )
+            }
+            Message::ApprovalReplied(Ok(res)) => {
+                self.push_activity("Aprovacao Confirmada", &res, ActivityLevel::Success);
+                Command::none()
+            }
+            Message::ApprovalReplied(Err(e)) => {
+                self.push_activity("Falha na Aprovacao", &e, ActivityLevel::Error);
+                Command::none()
+            }
+            Message::BackendEventReceived(event) => {
+                match event {
+                    websocket::Event::Connected => {
+                        self.status = "ONLINE".to_string();
+                        self.push_activity(
+                            "WebSocket",
+                            "Conectado ao NEXUS Core",
+                            ActivityLevel::Success,
+                        );
+                    }
+                    websocket::Event::Disconnected => {
+                        self.status = "OFFLINE".to_string();
+                        self.push_activity(
+                            "WebSocket",
+                            "Desconectado do NEXUS Core",
+                            ActivityLevel::Error,
+                        );
+                    }
+                    websocket::Event::Error(e) => {
+                        self.push_activity("WebSocket Erro", &e, ActivityLevel::Error);
+                    }
+                    websocket::Event::MessageReceived(sys_event) => {
+                        match sys_event {
+                            websocket::SystemEvent::ApprovalRequested {
+                                command_id,
+                                command,
+                                risk,
+                            } => {
+                                self.pending_approval = Some((command_id, command, risk));
+                            }
+                            websocket::SystemEvent::CommandStarted {
+                                command_id: _,
+                                command,
+                            } => {
+                                self.push_activity(
+                                    "Comando",
+                                    &format!("Iniciando: {}", command),
+                                    ActivityLevel::Warning,
+                                );
+                            }
+                            websocket::SystemEvent::CommandOutput {
+                                command_id: _,
+                                chunk,
+                                is_error: _,
+                            } => {
+                                if let Some(last_msg) = self.messages.last_mut() {
+                                    if last_msg.role == "TERMINAL" {
+                                        last_msg.content.push_str(&chunk);
+                                    } else {
+                                        self.messages.push(ChatMessage {
+                                            role: "TERMINAL".to_string(),
+                                            content: chunk,
+                                            timestamp: current_time(),
+                                            feedback: None,
+                                        });
+                                    }
+                                } else {
+                                    self.messages.push(ChatMessage {
+                                        role: "TERMINAL".to_string(),
+                                        content: chunk,
+                                        timestamp: current_time(),
+                                        feedback: None,
+                                    });
+                                }
+                                self.is_thinking = false;
+                                return scrollable::snap_to(
+                                    scrollable::Id::new(SCROLLABLE_ID),
+                                    scrollable::RelativeOffset::END,
+                                );
+                            }
+                            websocket::SystemEvent::CommandFinished {
+                                command_id: _,
+                                exit_code,
+                            } => {
+                                let status = if exit_code == 0 {
+                                    ActivityLevel::Success
+                                } else {
+                                    ActivityLevel::Error
+                                };
+                                self.push_activity(
+                                    "Comando Concluido",
+                                    &format!("Exit code: {}", exit_code),
+                                    status,
+                                );
+                            }
+                            websocket::SystemEvent::PatchPreview { path, diff: _ } => {
+                                self.push_activity(
+                                    "Patch",
+                                    &format!("Preparando alteracao: {}", path),
+                                    ActivityLevel::Info,
+                                );
+                            }
+                            websocket::SystemEvent::RollbackCreated { backup_path } => {
+                                self.push_activity(
+                                    "Backup",
+                                    &format!("Salvo em: {}", backup_path),
+                                    ActivityLevel::Success,
+                                );
+                            }
+                            websocket::SystemEvent::FilePatched { path } => {
+                                self.push_activity(
+                                    "Arquivo Alterado",
+                                    &path,
+                                    ActivityLevel::Warning,
+                                );
+                            }
+                            websocket::SystemEvent::FileChanged { path } => {
+                                self.push_activity(
+                                    "Filesystem",
+                                    &format!("Arquivo modificado: {}", path),
+                                    ActivityLevel::Info,
+                                );
+                            }
+                            websocket::SystemEvent::MessageStreamChunk { id: _, chunk } => {
+                                if let Some(last_msg) = self.messages.last_mut() {
+                                    if last_msg.role == "NEXUS" {
+                                        last_msg.content.push_str(&chunk);
+                                    } else {
+                                        self.messages.push(ChatMessage {
+                                            role: "NEXUS".to_string(),
+                                            content: chunk,
+                                            timestamp: current_time(),
+                                            feedback: None,
+                                        });
+                                    }
+                                } else {
+                                    self.messages.push(ChatMessage {
+                                        role: "NEXUS".to_string(),
+                                        content: chunk,
+                                        timestamp: current_time(),
+                                        feedback: None,
+                                    });
+                                }
+                                self.is_thinking = false;
+                                return scrollable::snap_to(
+                                    scrollable::Id::new(SCROLLABLE_ID),
+                                    scrollable::RelativeOffset::END,
+                                );
+                            }
+                            websocket::SystemEvent::TaskCompleted { task_id } => {
+                                self.push_activity(
+                                    "Tarefa Concluida",
+                                    &task_id,
+                                    ActivityLevel::Success,
+                                );
+                            }
+                            websocket::SystemEvent::TaskStateChanged {
+                                task_id: _,
+                                state,
+                                message,
+                            } => {
+                                self.push_activity(
+                                    "Task State",
+                                    &format!("{}: {}", state, message),
+                                    ActivityLevel::Info,
+                                );
+                            }
+                            websocket::SystemEvent::EvidenceGenerated {
+                                task_id: _,
+                                evidence_type,
+                                content,
+                                diff,
+                                backup_path,
+                            } => {
+                                let mut display_text =
+                                    format!("Evidência Registrada ({}):\n", evidence_type);
+                                if let Some(d) = diff {
+                                    display_text.push_str(&format!("```diff\n{}\n```", d));
+                                }
+                                if let Some(c) = content {
+                                    display_text.push_str(&format!("```\n{}\n```", c));
+                                }
+
+                                let msg = ChatMessage {
+                                    role: "EVIDENCE".to_string(),
+                                    content: display_text,
+                                    timestamp: current_time(),
+                                    feedback: None,
+                                };
+                                self.messages.push(msg);
+
+                                // Se tivermos um backup path, vamos injetar um botão de rollback, isso pode ser feito via widget.
+                                // Para simplificar o estado, se precisarmos de rollback renderizamos.
+                                if let Some(path) = backup_path {
+                                    self.push_activity(
+                                        "Rollback Disponível",
+                                        &path,
+                                        ActivityLevel::Warning,
+                                    );
+                                }
+
+                                return scrollable::snap_to(
+                                    scrollable::Id::new(SCROLLABLE_ID),
+                                    scrollable::RelativeOffset::END,
+                                );
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                Command::none()
+            }
         }
     }
 
@@ -934,6 +1264,7 @@ impl Application for NexusApp {
         Subscription::batch(vec![
             iced::time::every(Duration::from_millis(1000)).map(|_| Message::Tick),
             iced::event::listen().map(Message::EventOccurred),
+            websocket::connect().map(Message::BackendEventReceived),
         ])
     }
 
@@ -1079,7 +1410,7 @@ impl Application for NexusApp {
                 .into()
         };
 
-        let header = container(header_content)
+        let _header = container(header_content)
             .padding(self.outer_padding())
             .style(header_style);
 
@@ -1127,39 +1458,26 @@ impl Application for NexusApp {
                 .into()
         };
 
-        let footer = container(footer_content)
+        let _footer = container(footer_content)
             .padding(self.outer_padding())
             .style(footer_style);
 
         let shell: Element<'_, Message> = if breakpoint.is_tablet_or_smaller() {
-            Column::new()
-                .push(header)
-                .push(Rule::horizontal(1).style(rule_style))
-                .push(container(self.responsive_body()).height(Length::Fill))
-                .push(Rule::horizontal(1).style(rule_style))
-                .push(footer)
+            container(self.responsive_body())
+                .height(Length::Fill)
                 .into()
         } else {
+            let sidebar = container(self.sidebar_nav())
+                .width(Length::Fixed(if breakpoint == Breakpoint::Ultrawide {
+                    260.0
+                } else {
+                    244.0
+                }))
+                .height(Length::Fill)
+                .style(sidebar_style);
             Row::new()
-                .push(
-                    container(self.sidebar_nav())
-                        .width(Length::Fixed(if breakpoint == Breakpoint::Ultrawide {
-                            236.0
-                        } else {
-                            216.0
-                        }))
-                        .height(Length::Fill)
-                        .style(sidebar_style),
-                )
-                .push(
-                    Column::new()
-                        .push(header)
-                        .push(Rule::horizontal(1).style(rule_style))
-                        .push(container(self.active_section_view()).height(Length::Fill))
-                        .push(Rule::horizontal(1).style(rule_style))
-                        .push(footer)
-                        .width(Length::Fill),
-                )
+                .push(sidebar)
+                .push(container(self.active_section_view()).height(Length::Fill))
                 .into()
         };
 
@@ -1276,38 +1594,54 @@ impl NexusApp {
 
     fn sidebar_nav(&self) -> Element<'_, Message> {
         let items = [
-            ("◉", SidebarSection::Conversation),
-            ("▦", SidebarSection::Overview),
-            ("◎", SidebarSection::Missions),
-            ("▹", SidebarSection::Executions),
-            ("✓", SidebarSection::Approvals),
-            ("△", SidebarSection::Incidents),
-            ("⚙", SidebarSection::Settings),
+            (NexusIcon::Message, SidebarSection::Conversation),
+            (NexusIcon::Task, SidebarSection::Missions),
+            (NexusIcon::Settings, SidebarSection::Settings),
         ];
         let mut nav = Column::new()
-            .spacing(10)
+            .spacing(13)
             .padding(if self.breakpoint().is_tablet_or_smaller() {
                 12
             } else {
-                18
+                20
             })
             .push(
                 Row::new()
-                    .spacing(10)
+                    .spacing(12)
                     .align_items(Alignment::Center)
                     .push(
-                        container(text("N").size(16).style(TEXT_PRIMARY))
-                            .padding(8)
+                        container(text("N").size(23).style(CYAN))
+                            .padding(10)
                             .style(brand_mark_style),
                     )
                     .push(
                         Column::new()
-                            .spacing(2)
-                            .push(text("NEXUS").size(18).style(TEXT_PRIMARY))
-                            .push(text("Cognitive OS").size(10).style(TEXT_MUTED)),
+                            .spacing(5)
+                            .push(text("NEXUS").size(20).style(TEXT_PRIMARY))
+                            .push(
+                                Row::new()
+                                    .spacing(6)
+                                    .align_items(Alignment::Center)
+                                    .push(container(Space::new(7, 7)).style(
+                                        if self.status == "ONLINE" {
+                                            success_dot_style
+                                        } else {
+                                            error_dot_style
+                                        },
+                                    ))
+                                    .push(
+                                        text(if self.status == "ONLINE" {
+                                            "Online"
+                                        } else {
+                                            "Offline"
+                                        })
+                                        .size(11)
+                                        .style(TEXT_MUTED),
+                                    ),
+                            ),
                     ),
             )
-            .push(Space::with_height(Length::Fixed(8.0)));
+            .push(Space::with_height(Length::Fixed(26.0)));
 
         for (icon, section) in items {
             nav = nav.push(sidebar_item(
@@ -1321,22 +1655,43 @@ impl NexusApp {
         nav = nav.push(Space::with_height(Length::Fill)).push(
             container(
                 Column::new()
-                    .spacing(6)
-                    .push(text("NEXUS").size(13).style(TEXT_PRIMARY))
+                    .spacing(14)
                     .push(
-                        text("Sistema operacional cognitivo híbrido")
-                            .size(10)
+                        Row::new()
+                            .spacing(9)
+                            .align_items(Alignment::Center)
+                            .push(icon(NexusIcon::Sparkle, 18, CYAN))
+                            .push(text("NEXUS Pro").size(14).style(CYAN)),
+                    )
+                    .push(
+                        text("Seu assistente inteligente sempre pronto para ajudar.")
+                            .size(12)
                             .style(TEXT_SECONDARY),
                     )
-                    .push(text(self.hybrid_routing_line()).size(10).style(TEXT_MUTED)),
+                    .push(
+                        container(
+                            Row::new()
+                                .align_items(Alignment::Center)
+                                .push(text("Saiba mais").size(13).style(TEXT_PRIMARY))
+                                .push(Space::with_width(Length::Fill))
+                                .push(icon(NexusIcon::ChevronRight, 16, TEXT_PRIMARY)),
+                        )
+                        .padding([10, 18])
+                        .width(Length::Fill)
+                        .style(sidebar_learn_more_style),
+                    ),
             )
-            .padding(12)
+            .padding(16)
             .style(sidebar_card_style),
         );
 
         if self.breakpoint().is_tablet_or_smaller() {
-            scrollable(Row::new().spacing(8).push(nav))
-                .height(Length::Fixed(128.0))
+            scrollable(nav)
+                .height(Length::Fixed(if self.breakpoint().is_mobile() {
+                    300.0
+                } else {
+                    360.0
+                }))
                 .into()
         } else {
             nav.height(Length::Fill).into()
@@ -1357,6 +1712,13 @@ impl NexusApp {
             SidebarSection::Memory => self.memory_page(),
             SidebarSection::Settings => self.settings_page(),
         };
+        if self.active_section == SidebarSection::Conversation {
+            return container(content)
+                .height(Length::Fill)
+                .style(panel_center_style)
+                .into();
+        }
+
         container(content)
             .padding(self.panel_padding())
             .height(Length::Fill)
@@ -1369,6 +1731,10 @@ impl NexusApp {
             scrollable(
                 Column::new()
                     .spacing(14)
+                    .push(page_header(
+                        "Visão Geral",
+                        "Estado consolidado do NEXUS, missões e sinais operacionais.",
+                    ))
                     .push(self.mission_focus_card())
                     .push(self.hybrid_intelligence_panel())
                     .push(self.system_status_panel())
@@ -1386,6 +1752,10 @@ impl NexusApp {
             scrollable(
                 Column::new()
                     .spacing(14)
+                    .push(page_header(
+                        "Visão Geral",
+                        "Estado consolidado do NEXUS, missões e sinais operacionais.",
+                    ))
                     .push(
                         Row::new()
                             .spacing(14)
@@ -1653,7 +2023,7 @@ impl NexusApp {
                     Row::new()
                         .spacing(10)
                         .align_items(Alignment::Center)
-                        .push(text(">_").size(16).style(TEXT_MUTED))
+                        .push(icon(NexusIcon::ArrowUpRight, 16, TEXT_MUTED))
                         .push(
                             text(human_command_label(&command.command))
                                 .size(15)
@@ -1767,7 +2137,7 @@ impl NexusApp {
                     .spacing(12)
                     .align_items(Alignment::Center)
                     .push(
-                        container(text("✓").size(18).style(TEXT_PRIMARY))
+                        container(icon(NexusIcon::Check, 18, TEXT_PRIMARY))
                             .padding(8)
                             .style(success_shield_style),
                     )
@@ -1974,201 +2344,591 @@ impl NexusApp {
     }
 
     fn conversation_page(&self) -> Element<'_, Message> {
-        if self.breakpoint().is_tablet_or_smaller() {
-            // Layout móvel/tablet: coluna única
-            return scrollable(
-                Column::new()
-                    .spacing(14)
-                    .push(self.conversation_panel())
-                    .push(self.conversation_helper_panel())
-                    .push(self.latest_events_simple()),
-            )
-            .height(Length::Fill)
-            .into();
-        }
-
-        // Layout desktop: 3 colunas (conversa | CORE circle | command link)
-        Row::new()
-            .spacing(14)
-            // LEFT: Conversation panel
-            .push(
-                container(self.conversation_panel())
-                    .width(Length::FillPortion(35))
-                    .height(Length::Fill),
-            )
-            // CENTER: NEXUS SYSTEMS + CORE Circle + Status
-            .push(
-                container(self.nexus_core_panel())
-                    .width(Length::FillPortion(35))
-                    .height(Length::Fill),
-            )
-            // RIGHT: Command Link panel
-            .push(
-                scrollable(
-                    Column::new()
-                        .spacing(14)
-                        .push(self.command_link_panel())
-                        .push(self.latest_events_simple()),
-                )
-                .width(Length::FillPortion(30))
-                .height(Length::Fill),
-            )
+        Column::new()
+            .push(self.chat_top_bar())
+            .push(Rule::horizontal(1).style(rule_style))
+            .push(self.chat_workspace())
             .height(Length::Fill)
             .into()
     }
 
-    fn nexus_core_panel(&self) -> Element<'_, Message> {
-        let cpu_pct = (self.cpu_usage * 100.0).min(100.0) as u32;
-        let mem_pct = (self.ram_usage * 100.0).min(100.0) as u32;
-        
+    fn chat_top_bar(&self) -> Element<'_, Message> {
+        let is_online = self.status == "ONLINE";
+        let status = container(
+            Row::new()
+                .spacing(9)
+                .align_items(Alignment::Center)
+                .push(container(Space::new(10, 10)).style(if is_online {
+                    success_dot_style
+                } else {
+                    error_dot_style
+                }))
+                .push(
+                    text(if is_online { "Online" } else { "Offline" })
+                        .size(14)
+                        .style(TEXT_PRIMARY),
+                )
+                .push(icon(NexusIcon::ChevronDown, 14, CYAN)),
+        )
+        .padding([9, 15])
+        .style(chat_status_pill_style);
+
+        let avatar = container(text("U").size(15).style(TEXT_PRIMARY))
+            .padding(13)
+            .style(user_avatar_style);
+
+        container(
+            Row::new()
+                .spacing(16)
+                .align_items(Alignment::Center)
+                .push(Space::with_width(Length::Fill))
+                .push(status)
+                .push(avatar),
+        )
+        .padding(if self.breakpoint().is_mobile() {
+            [12, 16]
+        } else {
+            [18, 28]
+        })
+        .height(Length::Fixed(if self.breakpoint().is_mobile() {
+            68.0
+        } else {
+            82.0
+        }))
+        .width(Length::Fill)
+        .style(chat_top_bar_style)
+        .into()
+    }
+
+    fn chat_workspace(&self) -> Element<'_, Message> {
+        let show_starter = self.messages.len() <= 1 && !self.is_thinking;
+        let logo_size = if self.breakpoint().is_mobile() {
+            26
+        } else {
+            38
+        };
+        let title_size = if self.breakpoint().is_mobile() {
+            26
+        } else {
+            34
+        };
+        let subtitle_size = if self.breakpoint().is_mobile() {
+            14
+        } else {
+            17
+        };
+        let mut content = Column::new()
+            .spacing(if self.breakpoint().is_mobile() {
+                20
+            } else {
+                28
+            })
+            .align_items(Alignment::Center)
+            .padding(if self.breakpoint().is_mobile() {
+                [18, 0]
+            } else {
+                [30, 0]
+            });
+
+        if show_starter {
+            content = content.push(
+                Column::new()
+                    .spacing(18)
+                    .align_items(Alignment::Center)
+                    .push(
+                        container(text("N").size(logo_size).style(CYAN))
+                            .padding(if self.breakpoint().is_mobile() { 17 } else { 22 })
+                            .style(chat_logo_style),
+                    )
+                    .push(
+                        Column::new()
+                            .spacing(8)
+                            .align_items(Alignment::Center)
+                            .push(
+                                text("Como posso ajudar hoje?")
+                                    .size(title_size)
+                                    .style(TEXT_PRIMARY),
+                            )
+                            .push(
+                                text("Posso resumir arquivos, organizar tarefas ou responder perguntas.")
+                                    .size(subtitle_size)
+                                    .style(TEXT_SECONDARY),
+                            ),
+                    ),
+            );
+            content = content.push(self.prompt_grid());
+        } else {
+            content = content.push(Space::with_height(Length::Fixed(12.0)));
+        }
+
+        content = content.push(self.message_thread());
+
+        container(
+            Column::new()
+                .align_items(Alignment::Center)
+                .height(Length::Fill)
+                .push(
+                    scrollable(content)
+                        .id(scrollable::Id::new(SCROLLABLE_ID))
+                        .height(Length::Fill)
+                        .width(Length::Fill),
+                )
+                .push(if let Some((cmd_id, cmd_text, risk)) = &self.pending_approval {
+                    container(
+                        Column::new()
+                            .spacing(12)
+                            .push(text(format!("Ação Perigosa: {:?}", risk)).size(16).style(DANGER))
+                            .push(text(cmd_text).size(14).style(TEXT_PRIMARY))
+                            .push(Row::new()
+                                .spacing(12)
+                                .push(button(text("Aprovar").style(iced::Color::WHITE)).style(theme::Button::Positive).on_press(Message::ReplyApproval(cmd_id.clone(), true)))
+                                .push(button(text("Negar").style(iced::Color::WHITE)).style(theme::Button::Destructive).on_press(Message::ReplyApproval(cmd_id.clone(), false)))
+                            )
+                    )
+                    .padding(16)
+                    .width(self.chat_stage_length())
+                    .style(chat_input_shell_style)
+                } else {
+                    container(Space::new(0, 0))
+                })
+                .push(self.chat_input_bar())
+                .push(
+                    container(
+                        Row::new()
+                            .spacing(7)
+                            .align_items(Alignment::Center)
+                            .push(icon(NexusIcon::Lock, 12, TEXT_MUTED))
+                            .push(
+                                text("O NEXUS pode cometer erros. Verifique as informações importantes.")
+                                    .size(11)
+                                    .width(Length::Fill)
+                                    .style(TEXT_MUTED),
+                            ),
+                    )
+                    .padding([12, 0]),
+                ),
+        )
+        .padding(if self.breakpoint().is_mobile() {
+            [0, 14]
+        } else {
+            [0, 28]
+        })
+        .height(Length::Fill)
+        .width(Length::Fill)
+        .style(chat_workspace_style)
+        .into()
+    }
+
+    fn chat_stage_width(&self) -> f32 {
+        match self.breakpoint() {
+            Breakpoint::Ultrawide => 980.0,
+            Breakpoint::Desktop => 930.0,
+            Breakpoint::Laptop => 820.0,
+            _ => 0.0,
+        }
+    }
+
+    fn chat_stage_length(&self) -> Length {
+        if self.breakpoint().is_tablet_or_smaller() {
+            Length::Fill
+        } else {
+            Length::Fixed(self.chat_stage_width())
+        }
+    }
+
+    fn prompt_grid(&self) -> Element<'_, Message> {
+        let cards = [
+            (
+                NexusIcon::Document,
+                "Resumir documento",
+                "Resuma arquivos e textos longos.",
+                "Quero um resumo deste projeto e os próximos passos.",
+            ),
+            (
+                NexusIcon::List,
+                "Organizar tarefas",
+                "Organize suas tarefas e prioridades.",
+                "Organize minhas tarefas por prioridade.",
+            ),
+            (
+                NexusIcon::Circle,
+                "Explicar projeto",
+                "Explique ideias e conceitos complexos.",
+                "Explique este projeto em linguagem simples.",
+            ),
+            (
+                NexusIcon::ArrowUpRight,
+                "Criar plano",
+                "Monte um plano passo a passo.",
+                "Crie um plano de ação para melhorar este projeto.",
+            ),
+        ];
+
+        if self.breakpoint().is_tablet_or_smaller() {
+            let mut column = Column::new().spacing(12).width(Length::Fill);
+            for (icon, title, detail, prompt) in cards {
+                column = column.push(prompt_card(icon, title, detail, prompt, Length::Fill));
+            }
+            container(column).width(self.chat_stage_length()).into()
+        } else {
+            let mut row = Row::new().spacing(16).width(self.chat_stage_length());
+            for (icon, title, detail, prompt) in cards {
+                row = row.push(prompt_card(
+                    icon,
+                    title,
+                    detail,
+                    prompt,
+                    Length::FillPortion(1),
+                ));
+            }
+            row.into()
+        }
+    }
+
+    fn message_thread(&self) -> Element<'_, Message> {
+        let mut messages = Column::new().spacing(18).width(self.chat_stage_length());
+
+        for msg in self.messages.iter().rev().take(8).rev() {
+            messages = messages.push(chat_message_row(
+                msg,
+                self.breakpoint().is_tablet_or_smaller(),
+            ));
+        }
+
+        if self.is_thinking {
+            messages = messages.push(thinking_message_row(
+                self.tick_counter,
+                self.breakpoint().is_tablet_or_smaller(),
+            ));
+        }
+
+        container(messages).width(self.chat_stage_length()).into()
+    }
+
+    fn chat_input_bar(&self) -> Element<'_, Message> {
+        let input = text_input("Envie uma mensagem...", &self.input_value)
+            .on_input(Message::InputChanged)
+            .on_submit(Message::Submit)
+            .padding(12)
+            .size(15)
+            .width(Length::Fill)
+            .style(theme::TextInput::Custom(Box::new(ChatTextInputStyle)));
+
+        let send = icon_button(
+            NexusIcon::Send,
+            "Enviar mensagem",
+            (!self.is_thinking).then_some(Message::Submit),
+            IconButtonStyle::primary(48.0, 21),
+        );
+
+        container(
+            Row::new()
+                .spacing(14)
+                .align_items(Alignment::Center)
+                .push(icon_button(
+                    NexusIcon::Paperclip,
+                    "Anexar arquivo",
+                    None,
+                    IconButtonStyle::subtle(44.0, 20),
+                ))
+                .push(input)
+                .push(icon_button(
+                    NexusIcon::Mic,
+                    "Usar voz",
+                    None,
+                    IconButtonStyle::flat(40.0, 20),
+                ))
+                .push(send),
+        )
+        .padding([12, 14])
+        .width(self.chat_stage_length())
+        .height(Length::Fixed(72.0))
+        .style(chat_input_shell_style)
+        .into()
+    }
+
+    fn dashboard_header(&self) -> Element<'_, Message> {
+        let is_online = self.status == "ONLINE";
+        let status = container(
+            Row::new()
+                .spacing(9)
+                .align_items(Alignment::Center)
+                .push(container(Space::new(10, 10)).style(if is_online {
+                    success_dot_style
+                } else {
+                    danger_dot_style
+                }))
+                .push(
+                    text(if is_online {
+                        "Sistema ativo"
+                    } else {
+                        "Sistema offline"
+                    })
+                    .size(14)
+                    .style(if is_online { SUCCESS } else { DANGER }),
+                ),
+        )
+        .padding([10, 18])
+        .style(nexus_active_pill_style);
+
+        Row::new()
+            .spacing(20)
+            .align_items(Alignment::Center)
+            .push(
+                Column::new()
+                    .spacing(6)
+                    .push(text("Painel do NEXUS").size(34).style(TEXT_PRIMARY))
+                    .push(
+                        text("Resumo do sistema e atividades em andamento")
+                            .size(15)
+                            .style(TEXT_SECONDARY),
+                    ),
+            )
+            .push(Space::with_width(Length::Fill))
+            .push(status)
+            .into()
+    }
+
+    fn nexus_status_summary_card(&self) -> Element<'_, Message> {
+        let healthy = self.status == "ONLINE" && self.org.incidents.is_empty();
+        let activity = if self.is_thinking {
+            ("Alta", "Processando pedido", WARNING)
+        } else if self.active_operations_count() > 0 {
+            ("Média", "Operação em andamento", ACCENT)
+        } else {
+            ("Baixa", "Tudo tranquilo", SUCCESS)
+        };
+
+        container(
+            Column::new()
+                .spacing(22)
+                .align_items(Alignment::Center)
+                .push(
+                    container(
+                        text(if healthy { "✓" } else { "!" })
+                            .size(42)
+                            .style(if healthy { CYAN } else { WARNING }),
+                    )
+                    .padding(20)
+                    .style(nexus_status_icon_style),
+                )
+                .push(
+                    Column::new()
+                        .spacing(8)
+                        .align_items(Alignment::Center)
+                        .push(
+                            text(if healthy {
+                                "Tudo funcionando normalmente"
+                            } else {
+                                "Atenção necessária"
+                            })
+                            .size(26)
+                            .style(TEXT_PRIMARY),
+                        )
+                        .push(
+                            text(if healthy {
+                                "O NEXUS está pronto para ajudar você."
+                            } else {
+                                "Há sinais que precisam ser revisados."
+                            })
+                            .size(14)
+                            .style(TEXT_SECONDARY),
+                        ),
+                )
+                .push(
+                    Row::new()
+                        .spacing(24)
+                        .align_items(Alignment::Center)
+                        .push(nexus_summary_metric(
+                            "↗",
+                            "Desempenho",
+                            performance_label(self.cpu_usage),
+                            "Sistema responsivo",
+                            ACCENT,
+                        ))
+                        .push(container(Space::new(1, 72)).style(vertical_divider_style))
+                        .push(nexus_summary_metric(
+                            "▣",
+                            "Memória",
+                            format!("{:.0}%", self.ram_usage),
+                            "Uso equilibrado",
+                            PURPLE,
+                        ))
+                        .push(container(Space::new(1, 72)).style(vertical_divider_style))
+                        .push(nexus_summary_metric(
+                            "~",
+                            "Atividade",
+                            activity.0.to_string(),
+                            activity.1,
+                            activity.2,
+                        )),
+                ),
+        )
+        .padding(24)
+        .width(Length::Fill)
+        .style(nexus_main_card_style)
+        .into()
+    }
+
+    fn nexus_current_action_card(&self) -> Element<'_, Message> {
+        let action = if self.is_thinking {
+            self.processing_stage()
+        } else if let Some(command) = self.org.commands.first() {
+            format!("Última execução: {}", friendly_status(&command.status))
+        } else {
+            "Aguardando seu pedido".to_string()
+        };
+        let detail = if self.is_thinking {
+            "Estou processando a solicitação e volto com evidência quando concluir."
+        } else {
+            "Fale comigo ao lado e eu te ajudo."
+        };
+
+        container(
+            Row::new()
+                .spacing(22)
+                .align_items(Alignment::Center)
+                .push(
+                    container(text("✦").size(34).style(CYAN))
+                        .padding(22)
+                        .style(nexus_status_icon_style),
+                )
+                .push(
+                    Column::new()
+                        .spacing(8)
+                        .push(
+                            text("O que o NEXUS está fazendo agora")
+                                .size(18)
+                                .style(TEXT_PRIMARY),
+                        )
+                        .push(text(action).size(24).style(CYAN))
+                        .push(text(detail).size(14).style(TEXT_SECONDARY)),
+                ),
+        )
+        .padding(22)
+        .width(Length::Fill)
+        .style(nexus_card_style)
+        .into()
+    }
+
+    fn nexus_updates_card(&self) -> Element<'_, Message> {
+        let mut updates = Column::new().spacing(14);
+        for item in self.visible_activity().iter().rev().take(3) {
+            updates = updates.push(
+                Row::new()
+                    .spacing(14)
+                    .align_items(Alignment::Center)
+                    .push(
+                        container(
+                            text(activity_symbol(&item.level))
+                                .size(16)
+                                .style(activity_color(&item.level)),
+                        )
+                        .padding(8)
+                        .style(nexus_update_icon_style),
+                    )
+                    .push(
+                        Column::new()
+                            .spacing(3)
+                            .push(
+                                text(trim_text(&item.label, 44))
+                                    .size(15)
+                                    .style(TEXT_PRIMARY),
+                            )
+                            .push(text(trim_text(&item.detail, 78)).size(12).style(TEXT_MUTED)),
+                    )
+                    .push(Space::with_width(Length::Fill))
+                    .push(
+                        text(format!("Hoje, {}", trim_text(&item.timestamp, 5)))
+                            .size(12)
+                            .style(TEXT_MUTED),
+                    ),
+            );
+        }
+
         container(
             Column::new()
                 .spacing(16)
-                .push(
-                    // NEXUS SYSTEMS header
-                    Column::new()
-                        .spacing(8)
-                        .push(text("NEXUS SYSTEMS").size(14).style(CYAN))
-                        .push(
-                            Column::new()
-                                .spacing(6)
-                                .push(
-                                    Row::new()
-                                        .spacing(6)
-                                        .push(container(Space::new(8, 8)).style(success_dot_style))
-                                        .push(text("CORE").size(12).style(TEXT_PRIMARY))
-                                )
-                                .push(
-                                    Row::new()
-                                        .spacing(6)
-                                        .push(container(Space::new(8, 8)).style(danger_dot_style))
-                                        .push(text("Offline").size(10).style(TEXT_MUTED))
-                                )
-                                .push(
-                                    Column::new()
-                                        .spacing(3)
-                                        .push(
-                                            Row::new()
-                                                .spacing(8)
-                                                .push(text("CPU-LOAD").size(10).style(TEXT_MUTED))
-                                                .push(text(format!("{}%", cpu_pct)).size(10).style(TEXT_SECONDARY))
-                                        )
-                                        .push(
-                                            container(
-                                                container(Space::new(
-                                                    (cpu_pct as f32 / 100.0) * 60.0, 
-                                                    3.0
-                                                ))
-                                                .style(meter_fill_accent_style)
-                                            )
-                                            .width(Length::Fixed(60.0))
-                                            .style(meter_track_style)
-                                        )
-                                )
-                                .push(
-                                    Column::new()
-                                        .spacing(3)
-                                        .push(
-                                            Row::new()
-                                                .spacing(8)
-                                                .push(text("MEMORY").size(10).style(TEXT_MUTED))
-                                                .push(text(format!("{}%", mem_pct)).size(10).style(TEXT_SECONDARY))
-                                        )
-                                        .push(
-                                            container(
-                                                container(Space::new(
-                                                    (mem_pct as f32 / 100.0) * 60.0,
-                                                    3.0
-                                                ))
-                                                .style(meter_fill_accent_style)
-                                            )
-                                            .width(Length::Fixed(60.0))
-                                            .style(meter_track_style)
-                                        )
-                                )
-                                .push(
-                                    Row::new()
-                                        .spacing(6)
-                                        .push(text("RUNTIME").size(10).style(TEXT_MUTED))
-                                        .push(text("conectado").size(10).style(SUCCESS))
-                                )
-                        )
-                )
+                .push(text("Últimas atualizações").size(18).style(TEXT_PRIMARY))
+                .push(updates)
                 .push(Rule::horizontal(1).style(rule_style))
-                // CORE Circle
-                .push(
-                    container(self.core_circle_visual())
-                        .width(Length::Fill)
-                        .height(Length::Fixed(180.0))
-                        .center_x()
-                        .center_y()
-                )
-                .push(Rule::horizontal(1).style(rule_style))
-                // Mission Status
-                .push(
-                    Column::new()
-                        .spacing(6)
-                        .push(text("MISSÃO ATIVA").size(12).style(CYAN))
-                        .push(text("validar novas interfaces do swarm").size(11).style(TEXT_PRIMARY))
-                        .push(text("Aguardando parecer").size(10).style(TEXT_MUTED))
-                )
-        )
-        .padding(14)
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .style(section_style)
-        .into()
-    }
-
-    fn core_circle_visual(&self) -> Element<'_, Message> {
-        let cpu_pct = (self.cpu_usage * 100.0).min(100.0) as u32;
-        let mem_pct = (self.ram_usage * 100.0).min(100.0) as u32;
-        
-        container(
-            Column::new()
-                .spacing(8)
-                .align_items(Alignment::Center)
-                .width(Length::Fixed(140.0))
-                .push(text("CORE").size(16).style(CYAN))
-                .push(text("COGNITIVE OS".to_string()).size(9).style(TEXT_MUTED))
-                .push(text("RUNTIME").size(10).style(TEXT_SECONDARY))
                 .push(
                     Row::new()
-                        .spacing(12)
                         .align_items(Alignment::Center)
-                        .push(
-                            Column::new()
-                                .spacing(1)
-                                .align_items(Alignment::Center)
-                                .push(text("CPU").size(8).style(TEXT_MUTED))
-                                .push(text(format!("{}%", cpu_pct)).size(10).style(CYAN))
-                        )
-                        .push(
-                            Column::new()
-                                .spacing(1)
-                                .align_items(Alignment::Center)
-                                .push(text("MEM").size(8).style(TEXT_MUTED))
-                                .push(text(format!("{}%", mem_pct)).size(10).style(CYAN))
-                        )
-                        .push(
-                            Column::new()
-                                .spacing(1)
-                                .align_items(Alignment::Center)
-                                .push(text("I/O").size(8).style(TEXT_MUTED))
-                                .push(text("19").size(10).style(CYAN))
-                        )
-                )
+                        .push(Space::with_width(Length::Fill))
+                        .push(text("Ver mais atualizações").size(13).style(CYAN))
+                        .push(text("  >").size(15).style(CYAN))
+                        .push(Space::with_width(Length::Fill)),
+                ),
         )
-        .width(Length::Fixed(140.0))
-        .center_x()
-        .padding(12)
-        .style(sidebar_card_style)
+        .padding(22)
+        .width(Length::Fill)
+        .style(nexus_card_style)
         .into()
     }
 
-    fn command_link_panel(&self) -> Element<'_, Message> {
-        let mut send = button(text("SEND").size(11).style(TEXT_PRIMARY))
-            .padding([10, 16])
+    fn nexus_chat_card(&self) -> Element<'_, Message> {
+        let mut messages = Column::new().spacing(10);
+        for msg in self.messages.iter().rev().take(5).rev() {
+            let is_operator = msg.role == "OPERATOR";
+            messages = messages.push(
+                container(
+                    Column::new()
+                        .spacing(5)
+                        .push(
+                            text(if is_operator { "Você" } else { "NEXUS" })
+                                .size(11)
+                                .style(if is_operator { WARNING } else { CYAN }),
+                        )
+                        .push(
+                            text(trim_text(&msg.content, 240))
+                                .size(12)
+                                .style(TEXT_SECONDARY),
+                        ),
+                )
+                .padding(10)
+                .width(Length::Fill)
+                .style(if is_operator {
+                    operator_bubble_modern
+                } else {
+                    nexus_bubble_modern
+                }),
+            );
+        }
+
+        let body: Element<'_, Message> = if self.messages.len() <= 1 && !self.is_thinking {
+            container(
+                Column::new()
+                    .spacing(16)
+                    .align_items(Alignment::Center)
+                    .push(
+                        container(icon(NexusIcon::Message, 36, CYAN))
+                            .padding(24)
+                            .style(nexus_status_icon_style),
+                    )
+                    .push(
+                        text("Como posso ajudar você hoje?")
+                            .size(18)
+                            .style(TEXT_PRIMARY),
+                    )
+                    .push(
+                        text("Envie sua mensagem e eu responderei o mais rápido possível.")
+                            .size(13)
+                            .style(TEXT_SECONDARY),
+                    ),
+            )
+            .height(Length::Fill)
+            .center_x()
+            .center_y()
+            .style(nexus_chat_empty_style)
+            .into()
+        } else {
+            scrollable(messages).height(Length::Fill).into()
+        };
+
+        let mut send = button(text("Enviar  >").size(16))
+            .padding([14, 18])
+            .width(Length::Fill)
             .style(theme::Button::custom(PrimaryActionButtonStyle));
         if !self.is_thinking {
             send = send.on_press(Message::Submit);
@@ -2176,114 +2936,271 @@ impl NexusApp {
 
         container(
             Column::new()
-                .spacing(12)
+                .spacing(18)
                 .push(
-                    // Header
-                    Row::new()
-                        .spacing(12)
-                        .align_items(Alignment::Center)
-                        .push(text("COMMAND LINK").size(13).style(CYAN))
-                        .push(container(
-                            text("READY").size(9).style(TEXT_PRIMARY)
-                        )
-                        .padding([4, 8])
-                        .style(meter_fill_success_style))
-                )
-                .push(
-                    // Directive input
-                    container(
-                        Column::new()
-                            .spacing(8)
-                            .push(
-                                text("NEXUS - Iniciar").size(11).style(TEXT_PRIMARY)
-                            )
-                            .push(
-                                text("Pronto? você quer pedir uma análise, uma modificação ou outras coisas próximo passo.")
-                                    .size(9)
-                                    .style(TEXT_SECONDARY)
-                            )
-                    )
-                    .padding(10)
-                    .style(sidebar_card_style)
-                    .width(Length::Fill)
-                )
-                .push(
-                    // Input + Send button
-                    Row::new()
-                        .spacing(8)
-                        .push(
-                            text_input(
-                                "Diretiva para o NEXUS",
-                                &self.input_value,
-                            )
-                            .on_input(Message::InputChanged)
-                            .on_submit(Message::Submit)
-                            .padding(10)
-                            .width(Length::Fill),
-                        )
-                        .push(send)
-                )
-                .push(
-                    // Tabs
-                    Row::new()
-                        .spacing(10)
-                        .push(
-                            container(text("Análise").size(10).style(TEXT_PRIMARY))
-                                .padding([6, 10])
-                                .style(meter_fill_accent_style)
-                        )
-                        .push(
-                            container(text("Modificação").size(10).style(TEXT_MUTED))
-                                .padding([6, 10])
-                                .style(sidebar_card_style)
-                        )
-                        .push(
-                            container(text("Execução").size(10).style(TEXT_MUTED))
-                                .padding([6, 10])
-                                .style(sidebar_card_style)
-                        )
-                )
-                .push(
-                    // Status items
                     Column::new()
-                        .spacing(6)
+                        .spacing(8)
+                        .push(text("Fale com o NEXUS").size(26).style(TEXT_PRIMARY))
                         .push(
-                            Row::new()
-                                .spacing(8)
-                                .align_items(Alignment::Center)
-                                .push(text("O que aconteceu agora").size(10).style(TEXT_PRIMARY))
-                                .push(Space::with_width(Length::Fill))
-                                .push(text("19:38").size(9).style(TEXT_MUTED))
-                        )
-                        .push(
-                            Row::new()
-                                .spacing(8)
-                                .align_items(Alignment::Center)
-                                .push(text("Organização atualizada").size(10).style(TEXT_PRIMARY))
-                                .push(Space::with_width(Length::Fill))
-                                .push(text("19:38").size(9).style(TEXT_MUTED))
-                        )
-                        .push(
-                            Row::new()
-                                .spacing(8)
-                                .align_items(Alignment::Center)
-                                .push(text("Produto Linux").size(10).style(TEXT_PRIMARY))
-                                .push(Space::with_width(Length::Fill))
-                                .push(text("19:38").size(9).style(TEXT_MUTED))
-                        )
-                        .push(
-                            Row::new()
-                                .spacing(8)
-                                .align_items(Alignment::Start)
-                                .push(text("Interface iniciada").size(10).style(TEXT_PRIMARY))
-                                .push(Space::with_width(Length::Fill))
-                                .push(text("Conectando ao\nlocalhost local").size(8).style(TEXT_MUTED))
-                        )
+                            text("Estou aqui para ajudar. É só perguntar!")
+                                .size(14)
+                                .style(TEXT_SECONDARY),
+                        ),
                 )
+                .push(body)
+                .push(
+                    text_input("Digite sua mensagem...", &self.input_value)
+                        .on_input(Message::InputChanged)
+                        .on_submit(Message::Submit)
+                        .padding(16)
+                        .width(Length::Fill),
+                )
+                .push(send),
+        )
+        .padding(24)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .style(nexus_card_style)
+        .into()
+    }
+
+    fn hud_telemetry_rail(&self) -> Element<'_, Message> {
+        let runtime = self
+            .org
+            .commands
+            .first()
+            .map(|command| friendly_status(&command.status))
+            .unwrap_or_else(|| "idle".to_string());
+        let daemon = self
+            .product
+            .as_ref()
+            .map(|status| friendly_status(&status.daemon.status))
+            .unwrap_or_else(|| friendly_status(&self.status));
+        let local = self
+            .product
+            .as_ref()
+            .and_then(|status| status.models.local.selected_model.as_deref())
+            .unwrap_or("local pending");
+        let cloud = self
+            .product
+            .as_ref()
+            .map(|status| status.models.cloud.model.as_str())
+            .unwrap_or("cloud pending");
+
+        container(
+            Column::new()
+                .spacing(10)
+                .push(text("NEXUS SYSTEMS").size(13).style(CYAN))
+                .push(hud_metric_tile(
+                    "CORE",
+                    daemon,
+                    if self.status == "ONLINE" {
+                        SUCCESS
+                    } else {
+                        DANGER
+                    },
+                ))
+                .push(hud_meter_tile("CPU LOAD", self.cpu_usage, ACCENT))
+                .push(hud_meter_tile("MEMORY", self.ram_usage, WARNING))
+                .push(hud_metric_tile("RUNTIME", runtime, TEXT_SECONDARY))
+                .push(hud_metric_tile(
+                    "MODEL",
+                    format!("{} / {}", trim_text(local, 14), trim_text(cloud, 14)),
+                    TEXT_SECONDARY,
+                )),
         )
         .padding(14)
         .width(Length::Fill)
-        .style(section_style)
+        .style(hud_panel_style)
+        .into()
+    }
+
+    fn nexus_core_visual(&self) -> Element<'_, Message> {
+        let mission = self
+            .org
+            .swarm
+            .as_ref()
+            .and_then(|swarm| swarm.current_goal.as_deref())
+            .map(|goal| trim_text(goal, 90))
+            .unwrap_or_else(|| "Aguardando diretiva operacional".to_string());
+        let active = role_display_name(self.active_mission_step());
+        let pulse = match self.tick_counter % 4 {
+            0 => "NEXUS",
+            1 => "NEXUS",
+            2 => "CORE",
+            _ => "ONLINE",
+        };
+        let (ring_size, core_size, core_padding) = match self.breakpoint() {
+            Breakpoint::MobileSmall | Breakpoint::MobileLarge => (238.0, 146.0, 22),
+            Breakpoint::Tablet | Breakpoint::Laptop => (280.0, 166.0, 26),
+            _ => (340.0, 190.0, 34),
+        };
+
+        let core = container(
+            Column::new()
+                .spacing(8)
+                .align_items(Alignment::Center)
+                .push(text(pulse).size(34).style(TEXT_PRIMARY))
+                .push(text("COGNITIVE OS").size(12).style(CYAN))
+                .push(text(active.to_uppercase()).size(11).style(SUCCESS)),
+        )
+        .padding(core_padding)
+        .width(Length::Fixed(core_size))
+        .height(Length::Fixed(core_size))
+        .style(nexus_core_inner_style);
+
+        let visual = container(
+            Column::new()
+                .align_items(Alignment::Center)
+                .spacing(16)
+                .push(
+                    container(
+                        Column::new()
+                            .align_items(Alignment::Center)
+                            .spacing(14)
+                            .push(container(Space::new(1, 12)).width(Length::Fill))
+                            .push(core)
+                            .push(
+                                Row::new()
+                                    .spacing(10)
+                                    .align_items(Alignment::Center)
+                                    .push(hud_orbit_chip(
+                                        "CPU",
+                                        format!("{:.0}%", self.cpu_usage),
+                                        ACCENT,
+                                    ))
+                                    .push(hud_orbit_chip(
+                                        "RAM",
+                                        format!("{:.0}%", self.ram_usage),
+                                        WARNING,
+                                    ))
+                                    .push(hud_orbit_chip(
+                                        "OPS",
+                                        self.active_operations_count().to_string(),
+                                        SUCCESS,
+                                    )),
+                            ),
+                    )
+                    .padding(28)
+                    .width(Length::Fixed(ring_size))
+                    .height(Length::Fixed(ring_size))
+                    .style(nexus_core_ring_style),
+                )
+                .push(text("MISSÃO ATIVA").size(11).style(TEXT_MUTED))
+                .push(text(mission).size(16).style(TEXT_PRIMARY))
+                .push(text(self.current_stage.clone()).size(11).style(TEXT_MUTED)),
+        )
+        .padding(18)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .style(hud_core_stage_style);
+
+        visual.into()
+    }
+
+    fn hud_command_rail(&self) -> Element<'_, Message> {
+        let mut messages = Column::new().spacing(10);
+        for msg in self.messages.iter().rev().take(5).rev() {
+            let is_operator = msg.role == "OPERATOR";
+            messages = messages.push(
+                container(
+                    Column::new()
+                        .spacing(5)
+                        .push(
+                            Row::new()
+                                .spacing(8)
+                                .align_items(Alignment::Center)
+                                .push(
+                                    text(if is_operator { "OPERATOR" } else { "NEXUS" })
+                                        .size(10)
+                                        .style(if is_operator { WARNING } else { CYAN }),
+                                )
+                                .push(text(&msg.timestamp).size(9).style(TEXT_MUTED)),
+                        )
+                        .push(
+                            text(trim_text(&msg.content, 240))
+                                .size(11)
+                                .style(TEXT_PRIMARY),
+                        ),
+                )
+                .padding(10)
+                .width(Length::Fill)
+                .style(if is_operator {
+                    operator_bubble_modern
+                } else {
+                    nexus_bubble_modern
+                }),
+            );
+        }
+
+        if self.is_thinking {
+            messages = messages.push(
+                container(
+                    Column::new()
+                        .spacing(4)
+                        .push(text("PROCESSANDO").size(10).style(CYAN))
+                        .push(text(self.processing_stage()).size(11).style(TEXT_SECONDARY)),
+                )
+                .padding(10)
+                .width(Length::Fill)
+                .style(progress_bubble_modern),
+            );
+        }
+
+        let mut send = button(text("SEND").size(12))
+            .padding([12, 18])
+            .style(theme::Button::custom(PrimaryActionButtonStyle));
+        if !self.is_thinking {
+            send = send.on_press(Message::Submit);
+        }
+
+        let input = container(
+            Row::new()
+                .spacing(8)
+                .align_items(Alignment::Center)
+                .push(
+                    text_input("Diretiva para o NEXUS...", &self.input_value)
+                        .on_input(Message::InputChanged)
+                        .on_submit(Message::Submit)
+                        .padding(12)
+                        .width(Length::Fill),
+                )
+                .push(send),
+        )
+        .padding(8)
+        .style(input_field_style);
+
+        container(
+            Column::new()
+                .spacing(12)
+                .push(
+                    Row::new()
+                        .align_items(Alignment::Center)
+                        .push(text("COMMAND LINK").size(13).style(CYAN))
+                        .push(Space::with_width(Length::Fill))
+                        .push(
+                            text(if self.is_thinking { "BUSY" } else { "READY" })
+                                .size(10)
+                                .style(if self.is_thinking { WARNING } else { SUCCESS }),
+                        ),
+                )
+                .push(
+                    scrollable(messages)
+                        .height(Length::Fixed(
+                            if self.breakpoint() == Breakpoint::Ultrawide {
+                                410.0
+                            } else {
+                                310.0
+                            },
+                        ))
+                        .id(scrollable::Id::new(SCROLLABLE_ID)),
+                )
+                .push(input)
+                .push(prompt_mode_row()),
+        )
+        .padding(14)
+        .width(Length::Fill)
+        .style(hud_panel_style)
         .into()
     }
 
@@ -2658,26 +3575,73 @@ impl NexusApp {
     }
 
     fn missions_page(&self) -> Element<'_, Message> {
-        scrollable(
+        let mission = self
+            .org
+            .swarm
+            .as_ref()
+            .and_then(|swarm| swarm.current_goal.as_deref())
+            .map(|goal| trim_text(goal, 96))
+            .unwrap_or_else(|| "Nenhuma tarefa ativa no momento.".to_string());
+
+        let mut tasks = Column::new().spacing(12);
+        if let Some(swarm) = &self.org.swarm {
+            for item in swarm.plan.iter().take(6) {
+                tasks = tasks.push(premium_task_item(
+                    item.task.clone(),
+                    friendly_task_status(&item.status),
+                    format!("Responsável: {}", role_display_name(&item.role)),
+                ));
+            }
+        }
+
+        if self
+            .org
+            .swarm
+            .as_ref()
+            .map(|swarm| swarm.plan.is_empty())
+            .unwrap_or(true)
+        {
+            tasks = tasks
+                .push(premium_task_item(
+                    "Criar um plano de ação",
+                    "Pronto para começar",
+                    "Peça ao NEXUS para transformar uma ideia em passos claros.",
+                ))
+                .push(premium_task_item(
+                    "Organizar prioridades",
+                    "Sugestão",
+                    "Use a conversa para priorizar arquivos, decisões ou próximos passos.",
+                ))
+                .push(premium_task_item(
+                    "Resumir o projeto",
+                    "Sugestão",
+                    "O NEXUS pode gerar uma visão clara antes de executar qualquer ação.",
+                ));
+        }
+
+        self.premium_page_shell(
+            "Tarefas",
+            "Acompanhe o que importa sem ruído técnico.",
             Column::new()
-                .spacing(14)
-                .push(page_header(
-                    "Missoes",
-                    "Objetivo ativo, progresso e proximos passos.",
-                ))
-                .push(self.role_summary_row(
-                    "CEO",
-                    "Enxerga objetivo, prioridade e risco antes de aprovar qualquer acao.",
-                    "CTO",
-                    "Confere plano, responsavel tecnico e dependencia de runtime.",
-                    "Usuario",
-                    "Acompanha em qual etapa o NEXUS esta e o que vem depois.",
-                ))
-                .push(self.mission_command_overview())
-                .push(container(self.mission_progress_panel()).style(section_style)),
+                .spacing(16)
+                .push(
+                    container(
+                        Column::new()
+                            .spacing(8)
+                            .push(text("Foco atual").size(13).style(CYAN))
+                            .push(text(mission).size(22).style(TEXT_PRIMARY))
+                            .push(
+                                text("Tudo que exige detalhes técnicos fica disponível apenas no modo desenvolvedor.")
+                                    .size(13)
+                                    .style(TEXT_SECONDARY),
+                            ),
+                    )
+                    .padding(22)
+                    .width(Length::Fill)
+                    .style(premium_surface_style),
+                )
+                .push(tasks),
         )
-        .height(Length::Fill)
-        .into()
     }
 
     fn swarm_page(&self) -> Element<'_, Message> {
@@ -2708,7 +3672,7 @@ impl NexusApp {
             Column::new()
                 .spacing(14)
                 .push(page_header(
-                    "Execucoes",
+                    "Execuções",
                     "Acoes reais executadas com resultado e verificacao.",
                 ))
                 .push(self.role_summary_row(
@@ -2730,7 +3694,7 @@ impl NexusApp {
             Column::new()
                 .spacing(14)
                 .push(page_header(
-                    "Aprovacoes",
+                    "Aprovações",
                     "Comandos sensiveis aguardando decisao humana.",
                 ))
                 .push(self.role_summary_row(
@@ -2830,7 +3794,7 @@ impl NexusApp {
             Column::new()
                 .spacing(14)
                 .push(page_header(
-                    "Memoria",
+                    "Memória",
                     "Decisoes, aprendizados e registros organizacionais.",
                 ))
                 .push(self.role_summary_row(
@@ -2852,41 +3816,117 @@ impl NexusApp {
     }
 
     fn settings_page(&self) -> Element<'_, Message> {
-        scrollable(
-            Column::new()
-                .spacing(14)
-                .push(page_header(
-                    "Config",
-                    "Instalacao Linux, modelos e modo de visualizacao.",
-                ))
-                .push(self.role_summary_row(
-                    "CEO",
-                    "Confirma se a plataforma esta pronta para operar.",
-                    "CTO",
-                    "Confere pacote, daemon, paths e modelos.",
-                    "Usuario",
-                    "Ve local/cloud e alterna modo publico/engenharia.",
-                ))
-                .push(self.product_overview_strip())
-                .push(
-                    container(self.product_status_panel())
-                        .padding(14)
-                        .style(section_style),
+        let mut settings = Column::new()
+            .spacing(12)
+            .push(settings_item(
+                "Experiência",
+                "Interface conversacional limpa",
+                "Ativo",
+                SUCCESS,
+            ))
+            .push(settings_item(
+                "Anexos e voz",
+                "Entrada pronta para arquivos e comandos por voz",
+                "Disponível",
+                CYAN,
+            ))
+            .push(settings_item(
+                "Privacidade",
+                "Ações sensíveis continuam exigindo confirmação",
+                "Protegido",
+                SUCCESS,
+            ))
+            .push(
+                container(
+                    Row::new()
+                        .spacing(14)
+                        .align_items(Alignment::Center)
+                        .push(
+                            Column::new()
+                                .spacing(5)
+                                .push(text("Modo desenvolvedor").size(15).style(TEXT_PRIMARY))
+                                .push(
+                                    text("Mostra detalhes internos somente quando você quiser.")
+                                        .size(13)
+                                        .style(TEXT_SECONDARY),
+                                ),
+                        )
+                        .push(Space::with_width(Length::Fill))
+                        .push(
+                            Toggler::new(None, self.engineering_mode, |_| {
+                                Message::ToggleEngineeringMode
+                            })
+                            .size(26)
+                            .width(Length::Shrink)
+                            .style(theme::Toggler::Custom(Box::new(PremiumTogglerStyle))),
+                        ),
                 )
-                .push(
-                    button(
-                        text(if self.engineering_mode {
-                            "Desativar modo engenharia"
-                        } else {
-                            "Ativar modo engenharia"
-                        })
-                        .size(12),
-                    )
-                    .padding([10, 14])
-                    .on_press(Message::ToggleEngineeringMode),
-                ),
+                .padding(18)
+                .width(Length::Fill)
+                .style(premium_surface_style),
+            );
+
+        if self.engineering_mode {
+            settings = settings.push(
+                container(
+                    Column::new()
+                        .spacing(14)
+                        .push(text("Detalhes de engenharia").size(16).style(TEXT_PRIMARY))
+                        .push(text("Área opcional para diagnóstico. A experiência principal permanece limpa.").size(13).style(TEXT_MUTED))
+                        .push(self.product_overview_strip())
+                        .push(self.product_status_panel()),
+                )
+                .padding(18)
+                .width(Length::Fill)
+                .style(premium_surface_style),
+            );
+        }
+
+        self.premium_page_shell(
+            "Configurações",
+            "Preferências simples para manter o NEXUS silencioso e focado.",
+            settings,
         )
+    }
+
+    fn premium_page_shell<'a>(
+        &self,
+        title: &'static str,
+        subtitle: &'static str,
+        body: Column<'a, Message>,
+    ) -> Element<'a, Message> {
+        let page_width = if self.breakpoint().is_tablet_or_smaller() {
+            Length::Fill
+        } else {
+            Length::Fixed(860.0)
+        };
+
+        container(
+            scrollable(
+                Column::new()
+                    .spacing(24)
+                    .align_items(Alignment::Center)
+                    .push(Space::with_height(Length::Fixed(
+                        if self.breakpoint().is_mobile() {
+                            10.0
+                        } else {
+                            34.0
+                        },
+                    )))
+                    .push(
+                        Column::new()
+                            .spacing(8)
+                            .align_items(Alignment::Center)
+                            .push(text(title).size(32).style(TEXT_PRIMARY))
+                            .push(text(subtitle).size(15).style(TEXT_SECONDARY)),
+                    )
+                    .push(container(body).width(page_width)),
+            )
+            .height(Length::Fill),
+        )
+        .width(Length::Fill)
         .height(Length::Fill)
+        .style(chat_workspace_style)
         .into()
     }
 
@@ -2946,6 +3986,10 @@ impl NexusApp {
                         .width(Length::Fill)
                         .style(if is_operator {
                             chat_msg_user_style
+                        } else if msg.role == "TERMINAL" {
+                            chat_msg_terminal_style
+                        } else if msg.role == "EVIDENCE" {
+                            chat_msg_evidence_style
                         } else {
                             chat_msg_nexus_style
                         }),
@@ -3308,7 +4352,7 @@ impl NexusApp {
                 TEXT_SECONDARY,
             ))
             .push(runtime_line(
-                "Aprovacoes",
+                "Aprovações",
                 &format!("{} aguardando", self.org.approvals.len()),
                 if self.org.approvals.is_empty() {
                     SUCCESS
@@ -3375,11 +4419,11 @@ impl NexusApp {
                 }),
             );
             if idx < roles.len() - 1 {
-                row = row.push(
-                    text(">")
-                        .size(16)
-                        .style(if is_active { SUCCESS } else { ACCENT }),
-                );
+                row = row.push(icon(
+                    NexusIcon::ChevronRight,
+                    16,
+                    if is_active { SUCCESS } else { ACCENT },
+                ));
             }
         }
 
@@ -4453,24 +5497,40 @@ impl NexusApp {
 fn section_block<'a>(title: &'static str, body: Column<'a, Message>) -> Element<'a, Message> {
     container(
         Column::new()
-            .spacing(10)
-            .push(text(title).size(11).style(TEXT_SECONDARY))
+            .spacing(12)
+            .push(
+                Row::new()
+                    .spacing(10)
+                    .align_items(Alignment::Center)
+                    .push(text(route_icon_for_title(title)).size(16).style(CYAN))
+                    .push(text(title).size(13).style(TEXT_PRIMARY)),
+            )
             .push(body),
     )
-    .padding(12)
+    .padding(18)
     .width(Length::Fill)
-    .style(section_style)
+    .style(nexus_card_style)
     .into()
 }
 
 fn page_header<'a>(title: &'static str, subtitle: &'static str) -> Element<'a, Message> {
     container(
-        Column::new()
-            .spacing(6)
-            .push(text(title).size(22).style(TEXT_PRIMARY))
-            .push(text(subtitle).size(12).style(TEXT_SECONDARY)),
+        Row::new()
+            .spacing(16)
+            .align_items(Alignment::Center)
+            .push(
+                container(text(route_icon_for_title(title)).size(28).style(CYAN))
+                    .padding(12)
+                    .style(nexus_metric_icon_style),
+            )
+            .push(
+                Column::new()
+                    .spacing(6)
+                    .push(text(title).size(30).style(TEXT_PRIMARY))
+                    .push(text(subtitle).size(14).style(TEXT_SECONDARY)),
+            ),
     )
-    .padding([4, 0])
+    .padding([8, 0])
     .width(Length::Fill)
     .into()
 }
@@ -4499,6 +5559,131 @@ fn prompt_chip<'a>(
     .width(Length::FillPortion(1))
     .style(overview_chip_style)
     .into()
+}
+
+fn hud_metric_tile<'a>(label: &'static str, value: String, color: Color) -> Element<'a, Message> {
+    container(
+        Row::new()
+            .spacing(10)
+            .align_items(Alignment::Center)
+            .push(text("●").size(10).style(color))
+            .push(
+                Column::new()
+                    .spacing(3)
+                    .push(text(label).size(10).style(TEXT_MUTED))
+                    .push(text(value).size(12).style(TEXT_PRIMARY)),
+            ),
+    )
+    .padding(10)
+    .width(Length::Fill)
+    .style(hud_tile_style)
+    .into()
+}
+
+fn hud_meter_tile<'a>(label: &'static str, value: f32, color: Color) -> Element<'a, Message> {
+    let fill = value.clamp(4.0, 100.0) * 1.5;
+    container(
+        Column::new()
+            .spacing(7)
+            .push(
+                Row::new()
+                    .push(text(label).size(10).style(TEXT_MUTED))
+                    .push(Space::with_width(Length::Fill))
+                    .push(text(format!("{:.0}%", value)).size(10).style(color)),
+            )
+            .push(
+                Row::new()
+                    .spacing(6)
+                    .align_items(Alignment::Center)
+                    .push(container(Space::new(fill, 5)).style(match label {
+                        "MEMORY" => meter_fill_warning_style,
+                        _ => meter_fill_accent_style,
+                    }))
+                    .push(
+                        container(Space::with_width(Length::Fill).height(5))
+                            .style(meter_track_style),
+                    ),
+            ),
+    )
+    .padding(10)
+    .width(Length::Fill)
+    .style(hud_tile_style)
+    .into()
+}
+
+fn hud_orbit_chip<'a>(label: &'static str, value: String, color: Color) -> Element<'a, Message> {
+    container(
+        Column::new()
+            .spacing(3)
+            .align_items(Alignment::Center)
+            .push(text(label).size(9).style(TEXT_MUTED))
+            .push(text(value).size(12).style(color)),
+    )
+    .padding([7, 10])
+    .style(hud_orbit_chip_style)
+    .into()
+}
+
+fn nexus_summary_metric<'a>(
+    icon: &'static str,
+    label: &'static str,
+    value: String,
+    detail: &'static str,
+    color: Color,
+) -> Element<'a, Message> {
+    Row::new()
+        .spacing(14)
+        .align_items(Alignment::Center)
+        .push(
+            container(text(icon).size(27).style(color))
+                .padding(15)
+                .style(nexus_metric_icon_style),
+        )
+        .push(
+            Column::new()
+                .spacing(5)
+                .push(text(label).size(14).style(TEXT_SECONDARY))
+                .push(text(value).size(20).style(color))
+                .push(text(detail).size(12).style(TEXT_MUTED)),
+        )
+        .width(Length::FillPortion(1))
+        .into()
+}
+
+fn performance_label(cpu: f32) -> String {
+    if cpu < 60.0 {
+        "Ótimo".to_string()
+    } else if cpu < 82.0 {
+        "Alto".to_string()
+    } else {
+        "Crítico".to_string()
+    }
+}
+
+fn activity_symbol(level: &ActivityLevel) -> &'static str {
+    match level {
+        ActivityLevel::Info => "i",
+        ActivityLevel::Success => "✓",
+        ActivityLevel::Warning => "!",
+        ActivityLevel::Error => "×",
+    }
+}
+
+fn route_icon_for_title(title: &str) -> &'static str {
+    match title {
+        "Painel do NEXUS" | "Conversar" | "Fale com o NEXUS" => "◌",
+        "Visão Geral" => "▦",
+        "Missoes" | "Missões" | "Tarefas" | "PENDENTES" => "☑",
+        "Swarm" | "EQUIPE COGNITIVA" => "⇄",
+        "Execucoes" | "Execuções" | "EXECUCAO" | "PRONTAS PARA EXECUTAR" => "⌁",
+        "Aprovacoes" | "Aprovações" | "APROVACAO SELECIONADA" => "✓",
+        "Incidentes" => "!",
+        "Observador" => "◎",
+        "Telemetria" => "◍",
+        "Memoria" | "Memória" => "◇",
+        "Config" | "Configurações" => "⚙",
+        _ => "▱",
+    }
 }
 
 fn guidance_card<'a>(
@@ -4781,15 +5966,34 @@ fn role_summary_card<'a>(
     color: Color,
 ) -> Element<'a, Message> {
     container(
-        Column::new()
-            .spacing(7)
-            .push(text(label).size(11).style(color))
-            .push(text(body).size(11).style(TEXT_SECONDARY)),
+        Row::new()
+            .spacing(12)
+            .align_items(Alignment::Center)
+            .push(
+                container(text(role_icon(label)).size(16).style(color))
+                    .padding(10)
+                    .style(nexus_update_icon_style),
+            )
+            .push(
+                Column::new()
+                    .spacing(5)
+                    .push(text(label).size(12).style(color))
+                    .push(text(body).size(11).style(TEXT_SECONDARY)),
+            ),
     )
-    .padding(12)
+    .padding(14)
     .width(Length::FillPortion(1))
-    .style(role_summary_style)
+    .style(nexus_card_style)
     .into()
+}
+
+fn role_icon(label: &str) -> &'static str {
+    match label {
+        "CEO" => "◇",
+        "CTO" => "⌁",
+        "Usuario" | "Usuário" => "◌",
+        _ => "▱",
+    }
 }
 
 fn simple_card<'a>(
@@ -5219,6 +6423,16 @@ fn task_progress(lifecycle: &str) -> &'static str {
     }
 }
 
+fn friendly_task_status(status: &str) -> &'static str {
+    match status.to_ascii_lowercase().as_str() {
+        "done" | "completed" | "complete" => "Concluída",
+        "running" | "active" | "in_progress" | "progress" => "Em andamento",
+        "blocked" | "failed" => "Precisa atenção",
+        "queued" | "pending" | "created" => "Pendente",
+        _ => "Planejada",
+    }
+}
+
 fn runtime_event_detail(event: &RuntimeEvent) -> String {
     if !event.message.is_empty() {
         return event.message.clone();
@@ -5327,28 +6541,71 @@ fn overview_chip<'a>(label: &'static str, value: String, color: Color) -> Elemen
     .into()
 }
 
+fn icon<'a>(icon: NexusIcon, size: u16, color: Color) -> Element<'a, Message> {
+    Svg::new(svg::Handle::from_memory(icon.svg().as_bytes()))
+        .width(Length::Fixed(size as f32))
+        .height(Length::Fixed(size as f32))
+        .style(theme::Svg::Custom(Box::new(IconSvgStyle { color })))
+        .into()
+}
+
+fn tooltip_label<'a>(
+    content: Element<'a, Message>,
+    label: &'static str,
+    position: tooltip::Position,
+) -> Element<'a, Message> {
+    Tooltip::new(content, text(label).size(11).style(TEXT_PRIMARY), position)
+        .gap(8)
+        .padding(8)
+        .style(tooltip_style)
+        .into()
+}
+
+fn icon_button<'a>(
+    icon_kind: NexusIcon,
+    label: &'static str,
+    message: Option<Message>,
+    style: IconButtonStyle,
+) -> Element<'a, Message> {
+    let mut control = button(icon(icon_kind, style.icon_size, style.icon_color()))
+        .padding(style.padding)
+        .width(Length::Fixed(style.size))
+        .height(Length::Fixed(style.size))
+        .style(theme::Button::custom(style));
+
+    if let Some(message) = message {
+        control = control.on_press(message);
+    }
+
+    tooltip_label(control.into(), label, tooltip::Position::Top)
+}
+
 fn sidebar_item<'a>(
-    icon: &'static str,
+    icon_kind: NexusIcon,
     label: &'static str,
     active: bool,
     message: Message,
 ) -> Element<'a, Message> {
     let item = button(
         Row::new()
-            .spacing(10)
+            .spacing(12)
             .align_items(Alignment::Center)
             .push(
-                text(icon)
-                    .size(13)
-                    .style(if active { ACCENT } else { TEXT_MUTED }),
+                container(icon(icon_kind, 18, if active { CYAN } else { TEXT_MUTED }))
+                    .padding(9)
+                    .style(if active {
+                        nexus_metric_icon_style
+                    } else {
+                        nexus_update_icon_style
+                    }),
             )
             .push(
                 text(label)
-                    .size(12)
+                    .size(14)
                     .style(if active { TEXT_PRIMARY } else { TEXT_SECONDARY }),
             ),
     )
-    .padding([9, 10])
+    .padding([8, 10])
     .width(Length::Fill)
     .style(theme::Button::custom(SidebarButtonStyle { active }))
     .on_press(message);
@@ -5363,8 +6620,221 @@ fn sidebar_item<'a>(
         .into()
 }
 
+fn prompt_card<'a>(
+    icon_kind: NexusIcon,
+    title: &'static str,
+    detail: &'static str,
+    prompt: &'static str,
+    width: Length,
+) -> Element<'a, Message> {
+    button(
+        Column::new()
+            .spacing(14)
+            .push(
+                container(icon(icon_kind, 22, CYAN))
+                    .padding(9)
+                    .style(prompt_icon_style),
+            )
+            .push(
+                Column::new()
+                    .spacing(7)
+                    .push(text(title).size(14).style(TEXT_PRIMARY))
+                    .push(text(detail).size(13).style(TEXT_SECONDARY)),
+            ),
+    )
+    .padding(18)
+    .width(width)
+    .height(Length::Fixed(132.0))
+    .style(theme::Button::custom(SuggestionButtonStyle))
+    .on_press(Message::PromptSelected(prompt))
+    .into()
+}
+
+fn premium_task_item<'a>(
+    title: impl Into<String>,
+    status: impl Into<String>,
+    detail: impl Into<String>,
+) -> Element<'a, Message> {
+    container(
+        Row::new()
+            .spacing(14)
+            .align_items(Alignment::Center)
+            .push(
+                container(icon(NexusIcon::Check, 16, CYAN))
+                    .padding(10)
+                    .style(prompt_icon_style),
+            )
+            .push(
+                Column::new()
+                    .spacing(5)
+                    .push(text(title.into()).size(15).style(TEXT_PRIMARY))
+                    .push(text(detail.into()).size(13).style(TEXT_SECONDARY)),
+            )
+            .push(Space::with_width(Length::Fill))
+            .push(
+                container(text(status.into()).size(12).style(CYAN))
+                    .padding([8, 12])
+                    .style(chat_status_pill_style),
+            ),
+    )
+    .padding(16)
+    .width(Length::Fill)
+    .style(premium_surface_style)
+    .into()
+}
+
+fn settings_item<'a>(
+    title: &'static str,
+    detail: &'static str,
+    value: &'static str,
+    color: Color,
+) -> Element<'a, Message> {
+    container(
+        Row::new()
+            .spacing(14)
+            .align_items(Alignment::Center)
+            .push(container(Space::new(10, 10)).style(settings_dot_style))
+            .push(
+                Column::new()
+                    .spacing(5)
+                    .push(text(title).size(15).style(TEXT_PRIMARY))
+                    .push(text(detail).size(13).style(TEXT_SECONDARY)),
+            )
+            .push(Space::with_width(Length::Fill))
+            .push(text(value).size(13).style(color)),
+    )
+    .padding(18)
+    .width(Length::Fill)
+    .style(premium_surface_style)
+    .into()
+}
+
+fn chat_message_row<'a>(msg: &'a ChatMessage, compact: bool) -> Element<'a, Message> {
+    let is_operator = msg.role == "OPERATOR";
+    let is_error = msg.role == "CORE_ERROR";
+    let bubble_width = if compact {
+        Length::Fill
+    } else if is_operator {
+        Length::Fixed(430.0)
+    } else {
+        Length::Fixed(480.0)
+    };
+
+    let content = trim_text(&msg.content, if compact { 420 } else { 620 });
+    let bubble_style: fn(&Theme) -> container::Appearance = if is_error {
+        error_bubble_modern
+    } else if is_operator {
+        operator_bubble_modern
+    } else {
+        nexus_bubble_modern
+    };
+
+    let bubble = container(
+        text(content)
+            .size(15)
+            .style(TEXT_PRIMARY)
+            .width(Length::Fill),
+    )
+    .padding([14, 18])
+    .width(bubble_width)
+    .style(bubble_style);
+
+    if is_operator {
+        let stack = Column::new()
+            .spacing(6)
+            .align_items(Alignment::End)
+            .push(bubble)
+            .push(text(format!("{} ✓✓", msg.timestamp)).size(12).style(CYAN));
+
+        if compact {
+            Row::new()
+                .width(Length::Fill)
+                .push(Space::with_width(Length::Fixed(36.0)))
+                .push(stack.width(Length::Fill))
+                .into()
+        } else {
+            Row::new()
+                .width(Length::Fill)
+                .push(Space::with_width(Length::Fill))
+                .push(stack)
+                .into()
+        }
+    } else {
+        let avatar = container(text("N").size(18).style(CYAN))
+            .padding(8)
+            .style(chat_message_avatar_style);
+        let stack = Column::new()
+            .spacing(6)
+            .push(bubble)
+            .push(text(&msg.timestamp).size(12).style(TEXT_MUTED));
+
+        if compact {
+            Row::new()
+                .spacing(10)
+                .align_items(Alignment::Start)
+                .width(Length::Fill)
+                .push(avatar)
+                .push(stack.width(Length::Fill))
+                .into()
+        } else {
+            Row::new()
+                .spacing(14)
+                .align_items(Alignment::Start)
+                .width(Length::Fill)
+                .push(avatar)
+                .push(stack)
+                .push(Space::with_width(Length::Fill))
+                .into()
+        }
+    }
+}
+
+fn thinking_message_row<'a>(tick_counter: u32, compact: bool) -> Element<'a, Message> {
+    let dots = match tick_counter % 4 {
+        0 => "",
+        1 => ".",
+        2 => "..",
+        _ => "...",
+    };
+    let avatar = container(text("N").size(18).style(CYAN))
+        .padding(8)
+        .style(chat_message_avatar_style);
+    let bubble = container(
+        Column::new()
+            .spacing(10)
+            .push(text(format!("Pensando{}", dots)).size(14).style(CYAN))
+            .push(
+                Row::new()
+                    .spacing(6)
+                    .push(container(Space::new(32, 6)).style(typing_skeleton_style))
+                    .push(container(Space::new(52, 6)).style(typing_skeleton_style))
+                    .push(container(Space::new(24, 6)).style(typing_skeleton_style)),
+            ),
+    )
+    .padding([14, 18])
+    .width(if compact {
+        Length::Fill
+    } else {
+        Length::Fixed(480.0)
+    })
+    .style(progress_bubble_modern);
+
+    Row::new()
+        .spacing(14)
+        .align_items(Alignment::Start)
+        .width(Length::Fill)
+        .push(avatar)
+        .push(bubble)
+        .push(if compact {
+            Space::new(0, 0)
+        } else {
+            Space::with_width(Length::Fill)
+        })
+        .into()
+}
+
 fn current_time() -> String {
-    chrono::Local::now().format("%H:%M:%S").to_string()
+    chrono::Local::now().format("%H:%M").to_string()
 }
 
 fn short_id(value: &str) -> String {
@@ -5447,6 +6917,156 @@ fn play_audio(base64_data: String) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[derive(Debug, Clone, Copy)]
+struct IconSvgStyle {
+    color: Color,
+}
+
+impl svg::StyleSheet for IconSvgStyle {
+    type Style = Theme;
+
+    fn appearance(&self, _style: &Self::Style) -> svg::Appearance {
+        svg::Appearance {
+            color: Some(self.color),
+        }
+    }
+
+    fn hovered(&self, _style: &Self::Style) -> svg::Appearance {
+        svg::Appearance {
+            color: Some(self.color),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum IconButtonKind {
+    Primary,
+    Subtle,
+    Flat,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct IconButtonStyle {
+    kind: IconButtonKind,
+    size: f32,
+    icon_size: u16,
+    padding: [u16; 2],
+}
+
+impl IconButtonStyle {
+    fn primary(size: f32, icon_size: u16) -> Self {
+        Self {
+            kind: IconButtonKind::Primary,
+            size,
+            icon_size,
+            padding: [10, 12],
+        }
+    }
+
+    fn subtle(size: f32, icon_size: u16) -> Self {
+        Self {
+            kind: IconButtonKind::Subtle,
+            size,
+            icon_size,
+            padding: [10, 12],
+        }
+    }
+
+    fn flat(size: f32, icon_size: u16) -> Self {
+        Self {
+            kind: IconButtonKind::Flat,
+            size,
+            icon_size,
+            padding: [8, 10],
+        }
+    }
+
+    fn icon_color(self) -> Color {
+        match self.kind {
+            IconButtonKind::Primary => TEXT_PRIMARY,
+            IconButtonKind::Subtle => TEXT_SECONDARY,
+            IconButtonKind::Flat => CYAN,
+        }
+    }
+}
+
+impl button::StyleSheet for IconButtonStyle {
+    type Style = Theme;
+
+    fn active(&self, _style: &Self::Style) -> button::Appearance {
+        match self.kind {
+            IconButtonKind::Primary => button::Appearance {
+                background: Some(Color::from_rgb(0.160, 0.760, 0.840).into()),
+                text_color: TEXT_PRIMARY,
+                border: Border {
+                    color: Color::from_rgb(0.250, 0.900, 0.980),
+                    width: 1.0,
+                    radius: 100.0.into(),
+                },
+                ..Default::default()
+            },
+            IconButtonKind::Subtle => button::Appearance {
+                background: Some(Color::from_rgb(0.025, 0.034, 0.046).into()),
+                text_color: TEXT_SECONDARY,
+                border: Border {
+                    color: Color::from_rgb(0.090, 0.120, 0.150),
+                    width: 1.0,
+                    radius: 100.0.into(),
+                },
+                ..Default::default()
+            },
+            IconButtonKind::Flat => button::Appearance {
+                background: Some(Color::TRANSPARENT.into()),
+                text_color: CYAN,
+                border: Border {
+                    color: Color::TRANSPARENT,
+                    width: 1.0,
+                    radius: 100.0.into(),
+                },
+                ..Default::default()
+            },
+        }
+    }
+
+    fn hovered(&self, _style: &Self::Style) -> button::Appearance {
+        match self.kind {
+            IconButtonKind::Primary => button::Appearance {
+                background: Some(Color::from_rgb(0.210, 0.850, 0.920).into()),
+                text_color: TEXT_PRIMARY,
+                border: Border {
+                    color: Color::from_rgb(0.500, 0.960, 1.000),
+                    width: 1.0,
+                    radius: 100.0.into(),
+                },
+                ..Default::default()
+            },
+            IconButtonKind::Subtle | IconButtonKind::Flat => button::Appearance {
+                background: Some(Color::from_rgb(0.036, 0.056, 0.070).into()),
+                text_color: CYAN,
+                border: Border {
+                    color: Color::from_rgb(0.070, 0.220, 0.260),
+                    width: 1.0,
+                    radius: 100.0.into(),
+                },
+                ..Default::default()
+            },
+        }
+    }
+
+    fn disabled(&self, _style: &Self::Style) -> button::Appearance {
+        button::Appearance {
+            background: Some(Color::from_rgb(0.070, 0.110, 0.125).into()),
+            text_color: TEXT_MUTED,
+            border: Border {
+                color: Color::from_rgb(0.110, 0.170, 0.190),
+                width: 1.0,
+                radius: 100.0.into(),
+            },
+            ..Default::default()
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 struct SidebarButtonStyle {
     active: bool,
 }
@@ -5458,7 +7078,7 @@ impl button::StyleSheet for SidebarButtonStyle {
         button::Appearance {
             background: Some(
                 if self.active {
-                    Color::from_rgb(0.050, 0.120, 0.260)
+                    Color::from_rgb(0.020, 0.060, 0.075)
                 } else {
                     Color::TRANSPARENT
                 }
@@ -5471,12 +7091,12 @@ impl button::StyleSheet for SidebarButtonStyle {
             },
             border: Border {
                 color: if self.active {
-                    Color::from_rgb(0.180, 0.360, 0.760)
+                    Color::from_rgb(0.050, 0.310, 0.365)
                 } else {
                     Color::TRANSPARENT
                 },
                 width: 1.0,
-                radius: 7.0.into(),
+                radius: 8.0.into(),
             },
             ..Default::default()
         }
@@ -5484,12 +7104,12 @@ impl button::StyleSheet for SidebarButtonStyle {
 
     fn hovered(&self, _style: &Self::Style) -> button::Appearance {
         button::Appearance {
-            background: Some(Color::from_rgb(0.040, 0.070, 0.120).into()),
+            background: Some(Color::from_rgb(0.018, 0.050, 0.064).into()),
             text_color: TEXT_PRIMARY,
             border: Border {
-                color: Color::from_rgb(0.100, 0.220, 0.420),
+                color: Color::from_rgb(0.040, 0.230, 0.280),
                 width: 1.0,
-                radius: 7.0.into(),
+                radius: 8.0.into(),
             },
             ..Default::default()
         }
@@ -5542,6 +7162,205 @@ impl button::StyleSheet for PrimaryActionButtonStyle {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+struct SuggestionButtonStyle;
+
+impl button::StyleSheet for SuggestionButtonStyle {
+    type Style = Theme;
+
+    fn active(&self, _style: &Self::Style) -> button::Appearance {
+        button::Appearance {
+            background: Some(Color::from_rgb(0.036, 0.048, 0.064).into()),
+            text_color: TEXT_PRIMARY,
+            border: Border {
+                color: Color::from_rgb(0.080, 0.125, 0.160),
+                width: 1.0,
+                radius: 8.0.into(),
+            },
+            ..Default::default()
+        }
+    }
+
+    fn hovered(&self, _style: &Self::Style) -> button::Appearance {
+        button::Appearance {
+            background: Some(Color::from_rgb(0.045, 0.064, 0.082).into()),
+            text_color: TEXT_PRIMARY,
+            border: Border {
+                color: Color::from_rgb(0.075, 0.340, 0.395),
+                width: 1.0,
+                radius: 8.0.into(),
+            },
+            ..Default::default()
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RoundSendButtonStyle;
+
+impl button::StyleSheet for RoundSendButtonStyle {
+    type Style = Theme;
+
+    fn active(&self, _style: &Self::Style) -> button::Appearance {
+        button::Appearance {
+            background: Some(Color::from_rgb(0.160, 0.760, 0.840).into()),
+            text_color: Color::WHITE,
+            border: Border {
+                color: Color::from_rgb(0.250, 0.900, 0.980),
+                width: 1.0,
+                radius: 100.0.into(),
+            },
+            ..Default::default()
+        }
+    }
+
+    fn hovered(&self, _style: &Self::Style) -> button::Appearance {
+        button::Appearance {
+            background: Some(Color::from_rgb(0.210, 0.850, 0.920).into()),
+            text_color: Color::WHITE,
+            border: Border {
+                color: Color::from_rgb(0.500, 0.960, 1.000),
+                width: 1.0,
+                radius: 100.0.into(),
+            },
+            ..Default::default()
+        }
+    }
+
+    fn disabled(&self, _style: &Self::Style) -> button::Appearance {
+        button::Appearance {
+            background: Some(Color::from_rgb(0.070, 0.110, 0.125).into()),
+            text_color: TEXT_MUTED,
+            border: Border {
+                color: Color::from_rgb(0.110, 0.170, 0.190),
+                width: 1.0,
+                radius: 100.0.into(),
+            },
+            ..Default::default()
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct PremiumTogglerStyle;
+
+impl toggler::StyleSheet for PremiumTogglerStyle {
+    type Style = Theme;
+
+    fn active(&self, _style: &Self::Style, is_active: bool) -> toggler::Appearance {
+        toggler::Appearance {
+            background: if is_active {
+                Color::from_rgb(0.070, 0.330, 0.380)
+            } else {
+                Color::from_rgb(0.040, 0.052, 0.070)
+            },
+            background_border_width: 1.0,
+            background_border_color: if is_active {
+                Color::from_rgb(0.120, 0.560, 0.640)
+            } else {
+                Color::from_rgb(0.090, 0.120, 0.150)
+            },
+            foreground: if is_active { CYAN } else { TEXT_SECONDARY },
+            foreground_border_width: 0.0,
+            foreground_border_color: Color::TRANSPARENT,
+        }
+    }
+
+    fn hovered(&self, style: &Self::Style, is_active: bool) -> toggler::Appearance {
+        let mut appearance = self.active(style, is_active);
+        appearance.background = if is_active {
+            Color::from_rgb(0.085, 0.390, 0.440)
+        } else {
+            Color::from_rgb(0.052, 0.070, 0.090)
+        };
+        appearance
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct SubtleButtonStyle;
+
+impl button::StyleSheet for SubtleButtonStyle {
+    type Style = Theme;
+
+    fn active(&self, _style: &Self::Style) -> button::Appearance {
+        button::Appearance {
+            background: Some(Color::from_rgb(0.040, 0.058, 0.078).into()),
+            text_color: TEXT_PRIMARY,
+            border: Border {
+                color: Color::from_rgb(0.100, 0.145, 0.185),
+                width: 1.0,
+                radius: 100.0.into(),
+            },
+            ..Default::default()
+        }
+    }
+
+    fn hovered(&self, _style: &Self::Style) -> button::Appearance {
+        button::Appearance {
+            background: Some(Color::from_rgb(0.050, 0.078, 0.098).into()),
+            text_color: CYAN,
+            border: Border {
+                color: Color::from_rgb(0.085, 0.270, 0.315),
+                width: 1.0,
+                radius: 100.0.into(),
+            },
+            ..Default::default()
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ChatTextInputStyle;
+
+impl iced::widget::text_input::StyleSheet for ChatTextInputStyle {
+    type Style = Theme;
+
+    fn active(&self, _style: &Self::Style) -> iced::widget::text_input::Appearance {
+        chat_text_input_appearance(Color::TRANSPARENT)
+    }
+
+    fn focused(&self, _style: &Self::Style) -> iced::widget::text_input::Appearance {
+        chat_text_input_appearance(Color::from_rgb(0.030, 0.130, 0.155))
+    }
+
+    fn placeholder_color(&self, _style: &Self::Style) -> Color {
+        TEXT_MUTED
+    }
+
+    fn value_color(&self, _style: &Self::Style) -> Color {
+        TEXT_PRIMARY
+    }
+
+    fn disabled_color(&self, _style: &Self::Style) -> Color {
+        TEXT_MUTED
+    }
+
+    fn selection_color(&self, _style: &Self::Style) -> Color {
+        Color::from_rgb(0.060, 0.300, 0.360)
+    }
+
+    fn disabled(&self, _style: &Self::Style) -> iced::widget::text_input::Appearance {
+        chat_text_input_appearance(Color::TRANSPARENT)
+    }
+}
+
+fn chat_text_input_appearance(border_color: Color) -> iced::widget::text_input::Appearance {
+    iced::widget::text_input::Appearance {
+        background: Color::TRANSPARENT.into(),
+        border: Border {
+            color: border_color,
+            width: if border_color == Color::TRANSPARENT {
+                0.0
+            } else {
+                1.0
+            },
+            radius: 8.0.into(),
+        },
+        icon_color: TEXT_MUTED,
+    }
+}
+
 fn app_shell_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
         background: Some(BG.into()),
@@ -5549,6 +7368,167 @@ fn app_shell_style(_theme: &Theme) -> container::Appearance {
         ..Default::default()
     }
 }
+
+fn chat_top_bar_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.006, 0.012, 0.020).into()),
+        text_color: Some(TEXT_PRIMARY),
+        ..Default::default()
+    }
+}
+
+fn chat_status_pill_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.040, 0.052, 0.070).into()),
+        border: Border {
+            color: Color::from_rgb(0.080, 0.120, 0.155),
+            width: 1.0,
+            radius: 100.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+fn tooltip_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.036, 0.048, 0.066).into()),
+        text_color: Some(TEXT_PRIMARY),
+        border: Border {
+            color: Color::from_rgb(0.090, 0.135, 0.175),
+            width: 1.0,
+            radius: 8.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+fn user_avatar_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.060, 0.155, 0.245).into()),
+        border: Border {
+            color: Color::from_rgb(0.080, 0.190, 0.290),
+            width: 1.0,
+            radius: 100.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+fn chat_workspace_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.004, 0.010, 0.018).into()),
+        text_color: Some(TEXT_PRIMARY),
+        ..Default::default()
+    }
+}
+
+fn chat_logo_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.010, 0.050, 0.070).into()),
+        border: Border {
+            color: Color::from_rgb(0.030, 0.690, 0.790),
+            width: 1.0,
+            radius: 100.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+fn prompt_icon_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.020, 0.120, 0.145).into()),
+        border: Border {
+            color: Color::from_rgb(0.035, 0.190, 0.225),
+            width: 1.0,
+            radius: 8.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+fn chat_input_shell_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.040, 0.052, 0.068).into()),
+        border: Border {
+            color: Color::from_rgb(0.125, 0.160, 0.195),
+            width: 1.0,
+            radius: 28.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+fn chat_attachment_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.025, 0.034, 0.046).into()),
+        border: Border {
+            color: Color::from_rgb(0.090, 0.120, 0.150),
+            width: 1.0,
+            radius: 100.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+fn chat_message_avatar_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.020, 0.075, 0.115).into()),
+        border: Border {
+            color: Color::from_rgb(0.030, 0.380, 0.620),
+            width: 1.0,
+            radius: 100.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+fn sidebar_learn_more_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.045, 0.058, 0.074).into()),
+        border: Border {
+            color: Color::from_rgb(0.085, 0.120, 0.150),
+            width: 1.0,
+            radius: 100.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+fn premium_surface_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.026, 0.038, 0.064).into()),
+        border: Border {
+            color: Color::from_rgb(0.075, 0.115, 0.155),
+            width: 1.0,
+            radius: 8.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+fn settings_dot_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(CYAN.into()),
+        border: Border {
+            color: Color::from_rgb(0.110, 0.460, 0.520),
+            width: 1.0,
+            radius: 100.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+fn typing_skeleton_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.110, 0.145, 0.175).into()),
+        border: Border {
+            radius: 100.0.into(),
+            ..Default::default()
+        },
+        ..Default::default()
+    }
+}
+
 fn hud_top_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
         background: Some(Color::from_rgb(0.055, 0.068, 0.085).into()),
@@ -5595,9 +7575,9 @@ fn transmit_btn_style(_theme: &Theme) -> container::Appearance {
 }
 fn nexus_bubble_modern(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(SURFACE_HIGH.into()),
+        background: Some(Color::from_rgb(0.048, 0.062, 0.082).into()),
         border: Border {
-            color: Color::from_rgb(0.24, 0.39, 0.52),
+            color: Color::from_rgb(0.120, 0.165, 0.210),
             width: 1.0,
             radius: [8.0, 8.0, 8.0, 2.0].into(),
         },
@@ -5606,9 +7586,9 @@ fn nexus_bubble_modern(_theme: &Theme) -> container::Appearance {
 }
 fn operator_bubble_modern(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb(0.16, 0.135, 0.095).into()),
+        background: Some(PETROL.into()),
         border: Border {
-            color: Color::from_rgb(0.66, 0.52, 0.28),
+            color: Color::from_rgb(0.020, 0.320, 0.385),
             width: 1.0,
             radius: [8.0, 8.0, 2.0, 8.0].into(),
         },
@@ -5628,9 +7608,9 @@ fn error_bubble_modern(_theme: &Theme) -> container::Appearance {
 }
 fn progress_bubble_modern(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb(0.12, 0.15, 0.19).into()),
+        background: Some(Color::from_rgb(0.030, 0.055, 0.070).into()),
         border: Border {
-            color: ACCENT,
+            color: Color::from_rgb(0.060, 0.310, 0.370),
             width: 1.0,
             radius: [8.0, 8.0, 8.0, 2.0].into(),
         },
@@ -5768,12 +7748,187 @@ fn metric_card_style(_theme: &Theme) -> container::Appearance {
 
 fn section_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb(0.038, 0.050, 0.064).into()),
+        background: Some(Color::from_rgb(0.014, 0.026, 0.038).into()),
         border: Border {
-            color: Color::from_rgb(0.11, 0.16, 0.20),
+            color: Color::from_rgb(0.070, 0.115, 0.155),
             width: 1.0,
-            radius: 7.0.into(),
+            radius: 8.0.into(),
         },
+        ..Default::default()
+    }
+}
+
+fn hud_panel_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.012, 0.020, 0.026).into()),
+        border: Border {
+            color: Color::from_rgb(0.045, 0.115, 0.145),
+            width: 1.0,
+            radius: 6.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+fn hud_tile_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.016, 0.028, 0.036).into()),
+        border: Border {
+            color: Color::from_rgb(0.040, 0.105, 0.130),
+            width: 1.0,
+            radius: 4.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+fn hud_core_stage_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.005, 0.012, 0.020).into()),
+        border: Border {
+            color: Color::from_rgb(0.035, 0.120, 0.160),
+            width: 1.0,
+            radius: 4.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+fn nexus_core_ring_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.008, 0.024, 0.036).into()),
+        border: Border {
+            color: Color::from_rgb(0.115, 0.560, 0.680),
+            width: 1.0,
+            radius: 200.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+fn nexus_core_inner_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.014, 0.060, 0.092).into()),
+        border: Border {
+            color: Color::from_rgb(0.220, 0.720, 0.850),
+            width: 1.0,
+            radius: 120.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+fn hud_orbit_chip_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.012, 0.030, 0.040).into()),
+        border: Border {
+            color: Color::from_rgb(0.055, 0.150, 0.180),
+            width: 1.0,
+            radius: 4.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+fn hud_glass_strip_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.012, 0.030, 0.040).into()),
+        border: Border {
+            color: Color::from_rgb(0.065, 0.235, 0.305),
+            width: 1.0,
+            radius: 6.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+fn nexus_card_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.014, 0.026, 0.038).into()),
+        border: Border {
+            color: Color::from_rgb(0.070, 0.115, 0.155),
+            width: 1.0,
+            radius: 8.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+fn nexus_main_card_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.012, 0.040, 0.052).into()),
+        border: Border {
+            color: Color::from_rgb(0.035, 0.190, 0.230),
+            width: 1.0,
+            radius: 8.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+fn nexus_active_pill_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.016, 0.095, 0.070).into()),
+        border: Border {
+            color: Color::from_rgb(0.050, 0.210, 0.160),
+            width: 1.0,
+            radius: 8.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+fn nexus_status_icon_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.010, 0.070, 0.085).into()),
+        border: Border {
+            color: Color::from_rgb(0.050, 0.520, 0.610),
+            width: 1.0,
+            radius: 100.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+fn nexus_metric_icon_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.018, 0.056, 0.082).into()),
+        border: Border {
+            color: Color::from_rgb(0.040, 0.120, 0.165),
+            width: 1.0,
+            radius: 100.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+fn nexus_update_icon_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.026, 0.046, 0.060).into()),
+        border: Border {
+            color: Color::from_rgb(0.055, 0.105, 0.135),
+            width: 1.0,
+            radius: 100.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+fn nexus_chat_empty_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.010, 0.020, 0.032).into()),
+        border: Border {
+            color: Color::from_rgb(0.052, 0.088, 0.120),
+            width: 1.0,
+            radius: 8.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+fn vertical_divider_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        background: Some(Color::from_rgb(0.080, 0.125, 0.155).into()),
         ..Default::default()
     }
 }
@@ -5864,11 +8019,11 @@ fn active_flow_node_style(_theme: &Theme) -> container::Appearance {
 
 fn task_row_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb(0.055, 0.068, 0.085).into()),
+        background: Some(Color::from_rgb(0.018, 0.032, 0.044).into()),
         border: Border {
-            color: Color::from_rgb(0.13, 0.16, 0.2),
+            color: Color::from_rgb(0.055, 0.095, 0.125),
             width: 1.0,
-            radius: 6.0.into(),
+            radius: 8.0.into(),
         },
         ..Default::default()
     }
@@ -5948,9 +8103,9 @@ fn header_chip_style(_theme: &Theme) -> container::Appearance {
 
 fn brand_mark_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb(0.045, 0.095, 0.210).into()),
+        background: Some(Color::from_rgb(0.006, 0.045, 0.060).into()),
         border: Border {
-            color: ACCENT,
+            color: Color::from_rgb(0.020, 0.700, 0.780),
             width: 1.0,
             radius: 8.0.into(),
         },
@@ -6056,7 +8211,7 @@ fn feedback_card_style(_theme: &Theme) -> container::Appearance {
 
 fn header_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb(0.007, 0.014, 0.028).into()),
+        background: Some(Color::from_rgb(0.005, 0.012, 0.020).into()),
         ..Default::default()
     }
 }
@@ -6070,16 +8225,16 @@ fn panel_style(_theme: &Theme) -> container::Appearance {
 
 fn panel_center_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb(0.021, 0.030, 0.039).into()),
+        background: Some(Color::from_rgb(0.004, 0.010, 0.018).into()),
         ..Default::default()
     }
 }
 
 fn sidebar_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb(0.022, 0.030, 0.040).into()),
+        background: Some(Color::from_rgb(0.006, 0.012, 0.020).into()),
         border: Border {
-            color: Color::from_rgb(0.08, 0.12, 0.16),
+            color: Color::from_rgb(0.060, 0.085, 0.110),
             width: 1.0,
             radius: 0.0.into(),
         },
@@ -6101,11 +8256,11 @@ fn sidebar_item_style(_theme: &Theme) -> container::Appearance {
 
 fn sidebar_item_active_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb(0.045, 0.070, 0.088).into()),
+        background: Some(Color::from_rgb(0.028, 0.052, 0.066).into()),
         border: Border {
-            color: Color::from_rgb(0.12, 0.35, 0.48),
+            color: Color::from_rgb(0.035, 0.250, 0.300),
             width: 1.0,
-            radius: 7.0.into(),
+            radius: 8.0.into(),
         },
         ..Default::default()
     }
@@ -6113,9 +8268,9 @@ fn sidebar_item_active_style(_theme: &Theme) -> container::Appearance {
 
 fn sidebar_card_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb(0.034, 0.046, 0.060).into()),
+        background: Some(Color::from_rgb(0.035, 0.046, 0.060).into()),
         border: Border {
-            color: Color::from_rgb(0.09, 0.16, 0.21),
+            color: Color::from_rgb(0.085, 0.120, 0.150),
             width: 1.0,
             radius: 8.0.into(),
         },
@@ -6458,4 +8613,56 @@ async fn send_message(client: Client, message: String) -> Result<ChatResponse, S
         .await
         .map_err(|e| format!("Resposta invalida do backend: {}", e))?;
     Ok(json)
+}
+
+async fn reply_approval(command_id: String, approve: bool) -> Result<String, String> {
+    let client = reqwest::Client::new();
+    let url = if approve {
+        "http://127.0.0.1:4000/api/approve"
+    } else {
+        "http://127.0.0.1:4000/api/deny"
+    };
+
+    let payload = serde_json::json!({
+        "command_id": command_id
+    });
+
+    let res = client
+        .post(url)
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if res.status().is_success() {
+        Ok("Approval Sent".to_string())
+    } else {
+        Err("Failed to send approval".to_string())
+    }
+}
+
+fn chat_msg_terminal_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        text_color: Some(Color::from_rgb(0.5, 1.0, 0.5)),
+        background: Some(Color::from_rgb(0.05, 0.05, 0.05).into()),
+        border: Border {
+            color: Color::from_rgb(0.2, 0.4, 0.2),
+            width: 1.0,
+            radius: 4.0.into(),
+        },
+        shadow: iced::Shadow::default(),
+    }
+}
+
+fn chat_msg_evidence_style(_theme: &Theme) -> container::Appearance {
+    container::Appearance {
+        text_color: Some(Color::from_rgb(0.9, 0.9, 1.0)),
+        background: Some(Color::from_rgb(0.08, 0.12, 0.20).into()),
+        border: Border {
+            color: Color::from_rgb(0.3, 0.5, 0.8),
+            width: 1.0,
+            radius: 6.0.into(),
+        },
+        shadow: iced::Shadow::default(),
+    }
 }

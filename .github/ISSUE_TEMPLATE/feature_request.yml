@@ -14,3 +14,28 @@ body:
       description: A clear and concise description of what you want to happen and why it adds value.
     validations:
       required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of NEXUS does this primarily affect?
+      options:
+        - Conversational GUI
+        - Structured execution plans
+        - Action replay
+        - Workspace memory
+        - Self-healing execution
+        - Resource governor
+        - Security and approvals
+        - Packaging and install
+        - Other
+    validations:
+      required: true
+  - type: checkboxes
+    id: design-constraints
+    attributes:
+      label: Design constraints
+      options:
+        - label: The feature keeps the primary UX conversational and low-noise.
+        - label: The feature preserves execution evidence, verification, and replay when it touches runtime behavior.
+        - label: The feature respects local resource budgets and approval boundaries.

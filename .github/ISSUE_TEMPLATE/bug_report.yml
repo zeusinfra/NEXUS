@@ -20,3 +20,22 @@ body:
       label: Relevant log output
       description: Please copy and paste any relevant log output, terminal traces, or errors.
       render: shell
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Execution evidence
+      description: If this involves runtime execution, include the command_id, task_id, replay output, verification status, and whether a self-healing diagnostic was created.
+      placeholder: |
+        command_id:
+        task_id:
+        replay-command output:
+        verification status:
+        self-healing diagnostic:
+      render: shell
+  - type: checkboxes
+    id: runtime-scope
+    attributes:
+      label: Runtime scope
+      options:
+        - label: This bug affects command approval, execution, verification, replay, workspace memory, self-healing, or resource budgets.
+        - label: I checked that the issue is not only a UI rendering problem.

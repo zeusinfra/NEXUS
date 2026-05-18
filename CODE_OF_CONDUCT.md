@@ -12,6 +12,7 @@ We expect all contributors, maintainers, and community members to:
 *   **Be Respectful**: Treat everyone with professional courtesy.
 *   **Be Collaborative**: Share knowledge and help others grow within the NEXUS ecosystem.
 *   **Maintain Integrity**: Provide honest feedback and verifiable technical contributions.
+*   **Protect Evidence**: Do not misrepresent execution results, hide failures, or claim completed work without supporting evidence.
 *   **Focus on the Mission**: Align actions with the advancement of local-first cognitive systems.
 
 ## 🚫 Unacceptable Behavior
@@ -22,6 +23,7 @@ Unacceptable behaviors include, but are not limited to:
 *   Personal attacks or derogatory comments.
 *   Public or private harassment.
 *   Publishing others' private information without explicit permission (doxing).
+*   Falsifying test results, runtime evidence, replay history, incident status, or security impact.
 *   Any conduct that would be considered unprofessional in a high-stakes enterprise environment.
 
 ## ⚖️ Enforcement and Reporting

@@ -5,6 +5,10 @@ on:
     branches: ["main"]
     paths:
       - "**.py"
+      - "nexus_core/organization/**"
+      - "tests/unit/test_organization_*.py"
+      - "tests/unit/test_resource_budget.py"
+      - "tests/unit/test_workspace_context.py"
       - "requirements/**"
       - "requirements.txt"
       - "pytest.ini"
@@ -16,6 +20,9 @@ on:
 concurrency:
   group: python-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   lint-test:
@@ -65,8 +72,27 @@ jobs:
           python -m ruff check .
           python -m ruff format --check .
 
+      - name: Runtime evidence test slice
+        env:
+          NEXUS_TESTING: "1"
+          NEXUS_SKIP_DOTENV: "1"
+          NEXUS_EXEC_CONCURRENT_LIMIT: "2"
+          NEXUS_EXEC_TIMEOUT_MAX_SEC: "60"
+          NEXUS_EXEC_BLOCK_ON_RESOURCE_PRESSURE: "0"
+        run: |
+          python -m pytest \
+            tests/unit/test_organization_runtime.py \
+            tests/unit/test_organization_memory.py \
+            tests/unit/test_organization_daemon.py \
+            tests/unit/test_organization_security.py \
+            tests/unit/test_resource_budget.py \
+            tests/unit/test_workspace_context.py
+
       - name: Test
         env:
           NEXUS_TESTING: "1"
           NEXUS_SKIP_DOTENV: "1"
+          NEXUS_EXEC_CONCURRENT_LIMIT: "2"
+          NEXUS_EXEC_TIMEOUT_MAX_SEC: "60"
+          NEXUS_EXEC_BLOCK_ON_RESOURCE_PRESSURE: "0"
         run: python -m pytest

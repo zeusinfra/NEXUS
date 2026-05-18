@@ -19,9 +19,11 @@ from nexus_core.organization.continuous import ContinuousAgentRuntime
 from nexus_core.organization.health import clear_pid, write_pid
 from nexus_core.organization.memory import OrganizationalMemoryStore
 from nexus_core.organization.observer import ObserverEngine
+from nexus_core.organization.replay import ActionReplayBuilder
 from nexus_core.organization.runtime import RuntimeEngine
 from nexus_core.organization.security import PermissionManager
 from nexus_core.organization.swarm import SwarmOrchestrator
+from nexus_core.organization.workspace_context import WorkspaceMemory
 
 
 @dataclass
@@ -65,6 +67,8 @@ class OrganizationalDaemon:
             self.registry, self.blackboard, self.memory
         )
         self.swarm = SwarmOrchestrator(self.registry, self.blackboard, self.memory)
+        self.workspace_memory = WorkspaceMemory(self.config.project_root)
+        self.replay = ActionReplayBuilder(self.memory, self.blackboard)
         self.runtime = RuntimeEngine(
             self.config,
             self.blackboard,
@@ -79,6 +83,7 @@ class OrganizationalDaemon:
         self.config.ensure_directories()
         self.registry.sync_blackboard(self.blackboard)
         self.blackboard.set("mode", self.blackboard.get("mode", "IDLE") or "IDLE")
+        self.refresh_workspace_context(record_entry=record_event)
         if record_event:
             self.blackboard.append_event(
                 "ORG_DAEMON_INITIALIZED",
@@ -169,6 +174,26 @@ class OrganizationalDaemon:
             {"summary_id": summary["id"], "scope": scope},
         )
         return summary
+
+    def refresh_workspace_context(self, *, record_entry: bool = True) -> dict[str, Any]:
+        context = self.workspace_memory.analyze()
+        return self.workspace_memory.persist(
+            context,
+            blackboard=self.blackboard,
+            memory=self.memory,
+            record_entry=record_entry,
+        )
+
+    def workspace_context(self) -> dict[str, Any]:
+        return self.blackboard.get(
+            "workspace_context", {}
+        ) or self.refresh_workspace_context(record_entry=False)
+
+    def replay_command(self, command_id: str) -> dict[str, Any]:
+        return self.replay.command_replay(command_id)
+
+    def replay_task(self, task_id: str) -> dict[str, Any]:
+        return self.replay.task_replay(task_id)
 
     def submit_goal(self, goal: str, *, role: str | None = None) -> AgentResult:
         goal = (goal or "").strip()

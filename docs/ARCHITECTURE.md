@@ -8,13 +8,17 @@ Core flow:
 
 ```text
 User
--> CLI/TUI/API
+-> Conversational GUI / CLI / TUI / API
 -> Cognitive Orchestrator
 -> Model Router
 -> Agents
 -> Safety Gate
+-> Structured Execution Plan
+-> Resource Governor
 -> Runtime Executor
--> Audit Logs
+-> Verification Engine
+-> Action Replay
+-> Organizational Memory
 -> Verified Response
 ```
 
@@ -37,17 +41,52 @@ Main modules:
   generation through the local API.
 - `nexus_core/models/model_registry.py`: combined cloud/local status.
 - `nexus_core/product_cli.py`: Linux product CLI surface.
-- `nexus_core/organization/*`: existing daemon, memory, runtime, verification
-  and security layers.
+- `nexus_core/organization/runtime.py`: evidence-first execution runtime that
+  binds approvals, command IDs, resource budgets, verification and replay.
+- `nexus_core/organization/execution_plans.py`: plan -> step -> execution
+  structure for approved actions.
+- `nexus_core/organization/replay.py`: reconstructs command/task timelines from
+  persisted runtime events, plans and verification records.
+- `nexus_core/organization/workspace_context.py`: detects durable project facts
+  such as Rust, Iced, Axum, SQLx, WebSocket architecture and test coverage.
+- `nexus_core/organization/resource_budget.py`: enforces timeout, concurrency,
+  token and resource-pressure budgets.
+- `nexus_core/organization/self_healing.py`: classifies failures and produces
+  safe recovery steps without bypassing approval.
+- `nexus_core/organization/*`: daemon, memory, verification, security, observer
+  and orchestration layers.
+
+## Reliability model
+
+NEXUS treats every real action as a structured, replayable unit:
+
+```text
+Approval
+-> Execution plan
+-> Resource budget
+-> Command execution
+-> Evidence capture
+-> Verification
+-> Self-healing diagnostic when needed
+-> Replay timeline
+-> Persistent memory
+```
+
+The runtime must not mark work as complete without execution evidence. A failed
+command becomes a diagnosed incident with recovery steps; it does not become a
+silent success.
 
 ## Interface model
 
-The Rust/Iced frontend is organized like an understandable company operating
-system:
+The Rust/Iced frontend is organized as a premium conversational assistant:
 
-- CEO view: mission, impact, approvals and incidents.
-- CTO view: architecture, agents, runtime health and verification.
-- Beginner view: what is happening, who is acting and whether it succeeded.
+- Minimal sidebar for conversations, tasks and settings.
+- Central conversation focused on the user's intent.
+- Fixed bottom input with attachments, voice and send controls.
+- Suggestion cards for common cognitive workflows.
+- Technical evidence remains available through runtime commands and developer
+  surfaces instead of overwhelming the primary chat view.
 
-The GUI defaults to Public Mode for clarity and exposes Engineering Mode for
-logs, internal IDs, stdout/stderr and deeper runtime diagnostics.
+The product direction is less dashboard and more cognitive assistant: the user
+should feel clarity, verification and calm control, while the runtime preserves
+the audit trail underneath.

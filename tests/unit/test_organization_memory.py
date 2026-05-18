@@ -124,3 +124,48 @@ def test_memory_store_persists_swarm_runtime_tables(tmp_path):
     assert counts["incidents"] == 1
     assert counts["approvals"] == 1
     assert counts["memory_entries"] == 1
+
+
+def test_memory_store_persists_structured_execution_plans(tmp_path):
+    store = OrganizationalMemoryStore(tmp_path / "org.sqlite3")
+
+    plan = store.record_execution_plan(
+        {
+            "plan_id": "plan_1",
+            "task_id": "task_1",
+            "command_id": "cmd_1",
+            "proposal_id": "prop_1",
+            "title": "Fix Build Error",
+            "objective": "cargo check",
+            "status": "running",
+            "metadata": {"agent": "devops"},
+        }
+    )
+    step = store.record_execution_step(
+        {
+            "step_id": "step_1",
+            "plan_id": plan["plan_id"],
+            "step_index": 1,
+            "title": "Analyze logs",
+            "action_type": "analysis",
+            "status": "pending",
+            "command_id": "cmd_1",
+        }
+    )
+    store.update_execution_step(
+        step["step_id"],
+        status="passed",
+        evidence={"stdout_path": "logs/stdout.log"},
+        finished=True,
+    )
+    store.update_execution_plan(plan["plan_id"], status="completed", finished=True)
+
+    plans = store.list_execution_plans(command_id="cmd_1")
+    steps = store.list_execution_steps(plan_id=plan["plan_id"])
+    counts = store.counts()
+
+    assert plans[0]["status"] == "completed"
+    assert steps[0]["status"] == "passed"
+    assert steps[0]["evidence"]["stdout_path"] == "logs/stdout.log"
+    assert counts["execution_plans"] == 1
+    assert counts["execution_steps"] == 1

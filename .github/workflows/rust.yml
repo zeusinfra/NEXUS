@@ -6,6 +6,7 @@ on:
     paths:
       - "core-rust/**"
       - "watcher_rs/**"
+      - "nexus-iced/**"
       - ".github/workflows/rust.yml"
   pull_request:
     branches: ["main"]
@@ -14,8 +15,12 @@ concurrency:
   group: rust-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   rust:
+    name: Rust core ${{ matrix.crate }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -50,3 +55,38 @@ jobs:
       - name: Test
         working-directory: ${{ matrix.crate }}
         run: cargo test --all-targets
+
+  iced-gui:
+    name: Rust Iced conversational GUI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libasound2-dev \
+            libudev-dev \
+            libx11-dev \
+            libxi-dev \
+            libgl1-mesa-dev \
+            pkg-config
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: nexus-iced
+
+      - name: Format
+        working-directory: nexus-iced
+        run: cargo fmt --all -- --check
+
+      - name: Check GUI
+        working-directory: nexus-iced
+        run: cargo check

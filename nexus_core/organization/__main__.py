@@ -77,6 +77,23 @@ def main() -> None:
     commands.add_argument("--task-id", default=None)
     commands.add_argument("--limit", type=int, default=50)
 
+    replay_command = sub.add_parser("replay-command")
+    replay_command.add_argument("command_id")
+
+    replay_task = sub.add_parser("replay-task")
+    replay_task.add_argument("task_id")
+
+    execution_plans = sub.add_parser("execution-plans")
+    execution_plans.add_argument("--status", default=None)
+    execution_plans.add_argument("--task-id", default=None)
+    execution_plans.add_argument("--command-id", default=None)
+    execution_plans.add_argument("--limit", type=int, default=50)
+
+    execution_steps = sub.add_parser("execution-steps")
+    execution_steps.add_argument("--plan-id", default=None)
+    execution_steps.add_argument("--command-id", default=None)
+    execution_steps.add_argument("--limit", type=int, default=100)
+
     incidents = sub.add_parser("incidents")
     incidents.add_argument("--severity", default=None)
     incidents.add_argument("--limit", type=int, default=50)
@@ -91,6 +108,8 @@ def main() -> None:
 
     memory_status = sub.add_parser("memory-status")
     memory_status.add_argument("--json", action="store_true")
+
+    sub.add_parser("workspace-context")
 
     memory_tasks = sub.add_parser("memory-tasks")
     memory_tasks.add_argument("--status", default=None)
@@ -197,9 +216,14 @@ def main() -> None:
         "memory-entries",
         "swarm-status",
         "commands",
+        "replay-command",
+        "replay-task",
+        "execution-plans",
+        "execution-steps",
         "incidents",
         "runtime-events",
         "verifications",
+        "workspace-context",
         "observations",
         "agent-ticks",
         "dashboard",
@@ -231,6 +255,23 @@ def main() -> None:
         payload = daemon.memory.list_commands(
             status=args.status, task_id=args.task_id, limit=args.limit
         )
+    elif command == "replay-command":
+        payload = daemon.replay_command(args.command_id)
+    elif command == "replay-task":
+        payload = daemon.replay_task(args.task_id)
+    elif command == "execution-plans":
+        payload = daemon.memory.list_execution_plans(
+            status=args.status,
+            task_id=args.task_id,
+            command_id=args.command_id,
+            limit=args.limit,
+        )
+    elif command == "execution-steps":
+        payload = daemon.memory.list_execution_steps(
+            plan_id=args.plan_id,
+            command_id=args.command_id,
+            limit=args.limit,
+        )
     elif command == "incidents":
         payload = daemon.memory.list_incidents(severity=args.severity, limit=args.limit)
     elif command == "memory-agents":
@@ -239,6 +280,8 @@ def main() -> None:
         payload = daemon.memory.list_memory_entries(scope=args.scope, limit=args.limit)
     elif command == "memory-status":
         payload = daemon.memory_status()
+    elif command == "workspace-context":
+        payload = daemon.workspace_context()
     elif command == "memory-tasks":
         payload = daemon.memory.list_tasks(status=args.status, limit=args.limit)
     elif command == "memory-decisions":
@@ -292,6 +335,7 @@ def main() -> None:
             "approvals": daemon.permissions.queue.list(status="pending_approval"),
             "approved_commands": daemon.permissions.queue.list(status="approved"),
             "commands": daemon.memory.list_commands(limit=5),
+            "execution_plans": daemon.memory.list_execution_plans(limit=4),
             "runtime_events": daemon.memory.list_runtime_events(limit=3),
             "verifications": daemon.memory.list_verifications(limit=3),
             "org_events": daemon.memory.list_events(limit=6),
@@ -299,6 +343,7 @@ def main() -> None:
             "incidents": daemon.memory.list_incidents(limit=4),
             "observations": daemon.memory.list_observations(limit=3),
             "memory_entries": daemon.memory.list_memory_entries(limit=4),
+            "workspace_context": daemon.workspace_context(),
         }
     else:  # pragma: no cover - argparse prevents this branch
         raise SystemExit(f"Unknown command: {command}")

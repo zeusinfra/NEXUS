@@ -20,6 +20,10 @@ def _empty_state() -> dict[str, Any]:
         "mode": "IDLE",
         "current_goal": None,
         "plan": [],
+        "execution_plans": {},
+        "workspace_context": {},
+        "resource_budget": {},
+        "self_healing": [],
         "health": {"status": "starting", "last_heartbeat": None},
         "agents": {},
         "tasks": {},
@@ -184,6 +188,25 @@ class Blackboard:
         self._state["plan"] = plan
         self._touch()
         self.save()
+
+    def upsert_execution_plan(self, plan: dict[str, Any]) -> None:
+        plans = self._state.setdefault("execution_plans", {})
+        plans[plan["plan_id"]] = deepcopy(plan)
+        self._touch()
+        self.save()
+
+    def set_workspace_context(self, context: dict[str, Any]) -> None:
+        self._state["workspace_context"] = deepcopy(context)
+        self._touch()
+        self.save()
+
+    def set_resource_budget(self, budget: dict[str, Any]) -> None:
+        self._state["resource_budget"] = deepcopy(budget)
+        self._touch()
+        self.save()
+
+    def append_self_healing(self, diagnostic: dict[str, Any]) -> None:
+        self._append_limited("self_healing", diagnostic)
 
     def append_blocker(self, blocker: dict[str, Any]) -> None:
         self._append_limited("blockers", blocker)

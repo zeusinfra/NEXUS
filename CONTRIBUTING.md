@@ -13,6 +13,7 @@ At Zeus Protocol, we maintain high standards for code quality, documentation, an
 *   Adhere to our **local-first security model**.
 *   Include appropriate **documentation** and comments.
 *   Follow the project's **architectural patterns** (e.g., separating planning from execution).
+*   Preserve the runtime invariant that completed work must have execution evidence, verification state and replayable history.
 
 ---
 
@@ -27,8 +28,20 @@ At Zeus Protocol, we maintain high standards for code quality, documentation, an
 *   **Python**: Follow PEP 8 standards; use `ruff` for linting and formatting.
 *   **Rust**: Use `cargo fmt` and `cargo clippy`. Ensure all tests pass in the `core-rust` and `nexus-iced` crates.
 *   **Testing**: New features must include unit or integration tests. Run the full suite with `make test` and `make rust`.
+*   **Runtime Features**: Changes to execution, approvals, plans, replay, workspace memory, self-healing or resource budgets must include tests that prove evidence is persisted and failures are not hidden.
+*   **UX Direction**: User-facing changes should keep the primary experience conversational, calm and low-noise. Technical logs, telemetry and raw IDs belong in developer surfaces or CLI inspection commands.
 
-### 3. Submission (Pull Requests)
+### 3. Runtime Checklist
+Before submitting runtime work, verify the relevant commands:
+
+```bash
+./bin/nexus org workspace-context
+./bin/nexus org execution-plans
+./bin/nexus org replay-command cmd_...
+./bin/nexus org incidents
+```
+
+### 4. Submission (Pull Requests)
 *   Fill out the provided Pull Request template in detail.
 *   Ensure all CI/CD checks (GitHub Actions) pass.
 *   Reference any related issues or Strategic Goals from the Zeus Protocol roadmap.

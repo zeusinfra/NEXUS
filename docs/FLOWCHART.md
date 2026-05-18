@@ -1,17 +1,18 @@
 # NEXUS architecture flowchart
 
 This diagram describes the current product direction: NEXUS as a Linux
-installable Cognitive OS with hybrid local/cloud intelligence, supervised
-execution, verification and organizational memory.
+installable Cognitive OS with a premium conversational UI, hybrid local/cloud
+intelligence, supervised execution, verification, replay and organizational
+memory.
 
 ```mermaid
 flowchart TD
-    CEO[CEO / Operator / Beginner User] --> GUI[Rust Iced GUI]
+    CEO[CEO / Operator / Beginner User] --> GUI[Rust Iced Conversational GUI]
     CEO --> CLI[nexus CLI]
     CEO --> TUI[Terminal TUI]
 
     GUI --> ProductStatus[nexus status<br/>product status]
-    GUI --> OrgDashboard[Organization Dashboard]
+    GUI --> ChatSurface[Assistant Chat Surface]
     CLI --> ProductCLI[Product CLI]
     TUI --> ProductCLI
 
@@ -33,6 +34,10 @@ flowchart TD
     OrgDaemon --> Observer[Linux Observer]
     OrgDaemon --> Memory[SQLite Organizational Memory]
     OrgDaemon --> Verification[Verification Engine]
+    OrgDaemon --> WorkspaceContext[Workspace Memory]
+    OrgDaemon --> Replay[Action Replay Builder]
+    OrgDaemon --> ResourceBudget[Resource Governor]
+    OrgDaemon --> SelfHealing[Self-Healing Diagnostics]
 
     Agents --> CEOAgent[CEO Agent<br/>priority]
     Agents --> Planner[Planner Agent<br/>tasks]
@@ -43,24 +48,35 @@ flowchart TD
     Agents --> ObserverAgent[Observer Agent<br/>context]
 
     Safety --> ApprovalQueue[Human Approval Queue]
-    ApprovalQueue --> Runtime
+    ApprovalQueue --> Plan[Structured Execution Plan]
+    Plan --> ResourceBudget
+    ResourceBudget --> Runtime
     Runtime --> Logs[stdout / stderr / exit code / duration]
     Runtime --> Evidence[Evidence files]
     Logs --> Verification
     Evidence --> Verification
+    Verification --> Replay
+    SelfHealing --> Replay
+    Runtime --> SelfHealing
 
     Verification --> Memory
+    Plan --> Memory
+    Replay --> Memory
+    WorkspaceContext --> Memory
     Blackboard --> Memory
     Observer --> Memory
     OrgDaemon --> Incidents[Incident Center]
 
-    GUI --> PublicMode[Public Mode<br/>clear operational view]
-    GUI --> EngineeringMode[Engineering Mode<br/>logs, ids, traces]
+    GUI --> ChatSurface
+    ChatSurface --> UserInput[Fixed Chat Input<br/>attachments, voice, send]
+    ChatSurface --> Suggestions[Suggestion Cards<br/>summarize, organize, explain, plan]
+    GUI --> DevMode[Optional Developer Mode<br/>plans, replay, evidence]
 
     ProductStatus --> GUI
     Incidents --> GUI
     Memory --> GUI
     Verification --> GUI
+    Replay --> GUI
 ```
 
 ## Reading the system by role
@@ -73,9 +89,10 @@ CEO:
 
 CTO:
 
-- reads architecture, routing, daemon health, agent ownership and verification;
-- uses Engineering Mode when technical evidence is needed;
-- validates systemd, packaging, runtime and rollback details.
+- reads architecture, routing, daemon health, ownership, verification and
+  replay;
+- uses developer mode or CLI commands when technical evidence is needed;
+- validates systemd, packaging, runtime, rollback and resource budget details.
 
 Beginner user:
 
@@ -85,13 +102,13 @@ Beginner user:
 
 ## UI sections
 
-- Overview: executive summary of platform, mission, swarm and health.
-- Missions: objective, progress and next steps.
-- Swarm: agents, responsibilities and handoff flow.
-- Executions: real actions, result, verification and next step.
+- Conversation: primary assistant experience and task intake.
+- Suggestions: summarize document, organize tasks, explain project and create
+  plan.
 - Approvals: sensitive actions waiting for human decision.
-- Incidents: summarized failures, severity and impact.
-- Observer: current Linux context.
-- Telemetry: four essential cognitive signals.
-- Memory: decisions, events and organizational learning.
-- Config: .deb install, daemon, local model, gemma4 cloud model and display mode.
+- Executions: real actions, result, verification and next step.
+- Replay: reconstructed command/task timelines for audit and debugging.
+- Memory: decisions, workspace context, events and organizational learning.
+- Developer Mode: optional plans, logs, IDs, stdout/stderr and resource budgets.
+- Config: .deb install, daemon, local model, gemma4 cloud model and display
+  mode.

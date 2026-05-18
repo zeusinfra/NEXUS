@@ -12,6 +12,13 @@ Debian-based distributions.
 ./bin/nexus router explain "resumir logs do sistema"
 ```
 
+Launch the Rust/Iced conversational GUI from the repository root:
+
+```bash
+cd nexus-iced
+cargo run
+```
+
 The local LLM path uses an existing Ollama installation. NEXUS detects the
 binary, checks `http://localhost:11434/api/tags`, lists already downloaded
 models and never pulls a model automatically.
@@ -33,6 +40,30 @@ If no local model exists:
 ```bash
 ollama pull qwen2.5:3b
 ```
+
+## Runtime inspection
+
+During development, the organizational runtime can be inspected without opening
+a technical dashboard:
+
+```bash
+./bin/nexus org workspace-context
+./bin/nexus org execution-plans
+./bin/nexus org execution-steps --command-id cmd_...
+./bin/nexus org replay-command cmd_...
+./bin/nexus org replay-task task_...
+./bin/nexus org incidents
+```
+
+Useful execution budget environment variables:
+
+- `NEXUS_EXEC_CONCURRENT_LIMIT`: max active command executions.
+- `NEXUS_EXEC_TIMEOUT_MAX_SEC`: max timeout accepted by the runtime.
+- `NEXUS_EXEC_TOKEN_BUDGET`: planning/reasoning budget for execution flows.
+- `NEXUS_EXEC_CPU_SOFT_LIMIT`: CPU pressure threshold.
+- `NEXUS_EXEC_RAM_SOFT_LIMIT`: RAM pressure threshold.
+- `NEXUS_EXEC_BLOCK_ON_RESOURCE_PRESSURE`: block execution when CPU/RAM pressure
+  is above the configured soft limit.
 
 ## Debian package
 

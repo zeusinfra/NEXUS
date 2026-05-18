@@ -18,6 +18,9 @@ concurrency:
   group: browser-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   test-browser:
     name: Browser Stack Tests
@@ -47,5 +50,10 @@ jobs:
           NEXUS_TESTING: "1"
           NEXUS_SKIP_DOTENV: "1"
         run: |
-          # Run tests specifically related to browser control
-          python -m pytest tests/unit/test_browser.py || echo "No specific browser tests found yet"
+          shopt -s nullglob
+          tests=(tests/unit/test_browser*.py tests/integration/test_browser*.py)
+          if [ ${#tests[@]} -gt 0 ]; then
+            python -m pytest "${tests[@]}"
+          else
+            python -m py_compile nexus_core/browser_control.py
+          fi

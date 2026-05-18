@@ -4,6 +4,10 @@
 
 At Zeus Protocol, the security of the NEXUS system and the privacy of our users' operational data are our highest priorities. As a local-first cognitive operating layer, NEXUS is designed with security boundaries at its core, separating proposal, approval, and execution of system actions.
 
+The current runtime security invariant is evidence-first autonomy: an action is
+not considered complete unless the system has persisted execution evidence,
+verification state and replayable history.
+
 ## 🔓 Reporting a Vulnerability
 
 We value the work of security researchers and the community in helping us maintain a secure ecosystem. If you discover a security vulnerability within NEXUS or any Zeus Protocol infrastructure, we request that you report it to us responsibly.
@@ -40,7 +44,15 @@ Zeus Protocol follows the principles of responsible disclosure. We ask that rese
 
 ## 🎓 Security Research Guidelines
 
-Research performed on local NEXUS instances should not impact other users or Zeus Protocol's hosted infrastructure (zeusprotocol.cloud). We encourage security audits of our [Command Ledger], [RootDaemon Protocol], and [Sandbox Runtime].
+Research performed on local NEXUS instances should not impact other users or Zeus Protocol's hosted infrastructure (zeusprotocol.cloud). We encourage security audits of our command ledger, approval queue, structured execution plans, action replay, self-healing diagnostics, resource governor and sandbox runtime.
+
+Areas of special interest:
+
+*   bypassing approval before command execution;
+*   marking work complete without stdout/stderr, exit code or verification;
+*   losing or corrupting replay history;
+*   hiding failed commands from incidents;
+*   exceeding configured CPU, RAM, timeout or concurrency budgets.
 
 ---
 Copyright © 2026 Zeus Protocol. All rights reserved.

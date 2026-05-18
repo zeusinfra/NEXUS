@@ -33,6 +33,16 @@ updates:
         patterns:
           - "*"
 
+  - package-ecosystem: "cargo"
+    directory: "/nexus-iced"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      rust-iced-gui:
+        patterns:
+          - "*"
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

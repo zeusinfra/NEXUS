@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import shutil
 from dataclasses import dataclass, asdict
 from typing import Any, Callable
 
-import psutil
 from nexus_core.organization.memory import OrganizationalMemoryStore
+
+try:
+    import psutil
+except Exception:  # pragma: no cover - optional runtime dependency fallback
+    psutil = None
 
 
 @dataclass(frozen=True)
@@ -84,6 +89,13 @@ class ObserverEngine:
         return "IDLE", 0.55, triggers
 
     def _system_snapshot(self) -> dict[str, Any]:
+        if psutil is None:
+            disk = shutil.disk_usage("/")
+            return {
+                "cpu_percent": 0.0,
+                "ram_percent": 0.0,
+                "disk_percent": round((disk.used / disk.total) * 100, 2),
+            }
         return {
             "cpu_percent": psutil.cpu_percent(interval=None),
             "ram_percent": psutil.virtual_memory().percent,
@@ -91,6 +103,8 @@ class ObserverEngine:
         }
 
     def _top_processes(self) -> list[dict[str, Any]]:
+        if psutil is None:
+            return []
         rows: list[dict[str, Any]] = []
         try:
             for proc in psutil.process_iter(

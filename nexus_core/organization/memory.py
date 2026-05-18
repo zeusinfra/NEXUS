@@ -204,6 +204,37 @@ class OrganizationalMemoryStore:
                     created_at TEXT NOT NULL
                 )
             """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS org_execution_plans (
+                    plan_id TEXT PRIMARY KEY,
+                    task_id TEXT,
+                    command_id TEXT,
+                    proposal_id TEXT,
+                    title TEXT NOT NULL,
+                    objective TEXT NOT NULL DEFAULT '',
+                    status TEXT NOT NULL DEFAULT 'planned',
+                    metadata_json TEXT NOT NULL DEFAULT '{}',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    finished_at TEXT
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS org_execution_steps (
+                    step_id TEXT PRIMARY KEY,
+                    plan_id TEXT NOT NULL,
+                    step_index INTEGER NOT NULL,
+                    title TEXT NOT NULL,
+                    action_type TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    command_id TEXT,
+                    evidence_json TEXT NOT NULL DEFAULT '{}',
+                    error TEXT NOT NULL DEFAULT '',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    finished_at TEXT
+                )
+            """)
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_org_tasks_status ON org_tasks(status)"
             )
@@ -251,6 +282,21 @@ class OrganizationalMemoryStore:
             )
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_org_memory_scope ON org_memory_entries(scope)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_org_execution_plans_task ON org_execution_plans(task_id)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_org_execution_plans_command ON org_execution_plans(command_id)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_org_execution_plans_status ON org_execution_plans(status)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_org_execution_steps_plan ON org_execution_steps(plan_id)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_org_execution_steps_command ON org_execution_steps(command_id)"
             )
 
     def upsert_task(self, task: dict[str, Any]) -> None:
@@ -719,6 +765,133 @@ class OrganizationalMemoryStore:
             )
         return item
 
+    def record_execution_plan(self, plan: dict[str, Any]) -> dict[str, Any]:
+        item = dict(plan)
+        item.setdefault("plan_id", f"plan_{uuid.uuid4().hex[:12]}")
+        item.setdefault("status", "planned")
+        item.setdefault("metadata", {})
+        item.setdefault("created_at", utc_now())
+        item["updated_at"] = utc_now()
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO org_execution_plans (
+                    plan_id, task_id, command_id, proposal_id, title, objective,
+                    status, metadata_json, created_at, updated_at, finished_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(plan_id) DO UPDATE SET
+                    task_id = excluded.task_id,
+                    command_id = excluded.command_id,
+                    proposal_id = excluded.proposal_id,
+                    title = excluded.title,
+                    objective = excluded.objective,
+                    status = excluded.status,
+                    metadata_json = excluded.metadata_json,
+                    updated_at = excluded.updated_at,
+                    finished_at = excluded.finished_at
+                """,
+                (
+                    item["plan_id"],
+                    item.get("task_id"),
+                    item.get("command_id"),
+                    item.get("proposal_id"),
+                    item.get("title", "Execution plan"),
+                    item.get("objective", ""),
+                    item["status"],
+                    _json(item["metadata"]),
+                    item["created_at"],
+                    item["updated_at"],
+                    item.get("finished_at"),
+                ),
+            )
+        return item
+
+    def record_execution_step(self, step: dict[str, Any]) -> dict[str, Any]:
+        item = dict(step)
+        item.setdefault("step_id", f"step_{uuid.uuid4().hex[:12]}")
+        item.setdefault("status", "pending")
+        item.setdefault("evidence", {})
+        item.setdefault("error", "")
+        item.setdefault("created_at", utc_now())
+        item["updated_at"] = utc_now()
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO org_execution_steps (
+                    step_id, plan_id, step_index, title, action_type, status,
+                    command_id, evidence_json, error, created_at, updated_at, finished_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(step_id) DO UPDATE SET
+                    plan_id = excluded.plan_id,
+                    step_index = excluded.step_index,
+                    title = excluded.title,
+                    action_type = excluded.action_type,
+                    status = excluded.status,
+                    command_id = excluded.command_id,
+                    evidence_json = excluded.evidence_json,
+                    error = excluded.error,
+                    updated_at = excluded.updated_at,
+                    finished_at = excluded.finished_at
+                """,
+                (
+                    item["step_id"],
+                    item["plan_id"],
+                    int(item.get("step_index", 0)),
+                    item.get("title", "Execution step"),
+                    item.get("action_type", "generic"),
+                    item["status"],
+                    item.get("command_id"),
+                    _json(item["evidence"]),
+                    item.get("error", ""),
+                    item["created_at"],
+                    item["updated_at"],
+                    item.get("finished_at"),
+                ),
+            )
+        return item
+
+    def update_execution_step(
+        self,
+        step_id: str,
+        *,
+        status: str,
+        evidence: dict[str, Any] | None = None,
+        error: str = "",
+        finished: bool = False,
+    ) -> dict[str, Any]:
+        existing = self.get_execution_step(step_id)
+        if not existing:
+            raise KeyError(f"Execution step not found: {step_id}")
+        merged = {
+            **existing,
+            "status": status,
+            "evidence": evidence if evidence is not None else existing["evidence"],
+            "error": error,
+            "finished_at": utc_now() if finished else existing.get("finished_at"),
+        }
+        return self.record_execution_step(merged)
+
+    def update_execution_plan(
+        self,
+        plan_id: str,
+        *,
+        status: str,
+        metadata: dict[str, Any] | None = None,
+        finished: bool = False,
+    ) -> dict[str, Any]:
+        existing = self.get_execution_plan(plan_id)
+        if not existing:
+            raise KeyError(f"Execution plan not found: {plan_id}")
+        merged = {
+            **existing,
+            "status": status,
+            "metadata": metadata if metadata is not None else existing["metadata"],
+            "finished_at": utc_now() if finished else existing.get("finished_at"),
+        }
+        return self.record_execution_plan(merged)
+
     def summarize_recent(self, *, limit: int = 20) -> str:
         tasks = self.list_tasks(limit=limit)
         decisions = self.list_decisions(limit=limit)
@@ -984,6 +1157,31 @@ class OrganizationalMemoryStore:
             for row in rows
         ]
 
+    def get_command(self, command_id: str) -> dict[str, Any] | None:
+        rows = self._fetch("SELECT * FROM org_commands WHERE command_id = ?", [command_id])
+        if not rows:
+            return None
+        row = rows[0]
+        return {
+            "command_id": row["command_id"],
+            "agent_id": row["agent_id"],
+            "task_id": row["task_id"],
+            "proposal_id": row["proposal_id"],
+            "command": row["command"],
+            "cwd": row["cwd"],
+            "status": row["status"],
+            "pid": row["pid"],
+            "exit_code": row["exit_code"],
+            "duration_ms": row["duration_ms"],
+            "stdout_path": row["stdout_path"],
+            "stderr_path": row["stderr_path"],
+            "evidence_path": row["evidence_path"],
+            "risk_level": row["risk_level"],
+            "created_at": row["created_at"],
+            "finished_at": row["finished_at"],
+            "metadata": _loads(row["metadata_json"]),
+        }
+
     def list_incidents(
         self, *, severity: str | None = None, limit: int = 50
     ) -> list[dict[str, Any]]:
@@ -1066,6 +1264,73 @@ class OrganizationalMemoryStore:
             for row in rows
         ]
 
+    def get_execution_plan(self, plan_id: str) -> dict[str, Any] | None:
+        rows = self._fetch(
+            "SELECT * FROM org_execution_plans WHERE plan_id = ?", [plan_id]
+        )
+        if not rows:
+            return None
+        return self._execution_plan_from_row(rows[0])
+
+    def list_execution_plans(
+        self,
+        *,
+        status: str | None = None,
+        task_id: str | None = None,
+        command_id: str | None = None,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        query = "SELECT * FROM org_execution_plans"
+        params: list[Any] = []
+        conditions = []
+        if status:
+            conditions.append("status = ?")
+            params.append(status)
+        if task_id:
+            conditions.append("task_id = ?")
+            params.append(task_id)
+        if command_id:
+            conditions.append("command_id = ?")
+            params.append(command_id)
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        query += " ORDER BY updated_at DESC LIMIT ?"
+        params.append(limit)
+        return [self._execution_plan_from_row(row) for row in self._fetch(query, params)]
+
+    def get_execution_step(self, step_id: str) -> dict[str, Any] | None:
+        rows = self._fetch(
+            "SELECT * FROM org_execution_steps WHERE step_id = ?", [step_id]
+        )
+        if not rows:
+            return None
+        return self._execution_step_from_row(rows[0])
+
+    def list_execution_steps(
+        self,
+        *,
+        plan_id: str | None = None,
+        command_id: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        query = "SELECT * FROM org_execution_steps"
+        params: list[Any] = []
+        conditions = []
+        if plan_id:
+            conditions.append("plan_id = ?")
+            params.append(plan_id)
+        if command_id:
+            conditions.append("command_id = ?")
+            params.append(command_id)
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        if plan_id:
+            query += " ORDER BY step_index ASC LIMIT ?"
+        else:
+            query += " ORDER BY updated_at DESC LIMIT ?"
+        params.append(limit)
+        return [self._execution_step_from_row(row) for row in self._fetch(query, params)]
+
     def counts(self) -> dict[str, int]:
         with self.connect() as conn:
             return {
@@ -1102,6 +1367,12 @@ class OrganizationalMemoryStore:
                 "memory_entries": conn.execute(
                     "SELECT COUNT(*) FROM org_memory_entries"
                 ).fetchone()[0],
+                "execution_plans": conn.execute(
+                    "SELECT COUNT(*) FROM org_execution_plans"
+                ).fetchone()[0],
+                "execution_steps": conn.execute(
+                    "SELECT COUNT(*) FROM org_execution_steps"
+                ).fetchone()[0],
             }
 
     def _fetch(self, query: str, params: list[Any]) -> list[sqlite3.Row]:
@@ -1119,6 +1390,37 @@ class OrganizationalMemoryStore:
             "metadata": _loads(row["metadata_json"]),
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
+        }
+
+    def _execution_plan_from_row(self, row: sqlite3.Row) -> dict[str, Any]:
+        return {
+            "plan_id": row["plan_id"],
+            "task_id": row["task_id"],
+            "command_id": row["command_id"],
+            "proposal_id": row["proposal_id"],
+            "title": row["title"],
+            "objective": row["objective"],
+            "status": row["status"],
+            "metadata": _loads(row["metadata_json"]),
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+            "finished_at": row["finished_at"],
+        }
+
+    def _execution_step_from_row(self, row: sqlite3.Row) -> dict[str, Any]:
+        return {
+            "step_id": row["step_id"],
+            "plan_id": row["plan_id"],
+            "step_index": row["step_index"],
+            "title": row["title"],
+            "action_type": row["action_type"],
+            "status": row["status"],
+            "command_id": row["command_id"],
+            "evidence": _loads(row["evidence_json"]),
+            "error": row["error"],
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+            "finished_at": row["finished_at"],
         }
 
 

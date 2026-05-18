@@ -4,14 +4,14 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Website](https://img.shields.io/badge/Official-zeusprotocol.cloud-0052FF.svg)](https://zeusprotocol.cloud)
 
-NEXUS is the flagship **Cognitive Operating Layer** developed by **Zeus Protocol**. Engineered for mission-critical Linux environments, it provides a persistent, verifiable, and autonomous organizational engine that transforms standard workstations into intelligent operational centers.
+NEXUS is the flagship **Cognitive Operating Layer** developed by **Zeus Protocol**. Engineered for mission-critical Linux environments, it provides a persistent, verifiable, and autonomous organizational engine that transforms standard workstations into calm, conversational cognitive workspaces.
 
 ## 🏛️ Corporate Vision
 
 At Zeus Protocol, we believe in **Local-First Autonomy**. NEXUS is designed to bridge the gap between high-level cognitive planning and real-world system execution. It operates as a structured organization within your OS: agents plan, review, observe, and execute through an auditable, policy-driven runtime.
 
 The NEXUS operational contract is built on absolute transparency:
-**Objective → Strategic Planning → Verified Execution → Validation → Evidence → Persistent Memory**
+**Objective → Structured Plan → Budgeted Execution → Verification → Evidence → Replay → Persistent Memory**
 
 ---
 
@@ -24,12 +24,16 @@ The NEXUS operational contract is built on absolute transparency:
 ### 2. Enterprise Governance & Security
 *   **Policy Enforcement**: Granular permission gates separating command proposal, multi-stage approval, and execution.
 *   **Verifiable Runtime**: Every action is tracked with full artifact capture (stdout/stderr), cryptographic-ready command IDs, and mandatory verification checks.
+*   **Structured Execution Plans**: Approved actions are expanded into explicit steps such as approval validation, resource budget checks, execution, verification, and replay persistence.
+*   **Action Replay**: Completed commands and tasks can be reconstructed as timelines for debugging, audit, and cognitive observability.
 *   **Security Boundary**: Local-first architecture ensuring that mission-critical data remains within your private infrastructure.
 
 ### 3. Cognitive Observability
-*   **Enterprise Dashboard (Iced GUI)**: A high-fidelity Rust-based command center providing real-time telemetry, swarm interaction monitoring, and incident management.
-*   **Organizational Memory**: High-performance SQLite-backed ledger for decisions, summaries, and agent state transitions.
-*   **Operational HUD**: Real-time system health and neural metrics visualization.
+*   **Premium Conversational GUI (Rust/Iced)**: A ChatGPT/Claude-inspired assistant surface focused on clarity, low visual noise, and fast human interaction.
+*   **Organizational Memory**: High-performance SQLite-backed ledger for decisions, summaries, agent state transitions, execution plans, verification evidence, and replays.
+*   **Workspace Memory**: Project traits such as Rust, Iced, Axum, WebSocket architecture, SQLx, tests, and organization runtime are detected and persisted.
+*   **Self-Healing Diagnostics**: Failed commands are classified and converted into safe recovery steps before the operator receives a final failure.
+*   **Resource Governor**: Local autonomy is constrained by timeout, concurrency, CPU/RAM pressure, and token budgets.
 
 ---
 
@@ -39,7 +43,7 @@ The NEXUS operational contract is built on absolute transparency:
 | :--- | :--- |
 | `nexus_core/` | Core cognitive orchestration and security protocols. |
 | `nexus_core/organization/` | The persistent daemon and swarm management layer. |
-| `nexus-iced/` | Primary Enterprise Command Center GUI (Rust/Iced). |
+| `nexus-iced/` | Primary conversational GUI (Rust/Iced). |
 | `core-rust/` | High-performance system bridges and sensory modules. |
 | `apps/` | API backend and cognitive entrypoints. |
 | `bin/` | Unified enterprise launcher for the NEXUS ecosystem. |
@@ -61,8 +65,8 @@ cd NEXUS
 source .venv/bin/activate
 ```
 
-### Initializing the Command Center
-To launch the primary enterprise interface:
+### Initializing the Conversational Interface
+To launch the primary conversational interface:
 ```bash
 ./bin/nexus
 ```
@@ -71,6 +75,18 @@ For server-only operations or organizational management:
 ```bash
 ./bin/nexus org run
 ./bin/nexus org health
+```
+
+### Verifiable Runtime Commands
+The organizational runtime exposes the same evidence-first primitives used by
+the GUI:
+
+```bash
+./bin/nexus org workspace-context
+./bin/nexus org execution-plans
+./bin/nexus org execution-steps --command-id cmd_...
+./bin/nexus org replay-command cmd_...
+./bin/nexus org replay-task task_...
 ```
 
 ### Hybrid LLM Product CLI
@@ -127,6 +143,7 @@ architecture flowchart is in `docs/FLOWCHART.md`.
 Zeus Protocol maintains strict standards for autonomy and security.
 *   **Auditability**: Full ledger of every command proposed and executed.
 *   **Risk Mitigation**: Rollback guidance and impact assessment integrated into every operational proposal.
+*   **Replayability**: Commands and tasks can be replayed from persisted plans, runtime events, stdout/stderr artifacts, and verification records.
 *   **Incident Management**: Real-time monitoring of verifications and system incidents.
 
 ---

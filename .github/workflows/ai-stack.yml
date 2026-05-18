@@ -6,6 +6,8 @@ on:
     branches: ["main"]
     paths:
       - "nexus_core/llm_service.py"
+      - "nexus_core/model_router.py"
+      - "nexus_core/models/**"
       - "nexus_core/cognitive/**"
       - "requirements/ai.txt"
       - ".github/workflows/ai-stack.yml"
@@ -13,12 +15,17 @@ on:
     branches: ["main"]
     paths:
       - "nexus_core/llm_service.py"
+      - "nexus_core/model_router.py"
+      - "nexus_core/models/**"
       - "nexus_core/cognitive/**"
       - "requirements/ai.txt"
 
 concurrency:
   group: ai-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   test-ai:
@@ -45,5 +52,12 @@ jobs:
           NEXUS_TESTING: "1"
           NEXUS_SKIP_DOTENV: "1"
         run: |
-          # Run tests specifically related to AI and Cognition
-          python -m pytest tests/unit/test_cognitive.py || echo "No specific cognitive tests found yet"
+          python -m pytest \
+            tests/unit/test_llm_service.py \
+            tests/unit/test_model_router.py \
+            tests/unit/test_cognitive_db.py \
+            tests/unit/test_cognitive_execution.py \
+            tests/unit/test_cognitive_learning.py \
+            tests/unit/test_cognitive_planner.py \
+            tests/unit/test_cognitive_simulator.py \
+            tests/unit/test_cognitive_state.py

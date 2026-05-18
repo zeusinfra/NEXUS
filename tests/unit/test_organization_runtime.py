@@ -43,6 +43,9 @@ async def test_runtime_executes_approved_command_with_evidence(runtime_daemon):
     assert result["execution"]["status"] == ActionState.SUCCEEDED.value
     assert result["verification"]["status"] == "passed"
     assert result["execution"]["verified_by_executor"] is True
+    assert result["execution_plan"]["status"] == "completed"
+    assert result["resource_budget"]["allowed"] is True
+    assert result["replay"]["target_id"] == result["command_id"]
     assert result["runtime_events"]
 
     command_id = result["command_id"]
@@ -65,6 +68,16 @@ async def test_runtime_executes_approved_command_with_evidence(runtime_daemon):
         runtime_daemon.memory.list_approvals(status="executed")[0]["proposal_id"]
         == item["proposal_id"]
     )
+    assert runtime_daemon.memory.list_execution_plans(command_id=command_id)
+    step_statuses = {
+        step["action_type"]: step["status"]
+        for step in runtime_daemon.memory.list_execution_steps(command_id=command_id)
+    }
+    assert step_statuses["command_execution"] == "passed"
+    assert step_statuses["verification"] == "passed"
+    replay = runtime_daemon.replay_command(command_id)
+    replay_types = {entry["type"] for entry in replay["timeline"]}
+    assert {"plan_step", "runtime_event", "verification"}.issubset(replay_types)
 
 
 @pytest.mark.asyncio
@@ -92,9 +105,18 @@ async def test_runtime_records_failed_verification(runtime_daemon, tmp_path):
     assert result["execution"]["status"] == ActionState.FAILED.value
     assert result["execution"]["exit_code"] == 9
     assert result["verification"]["status"] == "failed"
+    assert result["execution_plan"]["status"] == "failed"
+    assert result["self_healing"]["status"] == "diagnosed"
     assert (
         runtime_daemon.memory.list_incidents()[0]["command_id"] == result["command_id"]
     )
+    event_types = {
+        event["event_type"]
+        for event in runtime_daemon.memory.list_runtime_events(
+            command_id=result["command_id"]
+        )
+    }
+    assert "SELF_HEALING_DIAGNOSTIC" in event_types
 
 
 def test_verification_engine_detects_file_changes(tmp_path):

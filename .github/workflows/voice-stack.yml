@@ -22,6 +22,9 @@ concurrency:
   group: voice-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   test-voice:
     name: Voice Stack Tests
@@ -52,5 +55,5 @@ jobs:
           NEXUS_TESTING: "1"
           NEXUS_SKIP_DOTENV: "1"
         run: |
-          # Run tests specifically related to voice
-          python -m pytest tests/unit/test_voice.py || echo "No specific voice tests found yet"
+          python -m py_compile nexus_core/asr.py nexus_core/voice_sensing.py
+          python -m pytest tests/unit/test_response_text_voice.py
