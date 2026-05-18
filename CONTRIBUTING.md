@@ -47,7 +47,7 @@ By contributing code to NEXUS, you grant Zeus Protocol a non-exclusive, irrevoca
 *   **Issues**: Use GitHub Issues for bug reports and verified feature requests.
 *   **Website**: [zeusprotocol.cloud](https://zeusprotocol.cloud)
 
-For enterprise-level support or proprietary integrations, please contact the Zeus Protocol team at [solutions@zeusprotocol.cloud](mailto:solutions@zeusprotocol.cloud).
+For enterprise-level support or proprietary integrations, please contact the Zeus Protocol team via WhatsApp: +55 (12) 98247-4095.
 
 ---
 Copyright © 2026 Zeus Protocol. All rights reserved.

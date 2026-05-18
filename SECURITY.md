@@ -12,7 +12,7 @@ We value the work of security researchers and the community in helping us mainta
 
 ### Reporting Process
 
-1.  **Email**: Send a detailed report to [security@zeusprotocol.cloud](mailto:security@zeusprotocol.cloud).
+1.  **WhatsApp**: Send a detailed report to +55 (12) 98247-4095.
 2.  **Encryption**: If sensitive information is included, please use our PGP key (available upon request or via our website).
 3.  **Details**: Include a description of the vulnerability, steps to reproduce, and potential impact.
 

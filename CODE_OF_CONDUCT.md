@@ -29,7 +29,7 @@ Unacceptable behaviors include, but are not limited to:
 Maintainers have the right and responsibility to remove, edit, or reject comments, commits, code, and other contributions that are not aligned with this Code of Conduct.
 
 ### Reporting an Incident
-If you witness or are subject to unacceptable behavior, please report it immediately to the Zeus Protocol Oversight Team at [conduct@zeusprotocol.cloud](mailto:conduct@zeusprotocol.cloud).
+If you witness or are subject to unacceptable behavior, please report it immediately to the Zeus Protocol Oversight Team at WhatsApp: +55 (12) 98247-4095.
 
 ### Consequences
 Participants asked to stop unacceptable behavior are expected to comply immediately. If a participant engages in unacceptable behavior, the maintainers may take any action they deem appropriate, including a formal warning, temporary ban, or permanent expulsion from the NEXUS project.
