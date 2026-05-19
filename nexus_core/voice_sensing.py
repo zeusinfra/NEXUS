@@ -441,15 +441,18 @@ class VoiceSensing:
         try:
             tmp_path = None
             try:
-                audio_wav = await voice_service.generate_speech_wav(spoken_text)
-                if not audio_wav:
-                    raise RuntimeError("Falha na síntese Kokoro")
+                audio_data, audio_mime = await voice_service.generate_speech_audio(
+                    spoken_text
+                )
+                if not audio_data:
+                    raise RuntimeError("Falha na síntese de voz")
 
+                suffix = ".mp3" if audio_mime == "audio/mpeg" else ".wav"
                 with tempfile.NamedTemporaryFile(
-                    suffix=".wav", delete=False, prefix="nexus_tts_"
+                    suffix=suffix, delete=False, prefix="nexus_tts_"
                 ) as tmp:
                     tmp_path = tmp.name
-                    tmp.write(audio_wav)
+                    tmp.write(audio_data)
 
                 if self.broadcast:
                     await self._send_status("Falando...")
@@ -483,7 +486,7 @@ class VoiceSensing:
                     )
             except Exception as kokoro_err:
                 # Fallback offline via Speech Dispatcher (spd-say) ou espeak-ng
-                logger.warning(f"Kokoro falhou, tentando fallback: {kokoro_err}")
+                logger.warning(f"TTS principal falhou, tentando fallback: {kokoro_err}")
                 spd = shutil.which("spd-say") or shutil.which("espeak-ng")
                 if not spd:
                     raise kokoro_err

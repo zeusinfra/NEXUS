@@ -6,7 +6,9 @@ _LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
 _INLINE_CODE_RE = re.compile(r"`([^`]+)`")
 _PATH_RE = re.compile(r"(?<!\w)(?:[~./\w-]+/)+[\w.-]+")
 _FILE_RE = re.compile(
-    r"\b[\w-]+\.(?:py|rs|toml|md|json|yaml|yml|txt|sh|deb|service|sqlite3|log)\b", re.I
+    r"\b[\w-]+\.(?:py|rs|toml|md|json|yaml|yml|txt|sh|deb|service|sqlite3|"
+    r"log|lock|env|ini|cfg|conf|html|css|js|jsx|ts|tsx|go|sql|onnx|bin|wav|mp3)\b",
+    re.I,
 )
 
 _TERM_PRONUNCIATION = {
@@ -21,7 +23,7 @@ _TERM_PRONUNCIATION = {
     "SQLite": "S Q Lite",
     "Ollama": "Olama",
     "OpenAI": "Open A I",
-    "Docker": "Dóquer",
+    "Docker": "Docker",
     "Podman": "Podman",
     "systemd": "sístem D",
     "stdout": "standard out",
@@ -31,7 +33,7 @@ _TERM_PRONUNCIATION = {
     "TOML": "T O M L",
     "README": "read me",
     "Makefile": "make file",
-    "GitHub": "Guít Rãb",
+    "GitHub": "Git Hub",
     "Sentry": "Sêntri",
 }
 
@@ -43,12 +45,54 @@ _EXT_PRONUNCIATION = {
     "json": "J S O N",
     "yaml": "Y A M L",
     "yml": "Y A M L",
+    "lock": "lock file",
+    "env": "env file",
+    "ini": "I N I",
+    "cfg": "config",
+    "conf": "config",
+    "html": "H T M L",
+    "css": "C S S",
+    "js": "JavaScript",
+    "jsx": "J S X",
+    "ts": "TypeScript",
+    "tsx": "T S X",
+    "go": "Go",
+    "sql": "S Q L",
     "txt": "texto",
     "sh": "shell",
     "deb": "Debian package",
     "service": "serviço systemd",
     "sqlite3": "SQLite",
     "log": "log",
+    "onnx": "O N N X",
+    "bin": "binary",
+    "wav": "WAV",
+    "mp3": "MP3",
+}
+
+_IDENTIFIER_ACRONYMS = {
+    "api": "A P I",
+    "asr": "A S R",
+    "ci": "C I",
+    "cli": "C L I",
+    "cpu": "C P U",
+    "css": "C S S",
+    "db": "D B",
+    "gui": "G U I",
+    "html": "H T M L",
+    "http": "H T T P",
+    "https": "H T T P S",
+    "id": "I D",
+    "json": "J S O N",
+    "llm": "L L M",
+    "ram": "R A M",
+    "sql": "S Q L",
+    "sqlx": "S Q L X",
+    "tts": "T T S",
+    "ui": "U I",
+    "url": "U R L",
+    "uuid": "U U I D",
+    "yaml": "Y A M L",
 }
 
 
@@ -119,7 +163,7 @@ def _speak_code_token(value: str) -> str:
         return _speak_path(token)
     if _FILE_RE.fullmatch(token):
         return _speak_file(token)
-    return token.replace("_", " ").replace("-", " ")
+    return _speak_identifier(token)
 
 
 def _speak_path(value: str) -> str:
@@ -130,7 +174,7 @@ def _speak_path(value: str) -> str:
     if not parts:
         return path
     spoken_parts = [
-        _speak_file(part) if "." in part else part.replace("_", " ").replace("-", " ")
+        _speak_file(part) if "." in part else _speak_identifier(part)
         for part in parts[-3:]
     ]
     prefix = "caminho "
@@ -142,11 +186,32 @@ def _speak_path(value: str) -> str:
 def _speak_file(value: str) -> str:
     name = str(value or "").strip()
     if "." not in name:
-        return name.replace("_", " ").replace("-", " ")
+        return _speak_identifier(name)
     stem, ext = name.rsplit(".", 1)
-    stem = _TERM_PRONUNCIATION.get(stem, stem).replace("_", " ").replace("-", " ")
+    stem = _speak_identifier(_TERM_PRONUNCIATION.get(stem, stem))
     spoken_ext = _EXT_PRONUNCIATION.get(ext.lower(), ext)
     return f"arquivo {stem}, ponto {spoken_ext}"
+
+
+def _speak_identifier(value: str) -> str:
+    identifier = str(value or "").strip()
+    if not identifier:
+        return ""
+
+    exact = _TERM_PRONUNCIATION.get(identifier)
+    if exact:
+        return exact
+
+    identifier = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", identifier)
+    identifier = identifier.replace("_", " ").replace("-", " ")
+    words = []
+    for part in identifier.split():
+        lower = part.lower()
+        if lower in _IDENTIFIER_ACRONYMS:
+            words.append(_IDENTIFIER_ACRONYMS[lower])
+        else:
+            words.append(_TERM_PRONUNCIATION.get(part, part))
+    return " ".join(words)
 
 
 def _speak_model_names(text: str) -> str:

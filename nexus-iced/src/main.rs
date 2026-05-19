@@ -13,6 +13,8 @@ use rodio::{Decoder, OutputStream, Sink};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::io::Cursor;
 use std::path::PathBuf;
+use std::process::Command as StdCommand;
+use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 use sysinfo::System;
 use tokio::process::Command as TokioCommand;
@@ -36,6 +38,221 @@ mod design {
     pub const SUCCESS: Color = Color::from_rgb(0.260, 0.820, 0.580);
     pub const WARNING: Color = Color::from_rgb(0.900, 0.670, 0.300);
     pub const DANGER: Color = Color::from_rgb(0.900, 0.330, 0.390);
+}
+
+#[derive(Clone, Copy, Debug)]
+struct AdaptivePalette {
+    accent: Color,
+    accent_soft: Color,
+    cyan: Color,
+    petrol: Color,
+    purple: Color,
+}
+
+static ADAPTIVE_PALETTE: OnceLock<AdaptivePalette> = OnceLock::new();
+
+impl AdaptivePalette {
+    fn detect() -> Self {
+        let system_accent = detect_system_accent().unwrap_or(design::CYAN);
+        let accent = normalize_accent(system_accent);
+        Self {
+            accent,
+            accent_soft: mix(design::BACKGROUND, accent, 0.26),
+            cyan: mix(accent, Color::WHITE, 0.18),
+            petrol: mix(Color::from_rgb(0.018, 0.045, 0.058), accent, 0.30),
+            purple: mix(Color::from_rgb(0.58, 0.36, 0.94), accent, 0.45),
+        }
+    }
+}
+
+fn adaptive_palette() -> &'static AdaptivePalette {
+    ADAPTIVE_PALETTE.get_or_init(AdaptivePalette::detect)
+}
+
+fn accent() -> Color {
+    adaptive_palette().accent
+}
+
+fn accent_soft() -> Color {
+    adaptive_palette().accent_soft
+}
+
+fn cyan() -> Color {
+    adaptive_palette().cyan
+}
+
+fn petrol() -> Color {
+    adaptive_palette().petrol
+}
+
+fn purple() -> Color {
+    adaptive_palette().purple
+}
+
+fn detect_system_accent() -> Option<Color> {
+    std::env::var("NEXUS_SYSTEM_ACCENT_COLOR")
+        .ok()
+        .and_then(|value| parse_color(&value))
+        .or_else(detect_kde_accent)
+        .or_else(detect_gnome_accent)
+        .or_else(detect_gtk_accent)
+}
+
+fn detect_kde_accent() -> Option<Color> {
+    let home = std::env::var("HOME").ok()?;
+    let kdeglobals = std::fs::read_to_string(format!("{home}/.config/kdeglobals")).ok()?;
+    find_ini_value(&kdeglobals, "General", "AccentColor")
+        .or_else(|| find_ini_value(&kdeglobals, "Colors:Selection", "BackgroundNormal"))
+        .and_then(|value| parse_color(&value))
+}
+
+fn detect_gnome_accent() -> Option<Color> {
+    let output = StdCommand::new("gsettings")
+        .args(["get", "org.gnome.desktop.interface", "accent-color"])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let value = String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .trim_matches('\'')
+        .trim_matches('"')
+        .to_lowercase();
+    named_system_accent(&value)
+}
+
+fn detect_gtk_accent() -> Option<Color> {
+    let home = std::env::var("HOME").ok()?;
+    for path in [
+        format!("{home}/.config/gtk-4.0/settings.ini"),
+        format!("{home}/.config/gtk-3.0/settings.ini"),
+    ] {
+        let Ok(settings) = std::fs::read_to_string(path) else {
+            continue;
+        };
+        if let Some(value) = find_ini_value(&settings, "Settings", "gtk-accent-color") {
+            return parse_color(&value);
+        }
+        if let Some(theme) = find_ini_value(&settings, "Settings", "gtk-theme-name") {
+            if let Some(color) = named_system_accent(&theme.to_lowercase()) {
+                return Some(color);
+            }
+        }
+    }
+    None
+}
+
+fn find_ini_value(contents: &str, section: &str, key: &str) -> Option<String> {
+    let mut in_section = false;
+    for raw_line in contents.lines() {
+        let line = raw_line.trim();
+        if line.is_empty() || line.starts_with('#') || line.starts_with(';') {
+            continue;
+        }
+        if line.starts_with('[') && line.ends_with(']') {
+            in_section = &line[1..line.len() - 1] == section;
+            continue;
+        }
+        if !in_section {
+            continue;
+        }
+        if let Some((current_key, value)) = line.split_once('=') {
+            if current_key.trim() == key {
+                return Some(value.trim().to_string());
+            }
+        }
+    }
+    None
+}
+
+fn parse_color(value: &str) -> Option<Color> {
+    let value = value.trim().trim_matches('\'').trim_matches('"');
+    if let Some(hex) = value.strip_prefix('#') {
+        return parse_hex_color(hex);
+    }
+    if value.contains(',') {
+        let mut channels = value.split(',').filter_map(|part| {
+            part.trim()
+                .parse::<f32>()
+                .ok()
+                .map(|channel| (channel / 255.0).clamp(0.0, 1.0))
+        });
+        return Some(Color::from_rgb(
+            channels.next()?,
+            channels.next()?,
+            channels.next()?,
+        ));
+    }
+    named_system_accent(&value.to_lowercase())
+}
+
+fn parse_hex_color(hex: &str) -> Option<Color> {
+    let hex = hex.trim();
+    let expanded;
+    let hex = if hex.len() == 3 {
+        expanded = hex.chars().flat_map(|ch| [ch, ch]).collect::<String>();
+        expanded.as_str()
+    } else {
+        hex
+    };
+    if hex.len() < 6 {
+        return None;
+    }
+    let r = u8::from_str_radix(&hex[0..2], 16).ok()? as f32 / 255.0;
+    let g = u8::from_str_radix(&hex[2..4], 16).ok()? as f32 / 255.0;
+    let b = u8::from_str_radix(&hex[4..6], 16).ok()? as f32 / 255.0;
+    Some(Color::from_rgb(r, g, b))
+}
+
+fn named_system_accent(value: &str) -> Option<Color> {
+    let value = value.to_lowercase();
+    let color = if value.contains("purple") || value.contains("violet") {
+        Color::from_rgb8(155, 92, 246)
+    } else if value.contains("pink") || value.contains("rose") {
+        Color::from_rgb8(236, 72, 153)
+    } else if value.contains("red") {
+        Color::from_rgb8(239, 68, 68)
+    } else if value.contains("orange") || value.contains("yaru") {
+        Color::from_rgb8(249, 115, 22)
+    } else if value.contains("yellow") {
+        Color::from_rgb8(234, 179, 8)
+    } else if value.contains("green") || value.contains("mint") {
+        Color::from_rgb8(34, 197, 94)
+    } else if value.contains("teal") || value.contains("cyan") {
+        Color::from_rgb8(20, 184, 166)
+    } else if value.contains("slate") || value.contains("grey") || value.contains("gray") {
+        Color::from_rgb8(100, 116, 139)
+    } else if value.contains("blue") {
+        Color::from_rgb8(59, 130, 246)
+    } else {
+        return None;
+    };
+    Some(color)
+}
+
+fn normalize_accent(color: Color) -> Color {
+    let luminance = relative_luminance(color);
+    if luminance < 0.18 {
+        mix(color, Color::WHITE, 0.42)
+    } else if luminance > 0.78 {
+        mix(color, Color::BLACK, 0.24)
+    } else {
+        color
+    }
+}
+
+fn relative_luminance(color: Color) -> f32 {
+    0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b
+}
+
+fn mix(a: Color, b: Color, amount: f32) -> Color {
+    let t = amount.clamp(0.0, 1.0);
+    Color::from_rgb(
+        a.r + (b.r - a.r) * t,
+        a.g + (b.g - a.g) * t,
+        a.b + (b.b - a.b) * t,
+    )
 }
 
 pub fn main() -> iced::Result {
@@ -638,11 +855,6 @@ const STROKE: Color = design::STROKE;
 const TEXT_PRIMARY: Color = design::TEXT_PRIMARY;
 const TEXT_SECONDARY: Color = design::TEXT_SECONDARY;
 const TEXT_MUTED: Color = design::TEXT_MUTED;
-const ACCENT: Color = design::ACCENT;
-const ACCENT_SOFT: Color = design::ACCENT_SOFT;
-const CYAN: Color = design::CYAN;
-const PETROL: Color = design::PETROL;
-const PURPLE: Color = Color::from_rgb(0.58, 0.36, 0.94);
 const SUCCESS: Color = design::SUCCESS;
 const WARNING: Color = design::WARNING;
 const DANGER: Color = design::DANGER;
@@ -654,6 +866,7 @@ impl Application for NexusApp {
     type Flags = ();
 
     fn new(_flags: ()) -> (Self, Command<Message>) {
+        let _ = adaptive_palette();
         let mut system = System::new_all();
         system.refresh_all();
         (
@@ -1341,7 +1554,7 @@ impl Application for NexusApp {
                 } else {
                     "Pendente".to_string()
                 },
-                CYAN,
+                cyan(),
             ))
             .push(header_status_card(
                 "Cloud AI",
@@ -1351,7 +1564,7 @@ impl Application for NexusApp {
                 } else {
                     "Aguardando".to_string()
                 },
-                PURPLE,
+                purple(),
             ))
             .push(header_status_card(
                 "Modo",
@@ -1361,7 +1574,7 @@ impl Application for NexusApp {
                 } else {
                     "Operador".to_string()
                 },
-                PURPLE,
+                purple(),
             ));
 
         let title_block = Column::new()
@@ -1417,7 +1630,7 @@ impl Application for NexusApp {
         let footer_content: Element<'_, Message> = if breakpoint.is_mobile() {
             Column::new()
                 .spacing(6)
-                .push(text("HUD").size(11).style(ACCENT))
+                .push(text("HUD").size(11).style(accent()))
                 .push(text(self.hud_line()).size(11).style(TEXT_SECONDARY))
                 .push(
                     text(format!(
@@ -1436,7 +1649,7 @@ impl Application for NexusApp {
             Row::new()
                 .spacing(16)
                 .align_items(Alignment::Center)
-                .push(text("HUD:").size(12).style(ACCENT).width(48))
+                .push(text("HUD:").size(12).style(accent()).width(48))
                 .push(text(self.hud_line()).size(12).style(TEXT_SECONDARY))
                 .push(Space::with_width(Length::Fill))
                 .push(
@@ -1489,7 +1702,16 @@ impl Application for NexusApp {
     }
 
     fn theme(&self) -> Theme {
-        Theme::Dark
+        Theme::custom(
+            "NEXUS System".to_string(),
+            iced::theme::Palette {
+                background: BG,
+                text: TEXT_PRIMARY,
+                primary: accent(),
+                success: SUCCESS,
+                danger: DANGER,
+            },
+        )
     }
 }
 
@@ -1610,7 +1832,7 @@ impl NexusApp {
                     .spacing(12)
                     .align_items(Alignment::Center)
                     .push(
-                        container(text("N").size(23).style(CYAN))
+                        container(text("N").size(23).style(cyan()))
                             .padding(10)
                             .style(brand_mark_style),
                     )
@@ -1660,8 +1882,8 @@ impl NexusApp {
                         Row::new()
                             .spacing(9)
                             .align_items(Alignment::Center)
-                            .push(icon(NexusIcon::Sparkle, 18, CYAN))
-                            .push(text("NEXUS Pro").size(14).style(CYAN)),
+                            .push(icon(NexusIcon::Sparkle, 18, cyan()))
+                            .push(text("NEXUS Pro").size(14).style(cyan())),
                     )
                     .push(
                         text("Seu assistente inteligente sempre pronto para ajudar.")
@@ -1852,7 +2074,7 @@ impl NexusApp {
                     Column::new()
                         .spacing(14)
                         .width(Length::Fill)
-                        .push(text("MISSÃO ATIVA").size(10).style(ACCENT))
+                        .push(text("MISSÃO ATIVA").size(10).style(accent()))
                         .push(text(goal).size(24).style(TEXT_PRIMARY))
                         .push(
                             text("Garantir integração, estabilidade e segurança antes da liberação para produção.")
@@ -1892,7 +2114,7 @@ impl NexusApp {
                                     .push(mission_fact(
                                         "Responsável",
                                         role_display_name(active_step).to_string(),
-                                        ACCENT,
+                                        accent(),
                                     ))
                                     .push(mission_fact("Iniciado em", started_at, TEXT_SECONDARY)),
                             )
@@ -1936,13 +2158,13 @@ impl NexusApp {
                             "Local AI",
                             trim_text(local, 18),
                             "Rápida · Privada · Offline",
-                            CYAN,
+                            cyan(),
                         ))
                         .push(ai_route_card(
                             "Cloud AI",
                             trim_text(cloud, 18),
                             "Raciocínio avançado · Estratégica",
-                            PURPLE,
+                            purple(),
                         )),
                 )
                 .push(
@@ -1950,7 +2172,7 @@ impl NexusApp {
                         Row::new()
                             .spacing(8)
                             .align_items(Alignment::Center)
-                            .push(text("⌘").size(14).style(PURPLE))
+                            .push(text("⌘").size(14).style(purple()))
                             .push(
                                 text(format!("Modo atual: {}", mode))
                                     .size(11)
@@ -2120,7 +2342,7 @@ impl NexusApp {
                     Row::new()
                         .push(text("EQUIPE COGNITIVA").size(12).style(TEXT_PRIMARY))
                         .push(Space::with_width(Length::Fill))
-                        .push(text("Ver todos").size(10).style(ACCENT)),
+                        .push(text("Ver todos").size(10).style(accent())),
                 )
                 .push(list),
         )
@@ -2190,7 +2412,7 @@ impl NexusApp {
                     Row::new()
                         .push(text("INCIDENTES").size(12).style(TEXT_PRIMARY))
                         .push(Space::with_width(Length::Fill))
-                        .push(text("Ver todos").size(10).style(ACCENT)),
+                        .push(text("Ver todos").size(10).style(accent())),
                 )
                 .push(content),
         )
@@ -2228,7 +2450,7 @@ impl NexusApp {
                     Row::new()
                         .push(text("ATIVIDADE RECENTE").size(12).style(TEXT_PRIMARY))
                         .push(Space::with_width(Length::Fill))
-                        .push(text("Ver todas").size(10).style(ACCENT)),
+                        .push(text("Ver todas").size(10).style(accent())),
                 )
                 .push(activity),
         )
@@ -2252,8 +2474,18 @@ impl NexusApp {
         let points = Row::new()
             .spacing(20)
             .align_items(Alignment::Center)
-            .push(timeline_point(&command_time, "Missão", "iniciada", ACCENT))
-            .push(timeline_point("agora", "Planner", "organizou etapas", CYAN))
+            .push(timeline_point(
+                &command_time,
+                "Missão",
+                "iniciada",
+                accent(),
+            ))
+            .push(timeline_point(
+                "agora",
+                "Planner",
+                "organizou etapas",
+                cyan(),
+            ))
             .push(timeline_point("agora", "Execução", "realizada", WARNING))
             .push(timeline_point(
                 &verification_time,
@@ -2368,7 +2600,7 @@ impl NexusApp {
                         .size(14)
                         .style(TEXT_PRIMARY),
                 )
-                .push(icon(NexusIcon::ChevronDown, 14, CYAN)),
+                .push(icon(NexusIcon::ChevronDown, 14, cyan())),
         )
         .padding([9, 15])
         .style(chat_status_pill_style);
@@ -2436,7 +2668,7 @@ impl NexusApp {
                     .spacing(18)
                     .align_items(Alignment::Center)
                     .push(
-                        container(text("N").size(logo_size).style(CYAN))
+                        container(text("N").size(logo_size).style(cyan()))
                             .padding(if self.breakpoint().is_mobile() { 17 } else { 22 })
                             .style(chat_logo_style),
                     )
@@ -2588,7 +2820,7 @@ impl NexusApp {
     fn message_thread(&self) -> Element<'_, Message> {
         let mut messages = Column::new().spacing(18).width(self.chat_stage_length());
 
-        for msg in self.messages.iter().rev().take(8).rev() {
+        for msg in &self.messages {
             messages = messages.push(chat_message_row(
                 msg,
                 self.breakpoint().is_tablet_or_smaller(),
@@ -2694,7 +2926,7 @@ impl NexusApp {
         let activity = if self.is_thinking {
             ("Alta", "Processando pedido", WARNING)
         } else if self.active_operations_count() > 0 {
-            ("Média", "Operação em andamento", ACCENT)
+            ("Média", "Operação em andamento", accent())
         } else {
             ("Baixa", "Tudo tranquilo", SUCCESS)
         };
@@ -2707,7 +2939,7 @@ impl NexusApp {
                     container(
                         text(if healthy { "✓" } else { "!" })
                             .size(42)
-                            .style(if healthy { CYAN } else { WARNING }),
+                            .style(if healthy { cyan() } else { WARNING }),
                     )
                     .padding(20)
                     .style(nexus_status_icon_style),
@@ -2744,7 +2976,7 @@ impl NexusApp {
                             "Desempenho",
                             performance_label(self.cpu_usage),
                             "Sistema responsivo",
-                            ACCENT,
+                            accent(),
                         ))
                         .push(container(Space::new(1, 72)).style(vertical_divider_style))
                         .push(nexus_summary_metric(
@@ -2752,7 +2984,7 @@ impl NexusApp {
                             "Memória",
                             format!("{:.0}%", self.ram_usage),
                             "Uso equilibrado",
-                            PURPLE,
+                            purple(),
                         ))
                         .push(container(Space::new(1, 72)).style(vertical_divider_style))
                         .push(nexus_summary_metric(
@@ -2789,7 +3021,7 @@ impl NexusApp {
                 .spacing(22)
                 .align_items(Alignment::Center)
                 .push(
-                    container(text("✦").size(34).style(CYAN))
+                    container(text("✦").size(34).style(cyan()))
                         .padding(22)
                         .style(nexus_status_icon_style),
                 )
@@ -2801,7 +3033,7 @@ impl NexusApp {
                                 .size(18)
                                 .style(TEXT_PRIMARY),
                         )
-                        .push(text(action).size(24).style(CYAN))
+                        .push(text(action).size(24).style(cyan()))
                         .push(text(detail).size(14).style(TEXT_SECONDARY)),
                 ),
         )
@@ -2856,8 +3088,8 @@ impl NexusApp {
                     Row::new()
                         .align_items(Alignment::Center)
                         .push(Space::with_width(Length::Fill))
-                        .push(text("Ver mais atualizações").size(13).style(CYAN))
-                        .push(text("  >").size(15).style(CYAN))
+                        .push(text("Ver mais atualizações").size(13).style(cyan()))
+                        .push(text("  >").size(15).style(cyan()))
                         .push(Space::with_width(Length::Fill)),
                 ),
         )
@@ -2878,7 +3110,7 @@ impl NexusApp {
                         .push(
                             text(if is_operator { "Você" } else { "NEXUS" })
                                 .size(11)
-                                .style(if is_operator { WARNING } else { CYAN }),
+                                .style(if is_operator { WARNING } else { cyan() }),
                         )
                         .push(
                             text(trim_text(&msg.content, 240))
@@ -2902,7 +3134,7 @@ impl NexusApp {
                     .spacing(16)
                     .align_items(Alignment::Center)
                     .push(
-                        container(icon(NexusIcon::Message, 36, CYAN))
+                        container(icon(NexusIcon::Message, 36, cyan()))
                             .padding(24)
                             .style(nexus_status_icon_style),
                     )
@@ -2990,7 +3222,7 @@ impl NexusApp {
         container(
             Column::new()
                 .spacing(10)
-                .push(text("NEXUS SYSTEMS").size(13).style(CYAN))
+                .push(text("NEXUS SYSTEMS").size(13).style(cyan()))
                 .push(hud_metric_tile(
                     "CORE",
                     daemon,
@@ -3000,7 +3232,7 @@ impl NexusApp {
                         DANGER
                     },
                 ))
-                .push(hud_meter_tile("CPU LOAD", self.cpu_usage, ACCENT))
+                .push(hud_meter_tile("CPU LOAD", self.cpu_usage, accent()))
                 .push(hud_meter_tile("MEMORY", self.ram_usage, WARNING))
                 .push(hud_metric_tile("RUNTIME", runtime, TEXT_SECONDARY))
                 .push(hud_metric_tile(
@@ -3041,7 +3273,7 @@ impl NexusApp {
                 .spacing(8)
                 .align_items(Alignment::Center)
                 .push(text(pulse).size(34).style(TEXT_PRIMARY))
-                .push(text("COGNITIVE OS").size(12).style(CYAN))
+                .push(text("COGNITIVE OS").size(12).style(cyan()))
                 .push(text(active.to_uppercase()).size(11).style(SUCCESS)),
         )
         .padding(core_padding)
@@ -3067,7 +3299,7 @@ impl NexusApp {
                                     .push(hud_orbit_chip(
                                         "CPU",
                                         format!("{:.0}%", self.cpu_usage),
-                                        ACCENT,
+                                        accent(),
                                     ))
                                     .push(hud_orbit_chip(
                                         "RAM",
@@ -3113,7 +3345,7 @@ impl NexusApp {
                                 .push(
                                     text(if is_operator { "OPERATOR" } else { "NEXUS" })
                                         .size(10)
-                                        .style(if is_operator { WARNING } else { CYAN }),
+                                        .style(if is_operator { WARNING } else { cyan() }),
                                 )
                                 .push(text(&msg.timestamp).size(9).style(TEXT_MUTED)),
                         )
@@ -3138,7 +3370,7 @@ impl NexusApp {
                 container(
                     Column::new()
                         .spacing(4)
-                        .push(text("PROCESSANDO").size(10).style(CYAN))
+                        .push(text("PROCESSANDO").size(10).style(cyan()))
                         .push(text(self.processing_stage()).size(11).style(TEXT_SECONDARY)),
                 )
                 .padding(10)
@@ -3176,7 +3408,7 @@ impl NexusApp {
                 .push(
                     Row::new()
                         .align_items(Alignment::Center)
-                        .push(text("COMMAND LINK").size(13).style(CYAN))
+                        .push(text("COMMAND LINK").size(13).style(cyan()))
                         .push(Space::with_width(Length::Fill))
                         .push(
                             text(if self.is_thinking { "BUSY" } else { "READY" })
@@ -3257,7 +3489,7 @@ impl NexusApp {
                         Column::new()
                             .spacing(5)
                             .push(text("Último feedback").size(10).style(TEXT_MUTED))
-                            .push(text(feedback_status).size(12).style(ACCENT))
+                            .push(text(feedback_status).size(12).style(accent()))
                             .push(text(feedback_hint).size(10).style(TEXT_SECONDARY)),
                     )
                     .padding(10)
@@ -3267,12 +3499,12 @@ impl NexusApp {
                 .push(guidance_card(
                     "Analisar",
                     "Entender erro, revisar ideia, explicar risco.",
-                    ACCENT,
+                    accent(),
                 ))
                 .push(guidance_card(
                     "Modificar",
                     "Alterar arquivos e mostrar o que mudou.",
-                    PURPLE,
+                    purple(),
                 ))
                 .push(guidance_card(
                     "Executar",
@@ -3322,7 +3554,7 @@ impl NexusApp {
                         .spacing(10)
                         .push(status_badge(&daemon))
                         .push(status_badge("hybrid"))
-                        .push(text(format!("Local AI: {}", trim_text(local, 24))).size(11).style(ACCENT)),
+                        .push(text(format!("Local AI: {}", trim_text(local, 24))).size(11).style(accent())),
                 )
                 .push(
                     Row::new()
@@ -3385,7 +3617,7 @@ impl NexusApp {
                 "Missão",
                 mission,
                 "O que o NEXUS está tentando resolver.",
-                ACCENT,
+                accent(),
             ))
             .push(simple_card(
                 "Aprovações",
@@ -3403,7 +3635,7 @@ impl NexusApp {
                 "IA local",
                 trim_text(&local, 28),
                 "Rápida, privada e offline quando possível.",
-                ACCENT,
+                accent(),
             ))
             .push(simple_card(
                 "IA cloud",
@@ -3437,7 +3669,7 @@ impl NexusApp {
                         .push(
                             text(if is_operator { "Você" } else { "NEXUS" })
                                 .size(11)
-                                .style(if is_operator { WARNING } else { ACCENT }),
+                                .style(if is_operator { WARNING } else { accent() }),
                         )
                         .push(text(&msg.timestamp).size(9).style(TEXT_MUTED)),
                 )
@@ -3482,7 +3714,7 @@ impl NexusApp {
                 container(
                     Column::new()
                         .spacing(6)
-                        .push(text("NEXUS está trabalhando").size(11).style(ACCENT))
+                        .push(text("NEXUS está trabalhando").size(11).style(accent()))
                         .push(text(self.processing_stage()).size(12).style(TEXT_SECONDARY))
                         .push(text("Ele só deve declarar alteração real quando houver evidência ou execução registrada.").size(10).style(TEXT_MUTED)),
                 )
@@ -3628,7 +3860,7 @@ impl NexusApp {
                     container(
                         Column::new()
                             .spacing(8)
-                            .push(text("Foco atual").size(13).style(CYAN))
+                            .push(text("Foco atual").size(13).style(cyan()))
                             .push(text(mission).size(22).style(TEXT_PRIMARY))
                             .push(
                                 text("Tudo que exige detalhes técnicos fica disponível apenas no modo desenvolvedor.")
@@ -3828,7 +4060,7 @@ impl NexusApp {
                 "Anexos e voz",
                 "Entrada pronta para arquivos e comandos por voz",
                 "Disponível",
-                CYAN,
+                cyan(),
             ))
             .push(settings_item(
                 "Privacidade",
@@ -3941,7 +4173,7 @@ impl NexusApp {
     ) -> Element<'_, Message> {
         let row = Row::new()
             .spacing(10)
-            .push(role_summary_card(label_a, text_a, ACCENT))
+            .push(role_summary_card(label_a, text_a, accent()))
             .push(role_summary_card(label_b, text_b, WARNING))
             .push(role_summary_card(label_c, text_c, SUCCESS));
         if self.breakpoint().is_mobile() {
@@ -3974,7 +4206,7 @@ impl NexusApp {
                     .push(
                         text(format!("{} · {}", msg.role, msg.timestamp))
                             .size(10)
-                            .style(if is_operator { WARNING } else { ACCENT }),
+                            .style(if is_operator { WARNING } else { accent() }),
                     )
                     .push(
                         container(
@@ -3999,7 +4231,7 @@ impl NexusApp {
 
         if self.is_thinking {
             response_col = response_col.push(
-                container(text(self.processing_stage()).size(12).style(ACCENT))
+                container(text(self.processing_stage()).size(12).style(accent()))
                     .padding(10)
                     .width(Length::Fill)
                     .style(progress_bubble_modern),
@@ -4264,7 +4496,7 @@ impl NexusApp {
         let row = Row::new()
             .spacing(10)
             .push(overview_chip("Sistema", daemon, SUCCESS))
-            .push(overview_chip("LLM local", trim_text(local, 22), ACCENT))
+            .push(overview_chip("LLM local", trim_text(local, 22), accent()))
             .push(overview_chip("LLM cloud", cloud, WARNING))
             .push(overview_chip("Instalacao", install, TEXT_SECONDARY));
 
@@ -4293,7 +4525,7 @@ impl NexusApp {
                                     .unwrap_or("GUARDED"),
                             )
                             .size(11)
-                            .style(ACCENT),
+                            .style(accent()),
                         ),
                 )
                 .push(chips),
@@ -4368,7 +4600,7 @@ impl NexusApp {
             .push(runtime_line(
                 "Roteamento",
                 &self.hybrid_routing_line(),
-                ACCENT,
+                accent(),
             ))
             .into()
     }
@@ -4422,7 +4654,7 @@ impl NexusApp {
                 row = row.push(icon(
                     NexusIcon::ChevronRight,
                     16,
-                    if is_active { SUCCESS } else { ACCENT },
+                    if is_active { SUCCESS } else { accent() },
                 ));
             }
         }
@@ -4694,13 +4926,13 @@ impl NexusApp {
                                     .push(
                                         text(format!("progresso {}", task_progress(&lifecycle)))
                                             .size(10)
-                                            .style(ACCENT),
+                                            .style(accent()),
                                     )
                             } else {
                                 Row::new().spacing(10).push(
                                     text(format!("progresso {}", task_progress(&lifecycle)))
                                         .size(10)
-                                        .style(ACCENT),
+                                        .style(accent()),
                                 )
                             })
                             .push(
@@ -4766,7 +4998,7 @@ impl NexusApp {
                     .push(
                         text(role_display_name(&agent.role).to_uppercase())
                             .size(12)
-                            .style(ACCENT),
+                            .style(accent()),
                     )
                     .push(Space::with_width(Length::Fill))
                     .push(status_badge(&friendly_status(&agent.status))),
@@ -4958,7 +5190,7 @@ impl NexusApp {
                         .push(
                             text(format!("{} · {}", entry.kind, entry.scope))
                                 .size(10)
-                                .style(ACCENT),
+                                .style(accent()),
                         )
                         .push(
                             text(trim_text(&entry.content, 120))
@@ -5421,7 +5653,7 @@ impl NexusApp {
             .push(
                 Row::new()
                     .align_items(Alignment::Center)
-                    .push(text(label).size(11).style(ACCENT))
+                    .push(text(label).size(11).style(accent()))
                     .push(Space::with_width(Length::Fill))
                     .push(
                         text(friendly_risk(&approval.risk))
@@ -5502,7 +5734,7 @@ fn section_block<'a>(title: &'static str, body: Column<'a, Message>) -> Element<
                 Row::new()
                     .spacing(10)
                     .align_items(Alignment::Center)
-                    .push(text(route_icon_for_title(title)).size(16).style(CYAN))
+                    .push(text(route_icon_for_title(title)).size(16).style(cyan()))
                     .push(text(title).size(13).style(TEXT_PRIMARY)),
             )
             .push(body),
@@ -5519,7 +5751,7 @@ fn page_header<'a>(title: &'static str, subtitle: &'static str) -> Element<'a, M
             .spacing(16)
             .align_items(Alignment::Center)
             .push(
-                container(text(route_icon_for_title(title)).size(28).style(CYAN))
+                container(text(route_icon_for_title(title)).size(28).style(cyan()))
                     .padding(12)
                     .style(nexus_metric_icon_style),
             )
@@ -5538,8 +5770,8 @@ fn page_header<'a>(title: &'static str, subtitle: &'static str) -> Element<'a, M
 fn prompt_mode_row<'a>() -> Element<'a, Message> {
     Row::new()
         .spacing(8)
-        .push(prompt_chip("Análise", "entender e explicar", ACCENT))
-        .push(prompt_chip("Modificação", "mudar com evidência", PURPLE))
+        .push(prompt_chip("Análise", "entender e explicar", accent()))
+        .push(prompt_chip("Modificação", "mudar com evidência", purple()))
         .push(prompt_chip("Execução", "rodar e verificar", WARNING))
         .into()
 }
@@ -5742,7 +5974,7 @@ fn feedback_card<'a>(feedback: &'a ChatFeedback) -> Element<'a, Message> {
                 Row::new()
                     .spacing(8)
                     .align_items(Alignment::Center)
-                    .push(text(&feedback.intent_label).size(10).style(ACCENT))
+                    .push(text(&feedback.intent_label).size(10).style(accent()))
                     .push(text("·").size(10).style(TEXT_MUTED))
                     .push(text(&feedback.status_label).size(10).style(SUCCESS))
                     .push(Space::with_width(Length::Fill))
@@ -5953,7 +6185,7 @@ fn timeline_point<'a>(
 
 fn activity_color(level: &ActivityLevel) -> Color {
     match level {
-        ActivityLevel::Info => ACCENT,
+        ActivityLevel::Info => accent(),
         ActivityLevel::Success => SUCCESS,
         ActivityLevel::Warning => WARNING,
         ActivityLevel::Error => DANGER,
@@ -6105,7 +6337,7 @@ fn runtime_line<'a>(label: &str, value: &str, color: Color) -> Row<'a, Message> 
             text(label.to_string())
                 .size(10)
                 .width(Length::Fixed(92.0))
-                .style(ACCENT),
+                .style(accent()),
         )
         .push(
             text(value.to_string())
@@ -6129,7 +6361,7 @@ fn soft_meter<'a>(label: &'static str, value: f32, hint: &'static str) -> Elemen
     let color = if clamped > 78.0 {
         WARNING
     } else if clamped > 48.0 {
-        ACCENT
+        accent()
     } else {
         SUCCESS
     };
@@ -6167,7 +6399,7 @@ fn soft_meter<'a>(label: &'static str, value: f32, hint: &'static str) -> Elemen
 fn status_color(status: &str) -> Color {
     match status.to_ascii_lowercase().as_str() {
         "completed" | "executed" | "passed" | "done" | "success" => SUCCESS,
-        "running" | "assigned" | "planning" | "verifying" | "ready" => ACCENT,
+        "running" | "assigned" | "planning" | "verifying" | "ready" => accent(),
         "approval_pending" | "pending_approval" | "blocked" | "rollback" => WARNING,
         "failed" | "error" | "offline" => DANGER,
         _ => TEXT_MUTED,
@@ -6187,7 +6419,7 @@ fn severity_color(severity: &str) -> Color {
     match severity.to_ascii_lowercase().as_str() {
         "critical" | "error" | "high" => DANGER,
         "warning" | "medium" => WARNING,
-        _ => ACCENT,
+        _ => accent(),
     }
 }
 
@@ -6591,13 +6823,17 @@ fn sidebar_item<'a>(
             .spacing(12)
             .align_items(Alignment::Center)
             .push(
-                container(icon(icon_kind, 18, if active { CYAN } else { TEXT_MUTED }))
-                    .padding(9)
-                    .style(if active {
-                        nexus_metric_icon_style
-                    } else {
-                        nexus_update_icon_style
-                    }),
+                container(icon(
+                    icon_kind,
+                    18,
+                    if active { cyan() } else { TEXT_MUTED },
+                ))
+                .padding(9)
+                .style(if active {
+                    nexus_metric_icon_style
+                } else {
+                    nexus_update_icon_style
+                }),
             )
             .push(
                 text(label)
@@ -6631,7 +6867,7 @@ fn prompt_card<'a>(
         Column::new()
             .spacing(14)
             .push(
-                container(icon(icon_kind, 22, CYAN))
+                container(icon(icon_kind, 22, cyan()))
                     .padding(9)
                     .style(prompt_icon_style),
             )
@@ -6660,7 +6896,7 @@ fn premium_task_item<'a>(
             .spacing(14)
             .align_items(Alignment::Center)
             .push(
-                container(icon(NexusIcon::Check, 16, CYAN))
+                container(icon(NexusIcon::Check, 16, cyan()))
                     .padding(10)
                     .style(prompt_icon_style),
             )
@@ -6672,7 +6908,7 @@ fn premium_task_item<'a>(
             )
             .push(Space::with_width(Length::Fill))
             .push(
-                container(text(status.into()).size(12).style(CYAN))
+                container(text(status.into()).size(12).style(cyan()))
                     .padding([8, 12])
                     .style(chat_status_pill_style),
             ),
@@ -6715,12 +6951,12 @@ fn chat_message_row<'a>(msg: &'a ChatMessage, compact: bool) -> Element<'a, Mess
     let bubble_width = if compact {
         Length::Fill
     } else if is_operator {
-        Length::Fixed(430.0)
+        Length::Fixed(620.0)
     } else {
-        Length::Fixed(480.0)
+        Length::Fixed(720.0)
     };
 
-    let content = trim_text(&msg.content, if compact { 420 } else { 620 });
+    let content = chat_display_content(&msg.content, compact);
     let bubble_style: fn(&Theme) -> container::Appearance = if is_error {
         error_bubble_modern
     } else if is_operator {
@@ -6732,6 +6968,7 @@ fn chat_message_row<'a>(msg: &'a ChatMessage, compact: bool) -> Element<'a, Mess
     let bubble = container(
         text(content)
             .size(15)
+            .line_height(iced::widget::text::LineHeight::Relative(1.42))
             .style(TEXT_PRIMARY)
             .width(Length::Fill),
     )
@@ -6744,7 +6981,7 @@ fn chat_message_row<'a>(msg: &'a ChatMessage, compact: bool) -> Element<'a, Mess
             .spacing(6)
             .align_items(Alignment::End)
             .push(bubble)
-            .push(text(format!("{} ✓✓", msg.timestamp)).size(12).style(CYAN));
+            .push(text(format!("{} ✓✓", msg.timestamp)).size(12).style(cyan()));
 
         if compact {
             Row::new()
@@ -6760,7 +6997,7 @@ fn chat_message_row<'a>(msg: &'a ChatMessage, compact: bool) -> Element<'a, Mess
                 .into()
         }
     } else {
-        let avatar = container(text("N").size(18).style(CYAN))
+        let avatar = container(text("N").size(18).style(cyan()))
             .padding(8)
             .style(chat_message_avatar_style);
         let stack = Column::new()
@@ -6796,13 +7033,13 @@ fn thinking_message_row<'a>(tick_counter: u32, compact: bool) -> Element<'a, Mes
         2 => "..",
         _ => "...",
     };
-    let avatar = container(text("N").size(18).style(CYAN))
+    let avatar = container(text("N").size(18).style(cyan()))
         .padding(8)
         .style(chat_message_avatar_style);
     let bubble = container(
         Column::new()
             .spacing(10)
-            .push(text(format!("Pensando{}", dots)).size(14).style(CYAN))
+            .push(text(format!("Pensando{}", dots)).size(14).style(cyan()))
             .push(
                 Row::new()
                     .spacing(6)
@@ -6831,6 +7068,38 @@ fn thinking_message_row<'a>(tick_counter: u32, compact: bool) -> Element<'a, Mes
             Space::with_width(Length::Fill)
         })
         .into()
+}
+
+fn chat_display_content(value: &str, compact: bool) -> String {
+    let max_token = if compact { 34 } else { 58 };
+    let normalized = value.replace('\t', "    ");
+    let mut output = String::with_capacity(normalized.len());
+    let mut token_len = 0usize;
+
+    for ch in normalized.chars() {
+        if ch == '\n' {
+            output.push(ch);
+            token_len = 0;
+            continue;
+        }
+
+        if ch.is_whitespace() {
+            output.push(ch);
+            token_len = 0;
+            continue;
+        }
+
+        output.push(ch);
+        token_len += 1;
+
+        let soft_boundary = matches!(ch, '/' | '\\' | '_' | '-' | '.' | ':' | '?' | '&' | '=');
+        if (token_len >= max_token && soft_boundary) || token_len >= max_token + 14 {
+            output.push('\n');
+            token_len = 0;
+        }
+    }
+
+    output
 }
 
 fn current_time() -> String {
@@ -6984,7 +7253,7 @@ impl IconButtonStyle {
         match self.kind {
             IconButtonKind::Primary => TEXT_PRIMARY,
             IconButtonKind::Subtle => TEXT_SECONDARY,
-            IconButtonKind::Flat => CYAN,
+            IconButtonKind::Flat => cyan(),
         }
     }
 }
@@ -6995,10 +7264,10 @@ impl button::StyleSheet for IconButtonStyle {
     fn active(&self, _style: &Self::Style) -> button::Appearance {
         match self.kind {
             IconButtonKind::Primary => button::Appearance {
-                background: Some(Color::from_rgb(0.160, 0.760, 0.840).into()),
+                background: Some(accent().into()),
                 text_color: TEXT_PRIMARY,
                 border: Border {
-                    color: Color::from_rgb(0.250, 0.900, 0.980),
+                    color: cyan(),
                     width: 1.0,
                     radius: 100.0.into(),
                 },
@@ -7016,7 +7285,7 @@ impl button::StyleSheet for IconButtonStyle {
             },
             IconButtonKind::Flat => button::Appearance {
                 background: Some(Color::TRANSPARENT.into()),
-                text_color: CYAN,
+                text_color: cyan(),
                 border: Border {
                     color: Color::TRANSPARENT,
                     width: 1.0,
@@ -7030,20 +7299,20 @@ impl button::StyleSheet for IconButtonStyle {
     fn hovered(&self, _style: &Self::Style) -> button::Appearance {
         match self.kind {
             IconButtonKind::Primary => button::Appearance {
-                background: Some(Color::from_rgb(0.210, 0.850, 0.920).into()),
+                background: Some(mix(accent(), Color::WHITE, 0.16).into()),
                 text_color: TEXT_PRIMARY,
                 border: Border {
-                    color: Color::from_rgb(0.500, 0.960, 1.000),
+                    color: mix(cyan(), Color::WHITE, 0.24),
                     width: 1.0,
                     radius: 100.0.into(),
                 },
                 ..Default::default()
             },
             IconButtonKind::Subtle | IconButtonKind::Flat => button::Appearance {
-                background: Some(Color::from_rgb(0.036, 0.056, 0.070).into()),
-                text_color: CYAN,
+                background: Some(mix(Color::from_rgb(0.030, 0.040, 0.054), accent(), 0.16).into()),
+                text_color: cyan(),
                 border: Border {
-                    color: Color::from_rgb(0.070, 0.220, 0.260),
+                    color: mix(STROKE, accent(), 0.42),
                     width: 1.0,
                     radius: 100.0.into(),
                 },
@@ -7078,7 +7347,7 @@ impl button::StyleSheet for SidebarButtonStyle {
         button::Appearance {
             background: Some(
                 if self.active {
-                    Color::from_rgb(0.020, 0.060, 0.075)
+                    mix(Color::from_rgb(0.018, 0.026, 0.036), accent(), 0.18)
                 } else {
                     Color::TRANSPARENT
                 }
@@ -7091,7 +7360,7 @@ impl button::StyleSheet for SidebarButtonStyle {
             },
             border: Border {
                 color: if self.active {
-                    Color::from_rgb(0.050, 0.310, 0.365)
+                    mix(STROKE, accent(), 0.62)
                 } else {
                     Color::TRANSPARENT
                 },
@@ -7104,10 +7373,10 @@ impl button::StyleSheet for SidebarButtonStyle {
 
     fn hovered(&self, _style: &Self::Style) -> button::Appearance {
         button::Appearance {
-            background: Some(Color::from_rgb(0.018, 0.050, 0.064).into()),
+            background: Some(mix(Color::from_rgb(0.018, 0.026, 0.036), accent(), 0.13).into()),
             text_color: TEXT_PRIMARY,
             border: Border {
-                color: Color::from_rgb(0.040, 0.230, 0.280),
+                color: mix(STROKE, accent(), 0.45),
                 width: 1.0,
                 radius: 8.0.into(),
             },
@@ -7124,10 +7393,10 @@ impl button::StyleSheet for PrimaryActionButtonStyle {
 
     fn active(&self, _style: &Self::Style) -> button::Appearance {
         button::Appearance {
-            background: Some(ACCENT.into()),
+            background: Some(accent().into()),
             text_color: Color::WHITE,
             border: Border {
-                color: Color::from_rgb(0.34, 0.65, 1.0),
+                color: cyan(),
                 width: 1.0,
                 radius: 7.0.into(),
             },
@@ -7137,10 +7406,10 @@ impl button::StyleSheet for PrimaryActionButtonStyle {
 
     fn hovered(&self, _style: &Self::Style) -> button::Appearance {
         button::Appearance {
-            background: Some(Color::from_rgb(0.27, 0.62, 1.0).into()),
+            background: Some(mix(accent(), Color::WHITE, 0.14).into()),
             text_color: Color::WHITE,
             border: Border {
-                color: Color::from_rgb(0.50, 0.76, 1.0),
+                color: mix(cyan(), Color::WHITE, 0.20),
                 width: 1.0,
                 radius: 7.0.into(),
             },
@@ -7183,10 +7452,10 @@ impl button::StyleSheet for SuggestionButtonStyle {
 
     fn hovered(&self, _style: &Self::Style) -> button::Appearance {
         button::Appearance {
-            background: Some(Color::from_rgb(0.045, 0.064, 0.082).into()),
+            background: Some(mix(Color::from_rgb(0.040, 0.052, 0.066), accent(), 0.10).into()),
             text_color: TEXT_PRIMARY,
             border: Border {
-                color: Color::from_rgb(0.075, 0.340, 0.395),
+                color: mix(STROKE, accent(), 0.55),
                 width: 1.0,
                 radius: 8.0.into(),
             },
@@ -7203,10 +7472,10 @@ impl button::StyleSheet for RoundSendButtonStyle {
 
     fn active(&self, _style: &Self::Style) -> button::Appearance {
         button::Appearance {
-            background: Some(Color::from_rgb(0.160, 0.760, 0.840).into()),
+            background: Some(accent().into()),
             text_color: Color::WHITE,
             border: Border {
-                color: Color::from_rgb(0.250, 0.900, 0.980),
+                color: cyan(),
                 width: 1.0,
                 radius: 100.0.into(),
             },
@@ -7216,10 +7485,10 @@ impl button::StyleSheet for RoundSendButtonStyle {
 
     fn hovered(&self, _style: &Self::Style) -> button::Appearance {
         button::Appearance {
-            background: Some(Color::from_rgb(0.210, 0.850, 0.920).into()),
+            background: Some(mix(accent(), Color::WHITE, 0.16).into()),
             text_color: Color::WHITE,
             border: Border {
-                color: Color::from_rgb(0.500, 0.960, 1.000),
+                color: mix(cyan(), Color::WHITE, 0.24),
                 width: 1.0,
                 radius: 100.0.into(),
             },
@@ -7250,17 +7519,17 @@ impl toggler::StyleSheet for PremiumTogglerStyle {
     fn active(&self, _style: &Self::Style, is_active: bool) -> toggler::Appearance {
         toggler::Appearance {
             background: if is_active {
-                Color::from_rgb(0.070, 0.330, 0.380)
+                mix(Color::from_rgb(0.040, 0.052, 0.070), accent(), 0.42)
             } else {
                 Color::from_rgb(0.040, 0.052, 0.070)
             },
             background_border_width: 1.0,
             background_border_color: if is_active {
-                Color::from_rgb(0.120, 0.560, 0.640)
+                mix(STROKE, accent(), 0.70)
             } else {
                 Color::from_rgb(0.090, 0.120, 0.150)
             },
-            foreground: if is_active { CYAN } else { TEXT_SECONDARY },
+            foreground: if is_active { cyan() } else { TEXT_SECONDARY },
             foreground_border_width: 0.0,
             foreground_border_color: Color::TRANSPARENT,
         }
@@ -7269,7 +7538,7 @@ impl toggler::StyleSheet for PremiumTogglerStyle {
     fn hovered(&self, style: &Self::Style, is_active: bool) -> toggler::Appearance {
         let mut appearance = self.active(style, is_active);
         appearance.background = if is_active {
-            Color::from_rgb(0.085, 0.390, 0.440)
+            mix(Color::from_rgb(0.040, 0.052, 0.070), accent(), 0.52)
         } else {
             Color::from_rgb(0.052, 0.070, 0.090)
         };
@@ -7298,10 +7567,10 @@ impl button::StyleSheet for SubtleButtonStyle {
 
     fn hovered(&self, _style: &Self::Style) -> button::Appearance {
         button::Appearance {
-            background: Some(Color::from_rgb(0.050, 0.078, 0.098).into()),
-            text_color: CYAN,
+            background: Some(mix(Color::from_rgb(0.046, 0.060, 0.078), accent(), 0.10).into()),
+            text_color: cyan(),
             border: Border {
-                color: Color::from_rgb(0.085, 0.270, 0.315),
+                color: mix(STROKE, accent(), 0.45),
                 width: 1.0,
                 radius: 100.0.into(),
             },
@@ -7321,7 +7590,7 @@ impl iced::widget::text_input::StyleSheet for ChatTextInputStyle {
     }
 
     fn focused(&self, _style: &Self::Style) -> iced::widget::text_input::Appearance {
-        chat_text_input_appearance(Color::from_rgb(0.030, 0.130, 0.155))
+        chat_text_input_appearance(mix(STROKE, accent(), 0.58))
     }
 
     fn placeholder_color(&self, _style: &Self::Style) -> Color {
@@ -7337,7 +7606,7 @@ impl iced::widget::text_input::StyleSheet for ChatTextInputStyle {
     }
 
     fn selection_color(&self, _style: &Self::Style) -> Color {
-        Color::from_rgb(0.060, 0.300, 0.360)
+        mix(BG, accent(), 0.50)
     }
 
     fn disabled(&self, _style: &Self::Style) -> iced::widget::text_input::Appearance {
@@ -7404,9 +7673,9 @@ fn tooltip_style(_theme: &Theme) -> container::Appearance {
 
 fn user_avatar_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb(0.060, 0.155, 0.245).into()),
+        background: Some(mix(Color::from_rgb(0.040, 0.052, 0.070), accent(), 0.28).into()),
         border: Border {
-            color: Color::from_rgb(0.080, 0.190, 0.290),
+            color: mix(STROKE, accent(), 0.42),
             width: 1.0,
             radius: 100.0.into(),
         },
@@ -7424,9 +7693,9 @@ fn chat_workspace_style(_theme: &Theme) -> container::Appearance {
 
 fn chat_logo_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb(0.010, 0.050, 0.070).into()),
+        background: Some(mix(BG, accent(), 0.18).into()),
         border: Border {
-            color: Color::from_rgb(0.030, 0.690, 0.790),
+            color: accent(),
             width: 1.0,
             radius: 100.0.into(),
         },
@@ -7436,9 +7705,9 @@ fn chat_logo_style(_theme: &Theme) -> container::Appearance {
 
 fn prompt_icon_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb(0.020, 0.120, 0.145).into()),
+        background: Some(mix(BG, accent(), 0.16).into()),
         border: Border {
-            color: Color::from_rgb(0.035, 0.190, 0.225),
+            color: mix(STROKE, accent(), 0.45),
             width: 1.0,
             radius: 8.0.into(),
         },
@@ -7450,7 +7719,7 @@ fn chat_input_shell_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
         background: Some(Color::from_rgb(0.040, 0.052, 0.068).into()),
         border: Border {
-            color: Color::from_rgb(0.125, 0.160, 0.195),
+            color: mix(STROKE, accent(), 0.18),
             width: 1.0,
             radius: 28.0.into(),
         },
@@ -7472,9 +7741,9 @@ fn chat_attachment_style(_theme: &Theme) -> container::Appearance {
 
 fn chat_message_avatar_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb(0.020, 0.075, 0.115).into()),
+        background: Some(mix(BG, accent(), 0.16).into()),
         border: Border {
-            color: Color::from_rgb(0.030, 0.380, 0.620),
+            color: mix(STROKE, accent(), 0.62),
             width: 1.0,
             radius: 100.0.into(),
         },
@@ -7508,9 +7777,9 @@ fn premium_surface_style(_theme: &Theme) -> container::Appearance {
 
 fn settings_dot_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(CYAN.into()),
+        background: Some(cyan().into()),
         border: Border {
-            color: Color::from_rgb(0.110, 0.460, 0.520),
+            color: mix(STROKE, accent(), 0.68),
             width: 1.0,
             radius: 100.0.into(),
         },
@@ -7564,9 +7833,9 @@ fn input_field_style(_theme: &Theme) -> container::Appearance {
 }
 fn transmit_btn_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(ACCENT.into()),
+        background: Some(accent().into()),
         border: Border {
-            color: Color::from_rgb(0.48, 0.78, 1.0),
+            color: cyan(),
             width: 1.0,
             radius: 8.0.into(),
         },
@@ -7586,9 +7855,9 @@ fn nexus_bubble_modern(_theme: &Theme) -> container::Appearance {
 }
 fn operator_bubble_modern(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(PETROL.into()),
+        background: Some(petrol().into()),
         border: Border {
-            color: Color::from_rgb(0.020, 0.320, 0.385),
+            color: mix(STROKE, accent(), 0.55),
             width: 1.0,
             radius: [8.0, 8.0, 2.0, 8.0].into(),
         },
@@ -7608,9 +7877,9 @@ fn error_bubble_modern(_theme: &Theme) -> container::Appearance {
 }
 fn progress_bubble_modern(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb(0.030, 0.055, 0.070).into()),
+        background: Some(mix(Color::from_rgb(0.030, 0.044, 0.060), accent(), 0.08).into()),
         border: Border {
-            color: Color::from_rgb(0.060, 0.310, 0.370),
+            color: mix(STROKE, accent(), 0.58),
             width: 1.0,
             radius: [8.0, 8.0, 8.0, 2.0].into(),
         },
@@ -7663,7 +7932,7 @@ fn activity_item_style(_theme: &Theme) -> container::Appearance {
 }
 fn info_activity_dot_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(ACCENT.into()),
+        background: Some(accent().into()),
         border: Border {
             radius: 100.0.into(),
             ..Default::default()
@@ -7762,7 +8031,7 @@ fn hud_panel_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
         background: Some(Color::from_rgb(0.012, 0.020, 0.026).into()),
         border: Border {
-            color: Color::from_rgb(0.045, 0.115, 0.145),
+            color: mix(STROKE, accent(), 0.18),
             width: 1.0,
             radius: 6.0.into(),
         },
@@ -7796,9 +8065,9 @@ fn hud_core_stage_style(_theme: &Theme) -> container::Appearance {
 
 fn nexus_core_ring_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb(0.008, 0.024, 0.036).into()),
+        background: Some(mix(BG, accent(), 0.10).into()),
         border: Border {
-            color: Color::from_rgb(0.115, 0.560, 0.680),
+            color: mix(STROKE, accent(), 0.70),
             width: 1.0,
             radius: 200.0.into(),
         },
@@ -7808,9 +8077,9 @@ fn nexus_core_ring_style(_theme: &Theme) -> container::Appearance {
 
 fn nexus_core_inner_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb(0.014, 0.060, 0.092).into()),
+        background: Some(mix(BG, accent(), 0.20).into()),
         border: Border {
-            color: Color::from_rgb(0.220, 0.720, 0.850),
+            color: cyan(),
             width: 1.0,
             radius: 120.0.into(),
         },
@@ -7856,9 +8125,9 @@ fn nexus_card_style(_theme: &Theme) -> container::Appearance {
 
 fn nexus_main_card_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb(0.012, 0.040, 0.052).into()),
+        background: Some(mix(Color::from_rgb(0.012, 0.026, 0.038), accent(), 0.08).into()),
         border: Border {
-            color: Color::from_rgb(0.035, 0.190, 0.230),
+            color: mix(STROKE, accent(), 0.28),
             width: 1.0,
             radius: 8.0.into(),
         },
@@ -7880,9 +8149,9 @@ fn nexus_active_pill_style(_theme: &Theme) -> container::Appearance {
 
 fn nexus_status_icon_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb(0.010, 0.070, 0.085).into()),
+        background: Some(mix(BG, accent(), 0.18).into()),
         border: Border {
-            color: Color::from_rgb(0.050, 0.520, 0.610),
+            color: mix(STROKE, accent(), 0.62),
             width: 1.0,
             radius: 100.0.into(),
         },
@@ -7937,7 +8206,7 @@ fn platform_strip_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
         background: Some(Color::from_rgb(0.035, 0.052, 0.064).into()),
         border: Border {
-            color: ACCENT_SOFT,
+            color: accent_soft(),
             width: 1.0,
             radius: 8.0.into(),
         },
@@ -8007,9 +8276,9 @@ fn flow_node_style(_theme: &Theme) -> container::Appearance {
 
 fn active_flow_node_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb(0.040, 0.088, 0.102).into()),
+        background: Some(mix(Color::from_rgb(0.038, 0.052, 0.068), accent(), 0.18).into()),
         border: Border {
-            color: Color::from_rgb(0.24, 0.74, 0.88),
+            color: mix(STROKE, accent(), 0.70),
             width: 1.0,
             radius: 6.0.into(),
         },
@@ -8103,9 +8372,9 @@ fn header_chip_style(_theme: &Theme) -> container::Appearance {
 
 fn brand_mark_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb(0.006, 0.045, 0.060).into()),
+        background: Some(mix(BG, accent(), 0.18).into()),
         border: Border {
-            color: Color::from_rgb(0.020, 0.700, 0.780),
+            color: accent(),
             width: 1.0,
             radius: 8.0.into(),
         },
@@ -8175,9 +8444,9 @@ fn mode_banner_style(_theme: &Theme) -> container::Appearance {
 
 fn agent_avatar_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(Color::from_rgb(0.060, 0.170, 0.330).into()),
+        background: Some(mix(BG, accent(), 0.22).into()),
         border: Border {
-            color: ACCENT,
+            color: mix(STROKE, accent(), 0.62),
             width: 1.0,
             radius: 100.0.into(),
         },
@@ -8302,7 +8571,7 @@ fn meter_fill_success_style(_theme: &Theme) -> container::Appearance {
 
 fn meter_fill_accent_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
-        background: Some(ACCENT.into()),
+        background: Some(accent().into()),
         border: Border {
             radius: 100.0.into(),
             ..Default::default()
@@ -8345,7 +8614,7 @@ fn chat_msg_nexus_style(_theme: &Theme) -> container::Appearance {
     container::Appearance {
         background: Some(Color::from_rgb(0.05, 0.07, 0.09).into()),
         border: Border {
-            color: ACCENT,
+            color: accent(),
             width: 1.0,
             radius: 8.0.into(),
         },
@@ -8367,7 +8636,7 @@ fn agent_card_style(_theme: &Theme) -> container::Appearance {
 
 fn btn_primary_style(_theme: &Theme) -> button::Appearance {
     button::Appearance {
-        background: Some(ACCENT.into()),
+        background: Some(accent().into()),
         border: Border {
             radius: 6.0.into(),
             ..Default::default()

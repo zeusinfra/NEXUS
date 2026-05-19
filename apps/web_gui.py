@@ -449,10 +449,10 @@ async def lifespan(app: FastAPI):
     # Iniciar Ciclo de Sono / Modo Sonho (Poda Sináptica)
     asyncio.create_task(dreaming_loop())
 
-    # Pre-carregar modelo de voz Kokoro (evita lag na primeira resposta)
+    # Pre-carregar motor de voz PT-BR (evita lag na primeira resposta)
     if ENABLE_VOICE:
-        logger.info("🎙️ [NEXUS VOICE] Pre-carregando motor Kokoro...")
-        asyncio.create_task(voice_service.generate_speech_wav("OK"))
+        logger.info("🎙️ [NEXUS VOICE] Pre-carregando motor de voz PT-BR...")
+        asyncio.create_task(voice_service.generate_speech_audio("OK"))
 
     # Sequência de Boot: Saudação e Diagnóstico (Nível 4)
     asyncio.create_task(boot_sequence())
@@ -662,14 +662,15 @@ async def boot_sequence():
     if now_ts - last_boot > 600:
         brain.blackboard.update("last_voice_boot", now_ts)
         try:
-            audio_wav = await voice_service.generate_speech_wav(report)
-            if audio_wav:
+            audio_data, audio_mime = await voice_service.generate_speech_audio(report)
+            if audio_data:
+                suffix = ".mp3" if audio_mime == "audio/mpeg" else ".wav"
                 boot_audio_path = os.path.join(
-                    PROJECT_ROOT, "data", "voice_temp", "boot_greeting.wav"
+                    PROJECT_ROOT, "data", "voice_temp", f"boot_greeting{suffix}"
                 )
                 os.makedirs(os.path.dirname(boot_audio_path), exist_ok=True)
                 with open(boot_audio_path, "wb") as f:
-                    f.write(audio_wav)
+                    f.write(audio_data)
                 players = ["ffplay", "mpv", "play"]
                 for player in players:
                     if shutil.which(player):
@@ -2314,10 +2315,12 @@ async def api_chat(req: ChatReq, request: Request):
             "feedback": feedback,
         }
         if req.voice_response and ENABLE_VOICE:
-            audio_b64 = await voice_service.generate_speech_base64(voice_reply or reply)
-            if audio_b64:
-                response["audio"] = audio_b64
-                response["audio_mime"] = "audio/wav"
+            audio_payload = await voice_service.generate_speech_payload(
+                voice_reply or reply
+            )
+            if audio_payload["audio"]:
+                response["audio"] = audio_payload["audio"]
+                response["audio_mime"] = audio_payload["audio_mime"]
         return response
     except Exception as e:
         thought_stop.set()
@@ -2602,11 +2605,11 @@ async def api_tts(req: TTSReq, request: Request):
     text = (req.text or "").strip()
     if not text:
         raise HTTPException(status_code=400, detail="text is required.")
-    audio_b64 = await voice_service.generate_speech_base64(text[:2000])
+    audio_payload = await voice_service.generate_speech_payload(text[:2000])
     return {
-        "ok": bool(audio_b64),
-        "audio": audio_b64,
-        "audio_mime": "audio/mpeg" if audio_b64 else None,
+        "ok": bool(audio_payload["audio"]),
+        "audio": audio_payload["audio"],
+        "audio_mime": audio_payload["audio_mime"] or None,
     }
 
 
@@ -3090,10 +3093,12 @@ async def _handle_client_text(text: str):
 
     if ENABLE_VOICE:
         try:
-            audio_b64 = await voice_service.generate_speech_base64(voice_reply or reply)
-            if audio_b64:
+            audio_payload = await voice_service.generate_speech_payload(
+                voice_reply or reply
+            )
+            if audio_payload["audio"]:
                 await broadcast_message(
-                    {"type": "AUDIO_RESPONSE", "payload": {"audio": audio_b64}}
+                    {"type": "AUDIO_RESPONSE", "payload": audio_payload}
                 )
         except Exception as e:
             print(f"[WS] TTS generation error: {e}")
@@ -3137,12 +3142,12 @@ async def _handle_client_vision():
             )
 
             if ENABLE_VOICE:
-                audio_b64 = await voice_service.generate_speech_base64(
+                audio_payload = await voice_service.generate_speech_payload(
                     voice_reply or reply
                 )
-                if audio_b64:
+                if audio_payload["audio"]:
                     await broadcast_message(
-                        {"type": "AUDIO_RESPONSE", "payload": {"audio": audio_b64}}
+                        {"type": "AUDIO_RESPONSE", "payload": audio_payload}
                     )
     except Exception as e:
         print(f"[WS] Vision analysis error: {e}")
