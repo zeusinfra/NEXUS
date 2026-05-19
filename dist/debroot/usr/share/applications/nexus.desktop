@@ -1,7 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=NEXUS Cognitive OS
-Comment=Supervised cognitive runtime for Linux
-Exec=nexus
-Terminal=false
-Categories=System;Utility;
