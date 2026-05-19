@@ -36,7 +36,14 @@ def test_swarm_orchestrator_creates_traceable_plan(tmp_path):
     assert status["current_goal"] == result["goal"]
     assert status["memory"]["agents"] >= 7
     assert status["memory"]["tasks"] >= len(result["tasks"])
-    assert status["memory"]["memory_entries"] == 1
+    assert status["memory"]["memory_entries"] >= 2
+    entries = daemon.memory.list_memory_entries(limit=10)
+    assert any(
+        entry["scope"] == "swarm"
+        and entry["kind"] == "objective"
+        and entry["metadata"]["objective_id"] == result["objective_id"]
+        for entry in entries
+    )
     assert daemon.memory.list_agents(role="planner")[0]["status"] == "assigned"
 
 

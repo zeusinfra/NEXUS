@@ -6,12 +6,35 @@ DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(dirname "$DIR")"
 VENV="$ROOT_DIR/.venv/bin/python"
 SYS="python3"
-SERVER_LOG="$ROOT_DIR/nexus_server.log"
+
+default_log_dir() {
+    if [[ -n "${NEXUS_LOG_DIR:-}" ]]; then
+        echo "$NEXUS_LOG_DIR"
+    elif [[ "$ROOT_DIR" == "/usr/lib/nexus" ]]; then
+        echo "${XDG_STATE_HOME:-${HOME:-/tmp}/.local/state}/nexus/logs"
+    else
+        echo "$ROOT_DIR/logs"
+    fi
+}
+
+default_runtime_dir() {
+    if [[ -n "${NEXUS_RUNTIME_DIR:-}" ]]; then
+        echo "$NEXUS_RUNTIME_DIR"
+    elif [[ "$ROOT_DIR" == "/usr/lib/nexus" ]]; then
+        echo "${XDG_STATE_HOME:-${HOME:-/tmp}/.local/state}/nexus"
+    else
+        echo "$ROOT_DIR/runtime"
+    fi
+}
+
+LOG_DIR="$(default_log_dir)"
+RUNTIME_DIR="$(default_runtime_dir)"
+SERVER_LOG="$LOG_DIR/nexus_server.log"
 
 # Usa venv se existir, senão usa sistema
 PY="$SYS"
 [[ -f "$VENV" ]] && PY="$VENV"
-mkdir -p "$ROOT_DIR/logs"
+mkdir -p "$LOG_DIR" "$RUNTIME_DIR"
 
 WATCHER_PID=""
 MEMORY_PID=""
@@ -26,6 +49,64 @@ backend_responds() {
 
 backend_port_open() {
     timeout 1 bash -c "</dev/tcp/127.0.0.1/${NEXUS_PORT:-8080}" >/dev/null 2>&1
+}
+
+watcher_port() {
+    echo "${NEXUS_WATCHER_PORT:-8081}"
+}
+
+watcher_responds() {
+    timeout 1 bash -c "</dev/tcp/127.0.0.1/$(watcher_port)" >/dev/null 2>&1
+}
+
+watcher_port_open() {
+    timeout 1 bash -c "</dev/tcp/127.0.0.1/$(watcher_port)" >/dev/null 2>&1
+}
+
+watcher_pids() {
+    pgrep -f "watcher_rs" 2>/dev/null || true
+}
+
+stop_stale_watcher() {
+    local pids
+    pids="$(watcher_pids)"
+    [[ -z "$pids" ]] && return 0
+    echo "⚠️  Watcher Rust está presumidamente travado: $pids"
+    kill $pids >/dev/null 2>&1 || true
+    sleep 2
+}
+
+memory_service_url() {
+    echo "${NEXUS_MEMORY_SERVICE_URL:-http://127.0.0.1:8085/health}"
+}
+
+memory_service_responds() {
+    service_responds "$(memory_service_url)"
+}
+
+memory_service_port() {
+    local url
+    url="$(memory_service_url)"
+    PYTHON_MEMORY_SERVICE_URL="$url" "$PY" - <<'PY'
+import os, urllib.parse
+url = os.environ['PYTHON_MEMORY_SERVICE_URL']
+parsed = urllib.parse.urlparse(url)
+port = parsed.port or (443 if parsed.scheme == 'https' else 80)
+print(port)
+PY
+}
+
+memory_service_pids() {
+    pgrep -f "memory_service" 2>/dev/null || true
+}
+
+stop_stale_memory_service() {
+    local pids
+    pids="$(memory_service_pids)"
+    [[ -z "$pids" ]] && return 0
+    echo "⚠️  Memory service presumidamente travado: $pids"
+    kill $pids >/dev/null 2>&1 || true
+    sleep 2
 }
 
 backend_pids() {
@@ -93,22 +174,161 @@ ensure_server_background() {
     return 1
 }
 
-start_rust_services() {
-    echo "🦀 Iniciando Microsserviços Rust (Watcher & Memory)..."
-    if service_responds "http://127.0.0.1:8081/ws"; then
-        echo "✅ Watcher Rust já está respondendo na porta 8081."
-    else
-        (cd "$ROOT_DIR/watcher_rs" && cargo run --release > "$ROOT_DIR/logs/watcher.log" 2>&1) &
-        WATCHER_PID=$!
+wait_for_port() {
+    local host=$1
+    local port=$2
+    local retries=${3:-10}
+    local i=0
+    while [[ $i -lt $retries ]]; do
+        if timeout 1 bash -c "</dev/tcp/${host}/${port}" >/dev/null 2>&1; then
+            return 0
+        fi
+        i=$((i + 1))
+        sleep 1
+    done
+    return 1
+}
+
+run_iced_gui() {
+    if [[ -x "$DIR/nexus-iced" ]]; then
+        exec "$DIR/nexus-iced"
     fi
 
-    if service_responds "http://127.0.0.1:8085/health"; then
-        echo "✅ Memory Service já está respondendo na porta 8085."
-    else
-        (cd "$ROOT_DIR/core-rust/nexus_memory" && cargo run --release --bin memory_service > "$ROOT_DIR/logs/memory.log" 2>&1) &
-        MEMORY_PID=$!
+    if [[ -d "$ROOT_DIR/nexus-iced" ]]; then
+        if ! command -v cargo >/dev/null 2>&1; then
+            echo "❌ Cargo não está disponível para iniciar a GUI em modo desenvolvimento." >&2
+            return 1
+        fi
+        (cd "$ROOT_DIR/nexus-iced" && cargo run --release)
+        return $?
     fi
-    sleep 2
+
+    echo "❌ GUI Iced não encontrada. Reinstale o pacote ou rode 'make deb' para gerar binários." >&2
+    return 1
+}
+
+start_watcher_process() {
+    if [[ -x "$DIR/watcher_rs" ]]; then
+        (
+            cd "$ROOT_DIR" && setsid -f nohup "$DIR/watcher_rs" > "$LOG_DIR/watcher.log" 2>&1
+        ) &
+        WATCHER_PID=$!
+        return 0
+    fi
+
+    if [[ -d "$ROOT_DIR/watcher_rs" ]]; then
+        if ! command -v cargo >/dev/null 2>&1; then
+            echo "❌ Cargo não está disponível para iniciar o Watcher em modo desenvolvimento." >&2
+            return 1
+        fi
+        (
+            cd "$ROOT_DIR/watcher_rs" && setsid -f nohup cargo run --release > "$LOG_DIR/watcher.log" 2>&1
+        ) &
+        WATCHER_PID=$!
+        return 0
+    fi
+
+    echo "❌ Watcher Rust não encontrado no runtime instalado." >&2
+    return 1
+}
+
+start_memory_service_process() {
+    if [[ -x "$DIR/memory_service" ]]; then
+        (
+            cd "$RUNTIME_DIR" && setsid -f nohup "$DIR/memory_service" > "$LOG_DIR/memory.log" 2>&1
+        ) &
+        MEMORY_PID=$!
+        return 0
+    fi
+
+    if [[ -d "$ROOT_DIR/core-rust/nexus_memory" ]]; then
+        if ! command -v cargo >/dev/null 2>&1; then
+            echo "❌ Cargo não está disponível para iniciar o Memory Service em modo desenvolvimento." >&2
+            return 1
+        fi
+        (
+            cd "$ROOT_DIR/core-rust/nexus_memory" && setsid -f nohup cargo run --release --bin memory_service > "$LOG_DIR/memory.log" 2>&1
+        ) &
+        MEMORY_PID=$!
+        return 0
+    fi
+
+    echo "❌ Memory Service Rust não encontrado no runtime instalado." >&2
+    return 1
+}
+
+ensure_watcher_background() {
+    local port
+    port="$(watcher_port)"
+    if watcher_responds; then
+        echo "✅ Watcher Rust já está respondendo na porta ${port}."
+        return 0
+    fi
+
+    if watcher_port_open; then
+        echo "⏳ Porta ${port} aberta, aguardando Watcher responder..."
+        if wait_for_port 127.0.0.1 "$port" 15; then
+            echo "✅ Watcher Rust pronto em ws://127.0.0.1:${port}/ws"
+            return 0
+        fi
+        echo "⚠️  Porta ${port} está aberta, mas Watcher não responde. Reiniciando processo." >&2
+        stop_stale_watcher
+    fi
+
+    echo "🌑 Iniciando Watcher Rust..."
+    start_watcher_process
+
+    if wait_for_port 127.0.0.1 "$port" 20; then
+        echo "✅ Watcher Rust pronto em ws://127.0.0.1:${port}/ws"
+        return 0
+    fi
+
+    echo "❌ Watcher Rust não respondeu dentro do tempo esperado. Veja $LOG_DIR/watcher.log." >&2
+    return 1
+}
+
+ensure_memory_service_background() {
+    local url port
+    url="$(memory_service_url)"
+    port="$(memory_service_port)"
+
+    if memory_service_responds; then
+        echo "✅ Memory Service já está respondendo em ${url}."
+        return 0
+    fi
+
+    if timeout 1 bash -c "</dev/tcp/127.0.0.1/${port}" >/dev/null 2>&1; then
+        echo "⏳ Porta ${port} ativa, aguardando /health do memory_service..."
+        for _ in $(seq 1 15); do
+            if memory_service_responds; then
+                echo "✅ Memory Service pronto em ${url}"
+                return 0
+            fi
+            sleep 1
+        done
+        echo "⚠️  Porta ${port} está ocupada, mas /health não respondeu. Reiniciando serviço de memória." >&2
+        stop_stale_memory_service
+    fi
+
+    echo "🌑 Iniciando Memory Service Rust..."
+    start_memory_service_process
+
+    for _ in $(seq 1 20); do
+        if memory_service_responds; then
+            echo "✅ Memory Service pronto em ${url}"
+            return 0
+        fi
+        sleep 1
+    done
+
+    echo "❌ Memory Service não respondeu dentro do tempo esperado. Veja $LOG_DIR/memory.log." >&2
+    return 1
+}
+
+start_rust_services() {
+    echo "🦀 Iniciando Microsserviços Rust (Watcher & Memory)..."
+    ensure_watcher_background
+    ensure_memory_service_background
 }
 
 cleanup_started_services() {
@@ -171,7 +391,7 @@ case "$1" in
     gui|iced|"")
         echo "🧠 NEXUS — Iniciando GUI Iced..."
         ensure_server_background
-        (cd "$ROOT_DIR/nexus-iced" && cargo run --release)
+        run_iced_gui
         ;;
     v4|core4|daemon)
         echo "🧠 Iniciando NEXUS Cognitive Core v4 (Loop contínuo)..."

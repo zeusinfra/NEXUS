@@ -6,6 +6,35 @@ VERSION="${NEXUS_VERSION:-0.1.5}"
 ARCH="${NEXUS_ARCH:-amd64}"
 PKG_DIR="$ROOT_DIR/dist/debroot"
 OUT="$ROOT_DIR/dist/nexus_${VERSION}_${ARCH}.deb"
+CARGO="${CARGO:-cargo}"
+
+require_cmd() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "Missing required command: $1" >&2
+    exit 1
+  fi
+}
+
+build_rust_binaries() {
+  require_cmd "$CARGO"
+
+  "$CARGO" build --manifest-path "$ROOT_DIR/nexus-iced/Cargo.toml" --release
+  "$CARGO" build --manifest-path "$ROOT_DIR/watcher_rs/Cargo.toml" --release
+  "$CARGO" build --manifest-path "$ROOT_DIR/core-rust/Cargo.toml" --release -p nexus_memory --bin memory_service
+  "$CARGO" build --manifest-path "$ROOT_DIR/backend/Cargo.toml" --release
+}
+
+install_bin() {
+  local src="$1"
+  local dst="$2"
+  if [[ ! -x "$src" ]]; then
+    echo "Expected compiled binary not found: $src" >&2
+    exit 1
+  fi
+  install -D -m 0755 "$src" "$dst"
+}
+
+require_cmd dpkg-deb
 
 mkdir -p "$ROOT_DIR/dist"
 rm -rf "$PKG_DIR"
@@ -19,15 +48,29 @@ mkdir -p \
   "$PKG_DIR/lib/systemd/system" \
   "$PKG_DIR/usr/share/applications"
 
+build_rust_binaries
+
 cp -a "$ROOT_DIR/apps" "$PKG_DIR/usr/lib/nexus/"
 cp -a "$ROOT_DIR/bin" "$PKG_DIR/usr/lib/nexus/"
+cp -a "$ROOT_DIR/communication" "$PKG_DIR/usr/lib/nexus/"
 cp -a "$ROOT_DIR/config" "$PKG_DIR/usr/lib/nexus/"
 cp -a "$ROOT_DIR/nexus_core" "$PKG_DIR/usr/lib/nexus/"
 cp -a "$ROOT_DIR/configs" "$PKG_DIR/usr/lib/nexus/"
+cp -a "$ROOT_DIR/ui" "$PKG_DIR/usr/lib/nexus/"
+cp -a "$ROOT_DIR/models" "$PKG_DIR/usr/lib/nexus/"
+cp -a "$ROOT_DIR/pattern_engine.py" "$PKG_DIR/usr/lib/nexus/pattern_engine.py"
 cp -a "$ROOT_DIR/config/config.example.toml" "$PKG_DIR/etc/nexus/config.toml"
 cp -a "$ROOT_DIR/config/nexus.env.example" "$PKG_DIR/etc/nexus/nexus.env"
 cp -a "$ROOT_DIR/packaging/systemd/nexus.service" "$PKG_DIR/lib/systemd/system/nexus.service"
 cp -a "$ROOT_DIR/packaging/desktop/nexus.desktop" "$PKG_DIR/usr/share/applications/nexus.desktop"
+
+install_bin "$ROOT_DIR/nexus-iced/target/release/nexus-iced" "$PKG_DIR/usr/lib/nexus/bin/nexus-iced"
+install_bin "$ROOT_DIR/watcher_rs/target/release/watcher_rs" "$PKG_DIR/usr/lib/nexus/bin/watcher_rs"
+install_bin "$ROOT_DIR/core-rust/target/release/memory_service" "$PKG_DIR/usr/lib/nexus/bin/memory_service"
+install_bin "$ROOT_DIR/backend/target/release/backend" "$PKG_DIR/usr/lib/nexus/bin/nexus-rust-backend"
+
+find "$PKG_DIR/usr/lib/nexus" -type d -name __pycache__ -prune -exec rm -rf {} +
+find "$PKG_DIR/usr/lib/nexus" -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
 
 cat > "$PKG_DIR/usr/bin/nexus" <<'WRAPPER'
 #!/usr/bin/env bash

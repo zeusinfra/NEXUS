@@ -45,8 +45,11 @@ The NEXUS operational contract is built on absolute transparency:
 | `nexus_core/organization/` | The persistent daemon and swarm management layer. |
 | `nexus-iced/` | Primary conversational GUI (Rust/Iced). |
 | `core-rust/` | High-performance system bridges and sensory modules. |
-| `apps/` | API backend and cognitive entrypoints. |
+| `apps/` | Primary Python FastAPI backend and cognitive entrypoints. |
+| `backend/` | Experimental Rust/Axum backend prototype; not required for default runtime. |
 | `bin/` | Unified enterprise launcher for the NEXUS ecosystem. |
+
+> The runtime backend is currently Python FastAPI in `apps/web_gui.py`. The `backend/` Rust/Axum project is an experimental lab for future migration and is not required for normal development or package runtime.
 
 ---
 
@@ -54,7 +57,8 @@ The NEXUS operational contract is built on absolute transparency:
 
 ### System Requirements
 NEXUS is optimized for modern Linux distributions (Debian, Ubuntu, Mint, Fedora).
-*   **Runtime**: Python 3.10+ & Rust Stable.
+*   **Runtime**: Python 3.10+. The Debian package ships compiled Rust binaries.
+*   **Build from source**: Rust Stable plus the normal native build toolchain.
 *   **Dependencies**: `build-essential`, `libudev-dev`, `python3-dev`.
 
 ### Standard Installation
@@ -123,6 +127,11 @@ make deb
 make test-package
 ```
 
+The package includes the Python FastAPI runtime, static UI assets and compiled
+Rust binaries for `nexus-iced`, `watcher_rs`, `memory_service` and the optional
+Rust backend lab binary. Installed runtime startup does not depend on
+`cargo run`.
+
 Install flow:
 
 ```bash
@@ -133,8 +142,10 @@ nexus status
 ```
 
 See `docs/INSTALL.md`, `docs/PACKAGE.md`, `docs/ARCHITECTURE.md` and
-`docs/SECURITY.md` for the product layout and safety model. The current
-architecture flowchart is in `docs/FLOWCHART.md`.
+`docs/RUNTIME.md` for the product layout, runtime paths and safety model. The
+current architecture flowchart is in `docs/FLOWCHART.md`; implementation
+decisions are tracked in `docs/ARCHITECTURE_DECISIONS.md`, and loose module
+classification is tracked in `docs/MODULE_CLASSIFICATION.md`.
 
 ---
 

@@ -1,5 +1,4 @@
-use sqlx::{sqlite::SqlitePoolOptions, SqlitePool, Row};
-use std::sync::Arc;
+use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
 
 pub struct Database {
     pub pool: SqlitePool,
@@ -17,7 +16,7 @@ impl Database {
         sqlx::query("PRAGMA journal_mode = WAL;")
             .execute(&pool)
             .await?;
-        
+
         sqlx::query("PRAGMA synchronous = NORMAL;")
             .execute(&pool)
             .await?;
@@ -62,7 +61,7 @@ impl Database {
                 event_type TEXT NOT NULL,
                 payload TEXT NOT NULL,
                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-            );"
+            );",
         )
         .execute(&pool)
         .await?;

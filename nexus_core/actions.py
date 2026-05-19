@@ -381,6 +381,15 @@ def system_capabilities(parameters: dict) -> dict:
         if item.strip()
     ]
     root_daemon_socket = os.getenv("NEXUS_DAEMON_SOCKET", "/tmp/nexus/daemon.sock")
+    root_daemon_enabled_env = os.getenv("NEXUS_ROOT_DAEMON_ENABLED", "0").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    root_daemon_socket_exists = Path(root_daemon_socket).exists()
+    root_daemon_enabled = root_daemon_enabled_env or root_daemon_socket_exists
+    root_daemon_status = "online" if root_daemon_socket_exists else "offline"
     return {
         "telemetry": {
             "system_diagnostics": True,
@@ -400,12 +409,11 @@ def system_capabilities(parameters: dict) -> dict:
             "progress_events": os.getenv("NEXUS_AGENT_PROGRESS_EVENTS", "1"),
         },
         "privileged_actions": {
-            "root_daemon_enabled": os.getenv("NEXUS_ROOT_DAEMON_ENABLED", "0")
-            .strip()
-            .lower()
-            in {"1", "true", "yes", "on"},
+            "root_daemon_enabled_env": root_daemon_enabled_env,
+            "root_daemon_enabled": root_daemon_enabled,
+            "root_daemon_status": root_daemon_status,
             "socket": root_daemon_socket,
-            "socket_exists": Path(root_daemon_socket).exists(),
+            "socket_exists": root_daemon_socket_exists,
         },
         "sensors": {
             "voice": os.getenv("NEXUS_ENABLE_VOICE", "1"),

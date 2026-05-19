@@ -11,13 +11,15 @@ pub fn start_background_workers(state: Arc<AppState>) {
         loop {
             sleep(Duration::from_secs(5)).await;
             count += 1;
-            let _ = state_clone.event_bus.publish(SystemEvent::SystemStateChanged {
-                metrics: serde_json::json!({
-                    "cpu_usage": "1.2%",
-                    "ram_usage": "45MB",
-                    "tick": count,
-                }),
-            });
+            let _ = state_clone
+                .event_bus
+                .publish(SystemEvent::SystemStateChanged {
+                    metrics: serde_json::json!({
+                        "cpu_usage": "1.2%",
+                        "ram_usage": "45MB",
+                        "tick": count,
+                    }),
+                });
         }
     });
 }

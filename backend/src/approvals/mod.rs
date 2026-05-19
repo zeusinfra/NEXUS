@@ -1,6 +1,6 @@
-use crate::events::{SystemEvent, RiskLevel, EventBus};
-use std::sync::Arc;
+use crate::events::{EventBus, RiskLevel, SystemEvent};
 use dashmap::DashMap;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct ApprovalEngine {
@@ -17,8 +17,9 @@ impl ApprovalEngine {
     }
 
     pub fn request_approval(&self, command_id: &str, command: &str, risk: RiskLevel) {
-        self.pending_approvals.insert(command_id.to_string(), command.to_string());
-        
+        self.pending_approvals
+            .insert(command_id.to_string(), command.to_string());
+
         let _ = self.event_bus.publish(SystemEvent::ApprovalRequested {
             command_id: command_id.to_string(),
             command: command.to_string(),

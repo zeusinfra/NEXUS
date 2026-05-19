@@ -1,6 +1,5 @@
-use crate::events::{SystemEvent, EventBus};
+use crate::events::{EventBus, SystemEvent};
 use std::process::Stdio;
-use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 
@@ -14,10 +13,14 @@ impl CommandExecutor {
         Self { event_bus }
     }
 
-    pub async fn execute(&self, command_id: &str, cmd_string: &str) -> Result<(i32, String), String> {
+    pub async fn execute(
+        &self,
+        command_id: &str,
+        cmd_string: &str,
+    ) -> Result<(i32, String), String> {
         let event_bus_clone = self.event_bus.clone();
         let c_id = command_id.to_string();
-        
+
         let _ = event_bus_clone.publish(SystemEvent::CommandStarted {
             command_id: c_id.clone(),
             command: cmd_string.to_string(),
@@ -69,20 +72,24 @@ impl CommandExecutor {
         });
 
         let status = child.wait().await.map_err(|e| e.to_string())?;
-        
+
         // Wait for streams to finish
         let (out_result, err_result) = tokio::join!(out_handle, err_handle);
-        
+
         let exit_code = status.code().unwrap_or(-1);
-        
+
         let _ = event_bus_clone.publish(SystemEvent::CommandFinished {
             command_id: c_id,
             exit_code,
         });
 
         let mut final_out = String::new();
-        if let Ok(o) = out_result { final_out.push_str(&o); }
-        if let Ok(e) = err_result { final_out.push_str(&e); }
+        if let Ok(o) = out_result {
+            final_out.push_str(&o);
+        }
+        if let Ok(e) = err_result {
+            final_out.push_str(&e);
+        }
 
         Ok((exit_code, final_out))
     }

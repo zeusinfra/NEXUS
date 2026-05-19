@@ -1,46 +1,58 @@
-# NEXUS security model
+# Security Policy — Zeus Protocol
 
-NEXUS separates planning from execution. Cloud and local models may propose or
-classify work, but real command execution remains local and must pass the
-existing organizational security layer.
+## 🛡️ Commitment to Security
 
-Command policy:
+At Zeus Protocol, the security of the NEXUS system and the privacy of our users' operational data are our highest priorities. As a local-first cognitive operating layer, NEXUS is designed with security boundaries at its core, separating proposal, approval, and execution of system actions.
 
-- `SAFE`: read-only diagnostics and limited inspection.
-- `CAUTION`: package installs, service restarts and user config changes.
-- `DANGEROUS`: `sudo`, `/etc`, ownership/mode changes, destructive file moves.
-- `BLOCKED`: destructive disk operations and root-wide deletion patterns.
+The current runtime security invariant is evidence-first autonomy: an action is
+not considered complete unless the system has persisted execution evidence,
+verification state and replayable history.
 
-Rules:
+## 🔓 Reporting a Vulnerability
 
-- `sudo` requires explicit approval.
-- destructive commands are blocked by default.
-- real executions must capture stdout, stderr, exit code and duration.
-- approved executions must pass through a structured execution plan.
-- resource budgets may cap or block execution before a process starts.
-- completed work must have verification evidence before it can be treated as
-  done.
-- failed executions must be diagnosed and persisted as incidents, not hidden.
-- logs must not hide failures.
-- API keys are read from environment files such as `/etc/nexus/nexus.env`.
+We value the work of security researchers and the community in helping us maintain a secure ecosystem. If you discover a security vulnerability within NEXUS or any Zeus Protocol infrastructure, we request that you report it to us responsibly.
 
-The hybrid model router sends critical work to the `gemma4:31b-cloud` route for
-strategic review and marks it as approval-required. The cloud route never
-executes a command directly.
+**Please do not open a public issue for security-related findings.**
 
-## Evidence and replay
+### Reporting Process
 
-The runtime persists:
+1.  **WhatsApp**: Send a detailed report to +55 (12) 98247-4095.
+2.  **Encryption**: If sensitive information is included, please use our PGP key (available upon request or via our website).
+3.  **Details**: Include a description of the vulnerability, steps to reproduce, and potential impact.
 
-- approval metadata and risk assessment;
-- execution plan and per-step status;
-- stdout/stderr paths and tails;
-- exit code, duration and command status;
-- verification result and evidence;
-- self-healing diagnostic when a command fails;
-- action replay timeline for command/task audit.
+### Our Response Timeline
 
-The core invariant is: NEXUS cannot honestly claim an action is done without
-execution evidence and verification state.
+*   **Acknowledgment**: You will receive an acknowledgment of your report within 24–48 hours.
+*   **Assessment**: Our security team will conduct a thorough assessment and keep you informed of the progress.
+*   **Resolution**: We aim to provide a resolution or mitigation strategy as quickly as possible, typically within 7–14 business days depending on the complexity.
 
-Architecture overview: [FLOWCHART.md](FLOWCHART.md).
+## 🚀 Supported Versions
+
+Zeus Protocol actively supports and provides security updates for the following versions of NEXUS:
+
+| Version | Supported |
+| :--- | :--- |
+| 1.x (Current) | ✅ Yes |
+| < 1.0 | ❌ No (Please upgrade to the latest Enterprise release) |
+
+## ⚖️ Responsible Disclosure Policy
+
+Zeus Protocol follows the principles of responsible disclosure. We ask that researchers:
+*   Give us reasonable time to investigate and mitigate the issue before making any information public.
+*   Avoid privacy violations, destruction of data, and interruption or degradation of our services.
+*   Do not engage in "extortion" or demand payment in exchange for reporting vulnerabilities.
+
+## 🎓 Security Research Guidelines
+
+Research performed on local NEXUS instances should not impact other users or Zeus Protocol's hosted infrastructure (zeusprotocol.cloud). We encourage security audits of our command ledger, approval queue, structured execution plans, action replay, self-healing diagnostics, resource governor and sandbox runtime.
+
+Areas of special interest:
+
+*   bypassing approval before command execution;
+*   marking work complete without stdout/stderr, exit code or verification;
+*   losing or corrupting replay history;
+*   hiding failed commands from incidents;
+*   exceeding configured CPU, RAM, timeout or concurrency budgets.
+
+---
+Copyright © 2026 Zeus Protocol. All rights reserved.

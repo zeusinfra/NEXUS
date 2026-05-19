@@ -1,40 +1,54 @@
-use crate::events::{SystemEvent, EventBus};
-use std::fs;
-use std::path::{Path, PathBuf};
+use crate::events::{EventBus, SystemEvent};
+use crate::execution::risk::Sandbox;
 use chrono::Utc;
 use similar::{ChangeTag, TextDiff};
+use std::fs;
+use std::path::{Path, PathBuf};
 
 #[derive(Clone)]
 pub struct FilePatchEngine {
     event_bus: EventBus,
+    sandbox: Sandbox,
     workspace_root: PathBuf,
 }
 
 impl FilePatchEngine {
     pub fn new(event_bus: EventBus, workspace_root: impl Into<PathBuf>) -> Self {
+        let workspace_root = workspace_root.into();
         Self {
             event_bus,
-            workspace_root: workspace_root.into(),
+            sandbox: Sandbox::new(workspace_root.clone()),
+            workspace_root,
         }
     }
 
-    pub async fn apply_patch(&self, relative_path: &str, new_content: &str) -> Result<String, String> {
+    pub async fn apply_patch(
+        &self,
+        relative_path: &str,
+        new_content: &str,
+    ) -> Result<String, String> {
+        if !self.sandbox.is_path_safe(relative_path) {
+            return Err("Unsafe patch path".to_string());
+        }
+
         let target_path = self.workspace_root.join(relative_path);
         let mut old_content = String::new();
-        let mut backup_path_str = String::new();
-        
+
         // 1. Create Backup and Read Old Content
         if target_path.exists() {
             old_content = fs::read_to_string(&target_path).unwrap_or_default();
             let timestamp = Utc::now().format("%Y%m%d_%H%M%S").to_string();
-            let backup_dir = self.workspace_root.join(format!(".nexus/backups/{}", timestamp));
-            
+            let backup_dir = self
+                .workspace_root
+                .join(format!(".nexus/backups/{}", timestamp));
+
             fs::create_dir_all(&backup_dir).map_err(|e| e.to_string())?;
-            
-            let backup_file = backup_dir.join(Path::new(relative_path).file_name().unwrap_or_default());
+
+            let backup_file =
+                backup_dir.join(Path::new(relative_path).file_name().unwrap_or_default());
             fs::copy(&target_path, &backup_file).map_err(|e| e.to_string())?;
-            
-            backup_path_str = backup_file.to_string_lossy().to_string();
+
+            let backup_path_str = backup_file.to_string_lossy().to_string();
 
             let _ = self.event_bus.publish(SystemEvent::RollbackCreated {
                 backup_path: backup_path_str.clone(),
@@ -64,7 +78,7 @@ impl FilePatchEngine {
         if let Some(parent) = target_path.parent() {
             fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
-        
+
         fs::write(&target_path, new_content).map_err(|e| e.to_string())?;
 
         // 4. Emit Patched event
@@ -76,9 +90,13 @@ impl FilePatchEngine {
     }
 
     pub async fn rollback(&self, relative_path: &str, backup_path: &str) -> Result<(), String> {
+        if !self.sandbox.is_path_safe(relative_path) {
+            return Err("Unsafe rollback path".to_string());
+        }
+
         let target_path = self.workspace_root.join(relative_path);
         let backup_path = PathBuf::from(backup_path);
-        
+
         if backup_path.exists() {
             fs::copy(&backup_path, &target_path).map_err(|e| e.to_string())?;
             Ok(())

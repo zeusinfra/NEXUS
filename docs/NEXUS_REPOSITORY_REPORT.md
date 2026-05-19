@@ -5,7 +5,7 @@ Raiz analisada: `/home/nexus/Documentos/NEXUS/NEXUS`
 
 ## 1. Resumo executivo
 
-O NEXUS e um Cognitive Operating OS local-first com interface conversacional Rust/Iced, runtime Python evidence-first, backend Rust/Axum, modulos Rust de alto desempenho, memoria organizacional SQLite, aprovacao humana, replay de execucao e empacotamento Debian.
+O NEXUS e um Cognitive Operating OS local-first com interface conversacional Rust/Iced, runtime Python evidence-first, backend API Python FastAPI como runtime principal, e backend Rust/Axum como prototipo experimental, modulos Rust de alto desempenho, memoria organizacional SQLite, aprovacao humana, replay de execucao e empacotamento Debian.
 
 O inventario rastreado pelo Git possui **486 arquivos**, aproximadamente **89,686 linhas textuais** e **41 entradas de raiz**.
 
@@ -62,8 +62,8 @@ O inventario rastreado pelo Git possui **486 arquivos**, aproximadamente **89,68
 | Makefile | 1 | 60 | Arquivo ou pasta de suporte do projeto. |
 | README.md | 1 | 160 | Arquivo ou pasta de suporte do projeto. |
 | SECURITY.md | 1 | 58 | Arquivo ou pasta de suporte do projeto. |
-| apps | 10 | 4,067 | Superficie FastAPI e rotas de produto para status, cognicao, privacidade, GUI web e hub em tempo real. |
-| backend | 20 | 4,097 | Backend Rust/Axum para eventos, aprovacoes, execucao, filesystem, gateway, LLM, storage e workers. |
+| apps | 10 | 4,067 | Primary Python FastAPI backend and product API surface for status, cognition, privacy, web GUI and realtime hub. |
+| backend | 20 | 4,097 | Experimental Rust/Axum backend prototype for future migration; not required for default runtime. |
 | bin | 4 | 340 | Launchers e comandos operacionais do produto NEXUS. |
 | cognitive-python | 1 | 113 | Ponte historica Python/Rust para experimentos cognitivos. |
 | communication | 4 | 199 | Contrato protobuf e servicos de voz/comunicacao. |

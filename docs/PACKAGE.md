@@ -25,6 +25,16 @@ The package skeleton is under `packaging/`:
 - `packaging/scripts/build_deb.sh`: deterministic package builder.
 - `packaging/desktop/nexus.desktop`: desktop entry.
 
+`make deb` compiles and installs runtime binaries into the package:
+
+- `/usr/lib/nexus/bin/nexus-iced`
+- `/usr/lib/nexus/bin/watcher_rs`
+- `/usr/lib/nexus/bin/memory_service`
+- `/usr/lib/nexus/bin/nexus-rust-backend`
+
+The installed runtime must use these binaries directly. `cargo run` is allowed
+only for repository development fallback when the compiled binaries are absent.
+
 Runtime directories:
 
 - config: `/etc/nexus/config.toml`
@@ -47,6 +57,7 @@ Default model packaging config:
 - cloud model: `gemma4:31b-cloud`
 
 Architecture overview: [FLOWCHART.md](FLOWCHART.md).
+Runtime details: [RUNTIME.md](RUNTIME.md).
 
 The systemd daemon starts the organizational runtime with:
 

@@ -3,6 +3,10 @@
 NEXUS is organized as a supervised cognitive runtime for Linux.
 
 See the complete Mermaid diagram in [FLOWCHART.md](FLOWCHART.md).
+Runtime paths and process details are in [RUNTIME.md](RUNTIME.md). Current
+implementation decisions are in
+[ARCHITECTURE_DECISIONS.md](ARCHITECTURE_DECISIONS.md), and loose module status
+is tracked in [MODULE_CLASSIFICATION.md](MODULE_CLASSIFICATION.md).
 
 Core flow:
 
@@ -41,6 +45,8 @@ Main modules:
   generation through the local API.
 - `nexus_core/models/model_registry.py`: combined cloud/local status.
 - `nexus_core/product_cli.py`: Linux product CLI surface.
+- `apps/web_gui.py`: Primary Python FastAPI backend and web GUI API surface. This is the default runtime backend.
+- `backend/`: Experimental Rust/Axum backend prototype for future migration; not required for the standard runtime.
 - `nexus_core/organization/runtime.py`: evidence-first execution runtime that
   binds approvals, command IDs, resource budgets, verification and replay.
 - `nexus_core/organization/execution_plans.py`: plan -> step -> execution

@@ -1,6 +1,7 @@
 use crate::events::RiskLevel;
 use std::path::{Path, PathBuf};
 
+#[derive(Clone)]
 pub struct Sandbox {
     workspace_root: PathBuf,
 }
@@ -17,9 +18,9 @@ impl Sandbox {
         if target_path.contains("..") || target_path.starts_with('~') {
             return false;
         }
-        
+
         let path = Path::new(target_path);
-        
+
         // Block known dangerous directories
         if path.starts_with("/etc") || path.starts_with("/bin") || path.starts_with("/sbin") {
             return false;
@@ -42,9 +43,14 @@ pub struct RiskClassifier;
 impl RiskClassifier {
     pub fn classify(command: &str) -> RiskLevel {
         let first_word = command.split_whitespace().next().unwrap_or("");
-        
+
         // Critical overrides
-        if command.contains("rm -rf /") || first_word == "dd" || first_word == "mkfs" || first_word == "shutdown" || first_word == "systemctl" {
+        if command.contains("rm -rf /")
+            || first_word == "dd"
+            || first_word == "mkfs"
+            || first_word == "shutdown"
+            || first_word == "systemctl"
+        {
             return RiskLevel::Critical;
         }
         if command.contains("/etc/") {
@@ -54,13 +60,12 @@ impl RiskClassifier {
         match first_word {
             // Safe
             "ls" | "cat" | "grep" | "find" => RiskLevel::Safe,
-            
+
             // Safe composites
             "git" => {
-                if command.contains("status") || command.contains("diff") || command.contains("log") {
+                if command.contains("status") || command.contains("diff") || command.contains("log")
+                {
                     RiskLevel::Safe
-                } else if command.contains("checkout") || command.contains("commit") || command.contains("push") {
-                    RiskLevel::Moderate
                 } else {
                     RiskLevel::Moderate
                 }
@@ -79,13 +84,15 @@ impl RiskClassifier {
                     RiskLevel::Moderate // install, run build
                 }
             }
-            
-            // Moderate 
+
+            // Moderate
             "pip" | "python" | "rustc" => RiskLevel::Moderate,
 
             // Dangerous
-            "rm" | "sudo" | "chmod" | "chown" | "mv" | "cp" | "curl" | "wget" => RiskLevel::Dangerous,
-            
+            "rm" | "sudo" | "chmod" | "chown" | "mv" | "cp" | "curl" | "wget" => {
+                RiskLevel::Dangerous
+            }
+
             // Default fallback
             _ => RiskLevel::Moderate,
         }

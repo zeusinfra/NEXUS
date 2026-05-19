@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import os
 import shutil
@@ -10,6 +11,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import requests
+
+from nexus_core.health_status import build_external_watcher_status, check_memory_service
 from nexus_core.model_router import ModelRouter
 from nexus_core.models.model_registry import model_status
 from nexus_core.models.ollama_client import OllamaClient
@@ -222,37 +226,124 @@ def config_payload() -> dict[str, Any]:
     }
 
 
+def _backend_health() -> dict[str, Any]:
+    url = f"http://127.0.0.1:{os.getenv('NEXUS_PORT', '8080')}/api/health"
+    try:
+        resp = requests.get(url, timeout=0.8)
+        return {
+            "status": "online" if resp.status_code == 200 else "offline",
+            "url": url,
+            "http_status": resp.status_code,
+        }
+    except Exception as exc:
+        return {"status": "offline", "url": url, "error": str(exc)}
+
+
+def _root_daemon_health() -> dict[str, Any]:
+    socket_path = os.getenv("NEXUS_DAEMON_SOCKET", "/tmp/nexus/daemon.sock")
+    enabled_env = os.getenv("NEXUS_ROOT_DAEMON_ENABLED", "0").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    socket_exists = Path(socket_path).exists()
+    return {
+        "enabled_env": enabled_env,
+        "enabled": enabled_env or socket_exists,
+        "socket": socket_path,
+        "socket_exists": socket_exists,
+        "status": "online" if socket_exists else "offline",
+        "detail": (
+            "Root daemon socket detectado mesmo com NEXUS_ROOT_DAEMON_ENABLED desativado."
+            if socket_exists and not enabled_env
+            else "Root daemon habilitado via ambiente." if enabled_env else "Root daemon desativado."
+        ),
+    }
+
+
 def health_payload() -> dict[str, Any]:
     status = status_payload()
     local = status["models"]["local"]
     cloud = status["models"]["cloud"]
+    backend = _backend_health()
+    memory = check_memory_service()
+    watcher = build_external_watcher_status(status["paths"]["project_root"])
+    root_daemon = _root_daemon_health()
+    llm_ok = bool(local["api_ok"] or cloud["ready"])
+    ffmpeg_available = bool(shutil.which("ffmpeg"))
+    faster_whisper_available = importlib.util.find_spec("faster_whisper") is not None
+    asr_ok = ffmpeg_available and faster_whisper_available
+    ocr_ok = bool(shutil.which("tesseract"))
+
     checks = [
-        {"name": "daemon", "ok": status["daemon"]["status"] in {"online", "stopped"}},
+        {"name": "backend", "ok": backend["status"] == "online", "detail": backend.get("url")},
         {
-            "name": "ollama_binary",
-            "ok": local["binary_found"],
-            "detail": local.get("binary_path"),
+            "name": "org_daemon",
+            "ok": status["daemon"]["status"] in {"online", "stopped"},
+            "detail": status["daemon"].get("detail"),
         },
-        {"name": "ollama_api", "ok": local["api_ok"], "detail": local.get("endpoint")},
         {
-            "name": "ollama_model",
-            "ok": bool(local["selected_model"]),
-            "detail": local.get("selected_model") or local.get("suggestion"),
+            "name": "root_daemon",
+            "ok": root_daemon["status"] == "online",
+            "detail": root_daemon.get("detail"),
+        },
+        {
+            "name": "watcher",
+            "ok": watcher["status"] == "online",
+            "detail": f"port={watcher.get('port')} open={watcher.get('port_open')}",
+        },
+        {
+            "name": "memory_service",
+            "ok": memory["status"] == "online",
+            "detail": (
+                f"{memory.get('url')}"
+                + (" (fallback_active)" if memory.get("fallback_active") else "")
+            ),
+        },
+        {
+            "name": "llm",
+            "ok": llm_ok,
+            "detail": local.get("selected_model")
+            or cloud.get("model")
+            or local.get("suggestion"),
+        },
+        {
+            "name": "asr",
+            "ok": asr_ok,
+            "detail": (
+                "ffmpeg + faster_whisper disponíveis"
+                if asr_ok
+                else "ffmpeg e/ou faster_whisper ausentes"
+            ),
+        },
+        {
+            "name": "ocr",
+            "ok": ocr_ok,
+            "detail": "tesseract disponível" if ocr_ok else "tesseract ausente",
         },
         {
             "name": "cloud_key",
             "ok": cloud["api_key_present"],
             "detail": cloud["api_key_env"],
         },
-        {
-            "name": "logs_dir",
-            "ok": Path(status["paths"]["log_dir"]).exists(),
-            "detail": status["paths"]["log_dir"],
-        },
     ]
+
     return {
-        "ok": all(item["ok"] for item in checks if item["name"] != "cloud_key"),
+        "ok": all(check["ok"] for check in checks if check["name"] != "cloud_key"),
         "checks": checks,
+        "backend": backend,
+        "daemon": status["daemon"],
+        "root_daemon": root_daemon,
+        "watcher": watcher,
+        "memory_service": memory,
+        "llm": {"local": local, "cloud": cloud, "ok": llm_ok},
+        "asr": {
+            "ok": asr_ok,
+            "ffmpeg_available": ffmpeg_available,
+            "faster_whisper_available": faster_whisper_available,
+        },
+        "ocr": {"ok": ocr_ok, "tesseract_available": ocr_ok},
         **status,
     }
 

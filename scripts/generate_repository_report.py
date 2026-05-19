@@ -12,7 +12,7 @@ from pathlib import Path
 ROOT_DESCRIPTIONS = {
     ".github": "Automacao GitHub: workflows de CI, Dependabot, templates de issue e pull request.",
     "apps": "Superficie FastAPI e rotas de produto para status, cognicao, privacidade, GUI web e hub em tempo real.",
-    "backend": "Backend Rust/Axum para eventos, aprovacoes, execucao, filesystem, gateway, LLM, storage e workers.",
+    "backend": "Experimental Rust/Axum backend prototype for future migration; not required for default runtime.",
     "bin": "Launchers e comandos operacionais do produto NEXUS.",
     "cognitive-python": "Ponte historica Python/Rust para experimentos cognitivos.",
     "communication": "Contrato protobuf e servicos de voz/comunicacao.",
@@ -335,7 +335,8 @@ def build_markdown(root: Path, files: list[FileInfo]) -> str:
     lines.append("")
     lines.append(
         "O NEXUS e um Cognitive Operating OS local-first com interface conversacional Rust/Iced, "
-        "runtime Python evidence-first, backend Rust/Axum, modulos Rust de alto desempenho, "
+        "runtime Python evidence-first, backend API Python FastAPI como runtime principal, "
+        "e backend Rust/Axum como prototipo experimental, modulos Rust de alto desempenho, "
         "memoria organizacional SQLite, aprovacao humana, replay de execucao e empacotamento Debian."
     )
     lines.append("")

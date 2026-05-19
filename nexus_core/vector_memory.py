@@ -38,7 +38,7 @@ class VectorMemory:
             self.vectors: Dict[str, List[float]] = {}
             self.load()
 
-        self.service_url = "http://127.0.0.1:8082"
+        self.service_url = os.getenv("NEXUS_MEMORY_SERVICE_URL", "http://127.0.0.1:8085").rstrip("/")
 
     def _call_service(self, endpoint: str, data: dict):
         try:

@@ -18,12 +18,22 @@ def check_memory_service(
     url = url or os.getenv("NEXUS_MEMORY_SERVICE_URL", "http://127.0.0.1:8085/health")
     try:
         resp = requests.get(url, timeout=timeout)
+        status = "online" if resp.status_code == 200 else "offline"
         return {
-            "status": "online" if resp.status_code == 200 else "offline",
+            "status": status,
             "url": url,
+            "http_status": resp.status_code,
+            "fallback_active": status != "online",
+            "fallback_mode": "python-local" if status != "online" else None,
         }
     except Exception as exc:
-        return {"status": "offline", "url": url, "error": str(exc)}
+        return {
+            "status": "offline",
+            "url": url,
+            "error": str(exc),
+            "fallback_active": True,
+            "fallback_mode": "python-local",
+        }
 
 
 def build_watcher_status(
@@ -69,6 +79,29 @@ def _watcher_port_open(
         return False
 
 
+def _watcher_ws_health(
+    host: str = "127.0.0.1", port: int = 8081, timeout: float = 0.35
+) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=timeout) as sock:
+            sock.settimeout(timeout)
+            request = (
+                "GET /ws HTTP/1.1\r\n"
+                f"Host: {host}:{port}\r\n"
+                "Upgrade: websocket\r\n"
+                "Connection: Upgrade\r\n"
+                "Sec-WebSocket-Key: x3JJHMbDL1EzLkh9GBhXDw==\r\n"
+                "Sec-WebSocket-Version: 13\r\n\r\n"
+            )
+            sock.sendall(request.encode("utf-8"))
+            response = sock.recv(1024)
+            return response.startswith(b"HTTP/1.1 101")
+    except OSError:
+        return False
+    except Exception:
+        return False
+
+
 def build_external_watcher_status(
     project_root: str | Path | None = None,
     *,
@@ -86,6 +119,7 @@ def build_external_watcher_status(
             continue
 
     port_open = _watcher_port_open(host=host, port=port)
+    ws_handshake_ok = _watcher_ws_health(host=host, port=port)
     running = bool(process_info or port_open)
     started_at = process_info.get("create_time") if process_info else None
     return {
@@ -96,6 +130,8 @@ def build_external_watcher_status(
         "mode": "external",
         "port": port,
         "port_open": port_open,
+        "ws_health": ws_handshake_ok,
+        "watcher_url": f"ws://{host}:{port}/ws",
     }
 
 

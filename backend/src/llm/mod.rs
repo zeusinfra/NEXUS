@@ -1,4 +1,9 @@
-use crate::{events::{SystemEvent, RiskLevel}, state::AppState, execution::risk::RiskClassifier, execution::graph::TaskStatus};
+use crate::{
+    events::{RiskLevel, SystemEvent},
+    execution::graph::{EvidenceRecord, TaskStatus},
+    execution::risk::RiskClassifier,
+    state::AppState,
+};
 use async_stream::stream;
 use futures::Stream;
 use std::sync::Arc;
@@ -49,9 +54,15 @@ impl LlmRouter {
                     state.approvals.request_approval(&request_id, &command, risk);
                     yield "\n⛔ Comando perigoso — aprovação solicitada na GUI.\n".to_string();
                     // Evidence: we record the approval request itself
-                    let _ = state.task_graph.record_evidence(
-                        &task_id, "approval_requested", Some(&command), None, None, None, "pending",
-                    ).await;
+                    let _ = state.task_graph.record_evidence(EvidenceRecord {
+                        task_id: &task_id,
+                        action_type: "approval_requested",
+                        command: Some(&command),
+                        stdout: None,
+                        diff: None,
+                        evidence_path: None,
+                        status: "pending",
+                    }).await;
                     return;
                 }
 
@@ -63,9 +74,15 @@ impl LlmRouter {
                     Ok((exit_code, stdout)) => {
                         // 5. Record execution evidence
                         let status_str = if exit_code == 0 { "success" } else { "failed" };
-                        let _ = state.task_graph.record_evidence(
-                            &task_id, "command", Some(&command), Some(&stdout), None, None, status_str,
-                        ).await;
+                        let _ = state.task_graph.record_evidence(EvidenceRecord {
+                            task_id: &task_id,
+                            action_type: "command",
+                            command: Some(&command),
+                            stdout: Some(&stdout),
+                            diff: None,
+                            evidence_path: None,
+                            status: status_str,
+                        }).await;
 
                         // 6. Emit evidence event to GUI
                         let _ = state.event_bus.publish(SystemEvent::EvidenceGenerated {
@@ -82,9 +99,15 @@ impl LlmRouter {
                         match test_result {
                             Ok((test_exit, test_out)) => {
                                 let test_status = if test_exit == 0 { "success" } else { "failed" };
-                                let _ = state.task_graph.record_evidence(
-                                    &task_id, "test", Some("cargo check"), Some(&test_out), None, None, test_status,
-                                ).await;
+                                let _ = state.task_graph.record_evidence(EvidenceRecord {
+                                    task_id: &task_id,
+                                    action_type: "test",
+                                    command: Some("cargo check"),
+                                    stdout: Some(&test_out),
+                                    diff: None,
+                                    evidence_path: None,
+                                    status: test_status,
+                                }).await;
                                 let _ = state.event_bus.publish(SystemEvent::EvidenceGenerated {
                                     task_id: task_id.clone(),
                                     evidence_type: "test".to_string(),
@@ -94,9 +117,15 @@ impl LlmRouter {
                                 });
                             }
                             Err(e) => {
-                                let _ = state.task_graph.record_evidence(
-                                    &task_id, "test", Some("cargo check"), Some(&e), None, None, "failed",
-                                ).await;
+                                let _ = state.task_graph.record_evidence(EvidenceRecord {
+                                    task_id: &task_id,
+                                    action_type: "test",
+                                    command: Some("cargo check"),
+                                    stdout: Some(&e),
+                                    diff: None,
+                                    evidence_path: None,
+                                    status: "failed",
+                                }).await;
                             }
                         }
 
@@ -112,9 +141,15 @@ impl LlmRouter {
                         yield summary;
                     }
                     Err(e) => {
-                        let _ = state.task_graph.record_evidence(
-                            &task_id, "command", Some(&command), Some(&e), None, None, "failed",
-                        ).await;
+                        let _ = state.task_graph.record_evidence(EvidenceRecord {
+                            task_id: &task_id,
+                            action_type: "command",
+                            command: Some(&command),
+                            stdout: Some(&e),
+                            diff: None,
+                            evidence_path: None,
+                            status: "failed",
+                        }).await;
                         let _ = state.task_graph.transition_task(&task_id, TaskStatus::Failed).await;
                         yield format!("\n❌ Falha na execução: {}\n", e);
                     }

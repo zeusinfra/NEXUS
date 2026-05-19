@@ -1,6 +1,6 @@
 use dashmap::DashMap;
-use std::sync::Arc;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentState {
@@ -42,5 +42,12 @@ impl AppState {
             patcher,
             test_runner,
         }
+    }
+
+    pub fn mark_bootstrap(&self) {
+        self.system_metrics
+            .insert("backend_state".to_string(), "bootstrapped".to_string());
+        let _ = self.active_agents.len();
+        let _ = self.db.pool.size();
     }
 }

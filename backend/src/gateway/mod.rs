@@ -1,13 +1,16 @@
-use crate::{events::SystemEvent, state::AppState, llm::LlmRouter};
+use crate::{events::SystemEvent, llm::LlmRouter, state::AppState};
 use axum::{
-    extract::{ws::{Message, WebSocket, WebSocketUpgrade}, State},
+    extract::{
+        ws::{Message, WebSocket, WebSocketUpgrade},
+        State,
+    },
     response::IntoResponse,
     routing::{get, post},
-    Router, Json,
+    Json, Router,
 };
 use futures::{sink::SinkExt, stream::StreamExt};
-use std::sync::Arc;
 use serde::Deserialize;
+use std::sync::Arc;
 
 #[derive(Deserialize)]
 pub struct ApprovalPayload {
@@ -20,11 +23,18 @@ pub struct RollbackPayload {
     pub backup_path: String,
 }
 
+#[derive(Deserialize)]
+pub struct PatchPayload {
+    pub relative_path: String,
+    pub content: String,
+}
+
 pub fn router(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/ws", get(ws_handler))
         .route("/api/approve", post(approve_handler))
         .route("/api/deny", post(deny_handler))
+        .route("/api/patch", post(patch_handler))
         .route("/api/rollback", post(rollback_handler))
         .with_state(state)
 }
@@ -54,13 +64,34 @@ async fn deny_handler(
     (axum::http::StatusCode::OK, "Denied")
 }
 
+async fn patch_handler(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<PatchPayload>,
+) -> impl IntoResponse {
+    match state
+        .patcher
+        .apply_patch(&payload.relative_path, &payload.content)
+        .await
+    {
+        Ok(diff) => (axum::http::StatusCode::OK, diff),
+        Err(error) => (axum::http::StatusCode::BAD_REQUEST, error),
+    }
+}
+
 async fn rollback_handler(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<RollbackPayload>,
 ) -> impl IntoResponse {
-    match state.patcher.rollback(&payload.relative_path, &payload.backup_path).await {
+    match state
+        .patcher
+        .rollback(&payload.relative_path, &payload.backup_path)
+        .await
+    {
         Ok(_) => (axum::http::StatusCode::OK, "Rollback successful"),
-        Err(_) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, "Rollback failed"),
+        Err(_) => (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "Rollback failed",
+        ),
     }
 }
 
@@ -98,10 +129,12 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
             pin_mut!(stream);
 
             while let Some(chunk) = stream.next().await {
-                let _ = state_recv.event_bus.publish(SystemEvent::MessageStreamChunk {
-                    id: "ws_stream".to_string(),
-                    chunk,
-                });
+                let _ = state_recv
+                    .event_bus
+                    .publish(SystemEvent::MessageStreamChunk {
+                        id: "ws_stream".to_string(),
+                        chunk,
+                    });
             }
         }
     });

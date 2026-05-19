@@ -1786,7 +1786,9 @@ def _build_operational_capabilities() -> dict:
         if item.strip()
     ]
     root_daemon_socket = os.getenv("NEXUS_DAEMON_SOCKET", "/tmp/nexus/daemon.sock")
-    root_daemon_enabled = _env_flag("NEXUS_ROOT_DAEMON_ENABLED", "0")
+    root_daemon_enabled_env = _env_flag("NEXUS_ROOT_DAEMON_ENABLED", "0")
+    root_daemon_socket_exists = os.path.exists(root_daemon_socket)
+    root_daemon_enabled = root_daemon_enabled_env or root_daemon_socket_exists
     return {
         "feedback": {
             "agent_progress_events": _env_flag("NEXUS_AGENT_PROGRESS_EVENTS", "1"),
@@ -1818,9 +1820,11 @@ def _build_operational_capabilities() -> dict:
             "allowed_edit_paths": allowed_edit_paths,
         },
         "privileged": {
+            "root_daemon_enabled_env": root_daemon_enabled_env,
             "root_daemon_enabled": root_daemon_enabled,
+            "root_daemon_status": "online" if root_daemon_socket_exists else "offline",
             "socket": root_daemon_socket,
-            "socket_exists": os.path.exists(root_daemon_socket),
+            "socket_exists": root_daemon_socket_exists,
             "approval_gates": True,
         },
         "sensors": {

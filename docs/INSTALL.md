@@ -15,9 +15,17 @@ Debian-based distributions.
 Launch the Rust/Iced conversational GUI from the repository root:
 
 ```bash
-cd nexus-iced
-cargo run
+./bin/nexus
 ```
+
+In repository mode the launcher can fall back to `cargo run --release` for Rust
+components when compiled binaries are not present. In the Debian package, the
+launcher uses compiled binaries from `/usr/lib/nexus/bin`.
+
+The canonical runtime backend for development and deployment is Python FastAPI in
+`apps/web_gui.py`. The `backend/` Rust/Axum directory is an experimental lab
+project for future backend migration and is not required for the standard
+repository or Debian runtime.
 
 The local LLM path uses an existing Ollama installation. NEXUS detects the
 binary, checks `http://localhost:11434/api/tags`, lists already downloaded
@@ -79,6 +87,9 @@ The package installs:
 
 - `/usr/bin/nexus`
 - `/usr/lib/nexus/`
+- `/usr/lib/nexus/bin/nexus-iced`
+- `/usr/lib/nexus/bin/watcher_rs`
+- `/usr/lib/nexus/bin/memory_service`
 - `/etc/nexus/config.toml`
 - `/etc/nexus/nexus.env`
 - `/var/lib/nexus/`
@@ -87,4 +98,5 @@ The package installs:
 
 Secrets belong in `/etc/nexus/nexus.env`, not in source code.
 
-Architecture overview: [FLOWCHART.md](FLOWCHART.md).
+Runtime details: [RUNTIME.md](RUNTIME.md). Architecture overview:
+[FLOWCHART.md](FLOWCHART.md).

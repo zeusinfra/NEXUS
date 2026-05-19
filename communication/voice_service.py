@@ -50,9 +50,29 @@ DEFAULT_PIPER_MODEL = os.getenv(
 ).strip()
 
 
+def default_tts_model_dir() -> Path:
+    explicit = os.getenv("NEXUS_TTS_MODEL_DIR")
+    if explicit:
+        return Path(explicit).expanduser()
+
+    runtime_dir = os.getenv("NEXUS_RUNTIME_DIR")
+    if runtime_dir:
+        return Path(runtime_dir).expanduser() / "models" / "tts"
+
+    if PROJECT_ROOT == Path("/usr/lib/nexus"):
+        state_home = Path(
+            os.getenv("XDG_STATE_HOME", str(Path.home() / ".local" / "state"))
+        )
+        return state_home / "nexus" / "models" / "tts"
+
+    return PROJECT_ROOT / "models" / "tts"
+
+
 class VoiceService:
-    def __init__(self, model_dir: str = "models/tts"):
-        self.model_dir = Path(model_dir)
+    def __init__(self, model_dir: str | None = None):
+        self.model_dir = (
+            Path(model_dir).expanduser() if model_dir else default_tts_model_dir()
+        )
         if not self.model_dir.is_absolute():
             self.model_dir = PROJECT_ROOT / self.model_dir
         self.model_path = self.model_dir / "kokoro-v1.0.onnx"

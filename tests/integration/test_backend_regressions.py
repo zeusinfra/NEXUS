@@ -16,6 +16,8 @@ from nexus_core.health_status import (
     check_memory_service,
 )
 from nexus_core.memory_manager import MemoryManager
+from nexus_core.vector_memory import VectorMemory
+from nexus_core.actions import system_capabilities
 from pattern_engine import PatternEngine
 from apps import web_gui
 
@@ -123,7 +125,53 @@ class BackendRegressionTests(unittest.TestCase):
 
         self.assertEqual(status["status"], "online")
         self.assertEqual(status["url"], "http://127.0.0.1:8085/health")
+        self.assertFalse(status.get("fallback_active"))
+        self.assertIsNone(status.get("fallback_mode"))
         get.assert_called_once()
+
+    def test_memory_service_health_reports_fallback_active_when_offline(self):
+        with patch("nexus_core.health_status.requests.get", side_effect=Exception("connect refused")):
+            status = check_memory_service()
+
+        self.assertEqual(status["status"], "offline")
+        self.assertEqual(status["url"], "http://127.0.0.1:8085/health")
+        self.assertTrue(status["fallback_active"])
+        self.assertEqual(status["fallback_mode"], "python-local")
+
+    def test_external_watcher_status_reports_websocket_handshake(self):
+        with patch("nexus_core.health_status.psutil.process_iter", return_value=[]):
+            with patch(
+                "nexus_core.health_status._watcher_port_open", return_value=True
+            ):
+                with patch(
+                    "nexus_core.health_status._watcher_ws_health", return_value=True
+                ):
+                    status = build_external_watcher_status("/repo", port=8081)
+
+        self.assertEqual(status["status"], "online")
+        self.assertTrue(status["ws_health"])
+        self.assertEqual(status["port"], 8081)
+
+    def test_vector_memory_uses_memory_service_env_or_default_port(self):
+        with patch.dict(os.environ, {}, clear=True):
+            vm = VectorMemory(storage_file="/tmp/vm.bin")
+            self.assertEqual(vm.service_url, "http://127.0.0.1:8085")
+
+        with patch.dict(
+            os.environ,
+            {"NEXUS_MEMORY_SERVICE_URL": "http://127.0.0.1:8085"},
+            clear=True,
+        ):
+            vm = VectorMemory(storage_file="/tmp/vm.bin")
+            self.assertEqual(vm.service_url, "http://127.0.0.1:8085")
+
+    def test_root_daemon_enabled_uses_socket_presence(self):
+        with patch("nexus_core.actions.Path.exists", return_value=True):
+            status = system_capabilities({})
+
+        self.assertTrue(status["privileged_actions"]["root_daemon_enabled"])
+        self.assertTrue(status["privileged_actions"]["socket_exists"])
+        self.assertEqual(status["privileged_actions"]["root_daemon_status"], "online")
 
     def test_watcher_status_reports_offline_without_process(self):
         status = build_watcher_status(None, None, None)

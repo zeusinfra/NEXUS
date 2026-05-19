@@ -3,6 +3,10 @@ __pycache__/
 .ruff_cache/
 .pytest_cache/
 
+# Build/package outputs
+dist/
+*.deb
+
 # Virtual env (keep local; do not commit)
 .venv/
 
@@ -38,8 +42,15 @@ configs/serviceAccountKey.json
 # Local Data / DB
 data/
 *.db
+*.db-shm
+*.db-wal
+*.db-journal
 *.sqlite
 *.sqlite3
+backend/*.db-shm
+backend/*.db-wal
+test_db/
+memory/long_term.json
 models/tts/*.onnx
 models/tts/*.bin
 test_audio.wav
