@@ -8,7 +8,7 @@ name = "nexus_security"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-pyo3 = { version = "0.24.1", features = ["auto-initialize"] }
+pyo3 = { version = "0.28.3", features = ["auto-initialize"] }
 regex = "1.10"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
