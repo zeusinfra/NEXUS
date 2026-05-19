@@ -162,7 +162,7 @@ Zeus Protocol maintains strict standards for autonomy and security.
 ## 🌐 Connect with Zeus Protocol
 
 *   **Official Website**: [zeusprotocol.cloud](https://zeusprotocol.cloud)
-*   **Developer Documentation**: [docs.zeusprotocol.cloud](https://zeusprotocol.cloud/docs)
+*   **Developer Documentation**: [docs.zeusprotocol.cloud](https://zeusprotocol.cloud/)
 *   **Support & Enterprise Inquiry**: WhatsApp +55 (12) 98247-4095
 
 ---
